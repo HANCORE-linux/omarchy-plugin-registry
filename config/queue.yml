@@ -14,7 +14,8 @@ default: &default
       threads: 3
       processes: <%= ENV.fetch("JOB_CONCURRENCY", 1) %>
       polling_interval: 1
-    - queues: "*"
+    # Explicit list — a wildcard would let long AI reviews starve mail delivery
+    - queues: [ default, mailers, active_storage_analysis, active_storage_purge ]
       threads: 2
       processes: 1
       polling_interval: 1

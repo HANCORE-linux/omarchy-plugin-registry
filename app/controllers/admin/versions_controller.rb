@@ -7,8 +7,9 @@ module Admin
     def show
       @plugin = @version.plugin
       @tarball = Registry::TarballInspector.inspect_bytes(@version.tarball.download) if @version.tarball.attached?
-      previous = @plugin.versions.where(state: [ :published, :yanked ]).where.not(id: @version.id)
-        .order(version_sort_key: :desc).first
+      # Same baseline definition the pipeline used — the human sees the same
+      # comparison the machine made
+      previous = @version.review_baseline
       if previous&.tarball&.attached?
         @previous = previous
         previous_tarball = Registry::TarballInspector.inspect_bytes(previous.tarball.download)

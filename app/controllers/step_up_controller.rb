@@ -7,13 +7,23 @@ class StepUpController < ApplicationController
   def show
   end
 
-  # TOTP path
+  # TOTP path. Failures burn a per-SESSION budget (IP rotation doesn't reset
+  # it); exhausting it kills the session outright.
+  MAX_SESSION_FAILURES = 5
+
   def create
     if Current.user.verify_otp(params[:code])
+      Current.session.update!(step_up_failures: 0)
       mark_second_factor_verified!
       redirect_to session.delete(:after_step_up) || dashboard_path, notice: "Verified."
     else
-      redirect_to step_up_path, alert: "That code didn't match."
+      Current.session.increment!(:step_up_failures)
+      if Current.session.step_up_failures >= MAX_SESSION_FAILURES
+        terminate_session
+        redirect_to new_session_path, alert: "Too many failed attempts — sign in again."
+      else
+        redirect_to step_up_path, alert: "That code didn't match."
+      end
     end
   end
 

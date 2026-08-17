@@ -22,11 +22,17 @@ module Registry
       keybindings = false
       dynamic_exec_sites = Set.new
       dynamic_network_sites = Set.new
+      shell_digests = Set.new
 
       @tarball.contents.each do |path, content|
         ext = File.extname(path).downcase
         shebang = ext.empty? && content.byteslice(0, 2) == "#!"
-        next unless CODE_EXTENSIONS.include?(ext) || shebang
+        # Executable QML smuggled into ANY file (Loader can point at .txt) is
+        # still fingerprinted — extension is a hint, not a boundary.
+        smuggled_code = !CODE_EXTENSIONS.include?(ext) && !shebang &&
+          content.byteslice(0, Registry::TarballInspector::MAX_SCAN_BYTES).to_s
+            .match?(/Process\s*\{|command:|bar\.run|execDetached|createQmlObject/)
+        next unless CODE_EXTENSIONS.include?(ext) || shebang || smuggled_code
         text = content.dup.force_encoding(Encoding::UTF_8)
         text = text.scrub unless text.valid_encoding?
 
@@ -47,6 +53,9 @@ module Registry
         # call, or a change to an existing one, is growth even when the
         # baseline already had one.
         [
+          /Qt\.createQmlObject\s*\([^\n]{0,160}/,
+          /Qt\.createComponent\s*\(\s*(?!["'])[^\n]{0,160}/,
+          /\bsetSource\s*\([^\n]{0,160}/,
           /command:\s*(?!\[\s*["'])[a-zA-Z_\[][^\n]{0,160}/,
           /command:\s*\[\s*["'](?:\/[\w\/]*\/)?(?:#{SHELL_INTERPRETERS.join('|')})["']\s*,\s*["']-c["']\s*,\s*(?!["'])[^\n]{0,160}/,
           /\b(?:bar\.run|execDetached|startDetached)\s*\(\s*(?!["'])(?!\[\s*["'])[^\n]{0,160}/
@@ -64,6 +73,9 @@ module Registry
         # commands behind `;`, `&&`, `||`, `|`, control flow, env-var prefixes,
         # and command substitution all join the fingerprint.
         if %w[.sh .bash].include?(ext) || shebang
+          # A shell script is an opaque program: ANY content change (arguments,
+          # URLs, flags — not just command names) is a capability change.
+          shell_digests << "#{path}##{Digest::SHA256.hexdigest(content).first(12)}"
           text.each_line do |line|
             next if line.strip.start_with?("#")
             line.split(/;|&&|\|\||\|/).each do |segment|
@@ -100,6 +112,7 @@ module Registry
         "paths" => capped(paths.sort, 200),
         "writes" => capped(writes.sort, 200),
         "keybindings" => keybindings,
+        "shell_digests" => shell_digests.sort,
         "dynamic_exec" => dynamic_exec_sites.sort,
         "dynamic_network" => dynamic_network_sites.sort
       }
@@ -153,7 +166,7 @@ module Registry
         additions.concat(added.map { |item| "+#{dimension.singularize}: #{item}" })
       end
       additions << "+keybindings" if current["keybindings"] && !previous["keybindings"]
-      %w[dynamic_exec dynamic_network].each do |dimension|
+      %w[shell_digests dynamic_exec dynamic_network].each do |dimension|
         added = Array(current[dimension]) - Array(previous[dimension])
         # Legacy boolean fingerprints compare as arrays after Array(); a true
         # baseline becomes [true] and any site list differs, forcing one

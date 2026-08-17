@@ -29,6 +29,18 @@ class PluginVersion < ApplicationRecord
   # deliberately excluded: nothing publishes before the review pipeline ran.
   def releasable? = held? || quarantined?
 
+  # THE capability baseline, shared by the pipeline and the admin inspection
+  # page: the highest-versioned sibling that cleared review (published, held,
+  # yanked, or quarantined-after-publish). One definition — the human must see
+  # the same comparison the machine made.
+  def review_baseline
+    plugin.versions.where.not(id: id)
+      .where("state IN (:cleared) OR (state = :quarantined AND published_at IS NOT NULL)",
+        cleared: [ self.class.states[:published], self.class.states[:held], self.class.states[:yanked] ],
+        quarantined: self.class.states[:quarantined])
+      .order(version_sort_key: :desc).first
+  end
+
   def yank!(reason:, actor:)
     transaction do
       update!(state: :yanked, yanked_at: Time.current, yank_reason: reason)

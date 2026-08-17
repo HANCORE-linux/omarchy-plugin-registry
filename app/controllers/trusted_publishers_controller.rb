@@ -1,6 +1,9 @@
 class TrustedPublishersController < ApplicationController
   before_action :require_recent_second_factor
   before_action :require_no_sensitive_cooldown, only: :create
+  # Each registration performs a GitHub API lookup — quota it
+  rate_limit to: 10, within: 1.hour, only: :create,
+    with: -> { redirect_to dashboard_path, alert: "Too many registrations — try again later." }
 
   def create
     publisher = Current.user.publishers.find_by!(name: params[:publisher_name])

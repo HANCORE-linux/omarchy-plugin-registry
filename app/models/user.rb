@@ -31,9 +31,11 @@ class User < ApplicationRecord
   # per account (on top of the per-IP throttle) against email bombing —
   # returns nil when throttled and sends nothing.
   def send_login_code
-    return nil if login_codes.where(created_at: 1.hour.ago..).count >= MAX_LOGIN_CODES_PER_HOUR
-    login_codes.active.update_all(consumed_at: Time.current)
-    login_codes.create!.tap { |code| LoginCodeMailer.sign_in_code(code).deliver_later }
+    with_lock do
+      return nil if login_codes.where(created_at: 1.hour.ago..).count >= MAX_LOGIN_CODES_PER_HOUR
+      login_codes.active.update_all(consumed_at: Time.current)
+      login_codes.create!.tap { |code| LoginCodeMailer.sign_in_code(code).deliver_later }
+    end
   end
 
   # Atomic one-shot redemption: the UPDATE both finds and consumes the code in

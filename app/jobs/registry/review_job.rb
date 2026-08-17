@@ -24,11 +24,7 @@ module Registry
       # versions: a takedown must not erase the baseline and let the next
       # submission inherit a smaller comparison surface.
       fingerprint = CapabilityFingerprint.compute(tarball)
-      previous = plugin.versions.where.not(id: version.id)
-        .where("state IN (:cleared) OR (state = :quarantined AND published_at IS NOT NULL)",
-          cleared: [ PluginVersion.states[:published], PluginVersion.states[:held], PluginVersion.states[:yanked] ],
-          quarantined: PluginVersion.states[:quarantined])
-        .order(version_sort_key: :desc).first
+      previous = version.review_baseline
       growth = CapabilityFingerprint.growth(previous&.capability_fingerprint, fingerprint)
 
       # 3. AI review (escalate-only) — updates carry the file-level diff so the
