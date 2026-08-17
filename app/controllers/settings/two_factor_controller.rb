@@ -19,10 +19,13 @@ module Settings
     # Confirm enrollment with a code from the authenticator
     def update
       @user = Current.user
+      # Capture BEFORE verification marks — mark_second_factor_verified!
+      # clears the recovery flag, and the cooldown decision must not miss that
+      was_recovery = @user.recovery_requested_at.present?
       if (codes = @user.enable_otp!(params[:code]))
         mark_second_factor_verified!
         apply_first_factor_cooldown(@user) unless @user.passkeys.exists?
-        @user.update!(recovery_requested_at: nil, sensitive_change_at: Time.current) if @user.recovery_requested_at
+        @user.update!(recovery_requested_at: nil, sensitive_change_at: Time.current) if was_recovery
         flash[:backup_codes] = codes
         redirect_to settings_two_factor_path, notice: "Two-factor authentication enabled. Save your backup codes now — this is the only time they're shown."
       else

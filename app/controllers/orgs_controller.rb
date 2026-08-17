@@ -1,6 +1,6 @@
 class OrgsController < ApplicationController
   before_action :require_recent_second_factor, only: %i[invite_member remove_member]
-  before_action :require_no_sensitive_cooldown, only: :invite_member
+  before_action :require_no_sensitive_cooldown, only: %i[invite_member remove_member]
   # Namespaces are first-claim and burned forever. The durable control is a
   # per-ACCOUNT ledger (founding org memberships), not a rotatable IP limit.
   MAX_ORGS_PER_WEEK = 3
@@ -44,6 +44,7 @@ class OrgsController < ApplicationController
   def invite_member
     publisher = Publisher.org.find(params[:id])
     return head :forbidden unless Current.user.owner_of?(publisher)
+    return roster_cooldown! unless roster_authority?(publisher)
 
     user = User.find_by(email_address: params[:email_address].to_s.strip.downcase)
     if user && !publisher.memberships.exists?(user:)
@@ -59,6 +60,7 @@ class OrgsController < ApplicationController
   def remove_member
     publisher = Publisher.org.find(params[:id])
     return head :forbidden unless Current.user.owner_of?(publisher)
+    return roster_cooldown! unless roster_authority?(publisher)
 
     membership = publisher.memberships.find(params[:membership_id])
     # Only ACCEPTED owners count — a pending invitation is a maybe, and the
@@ -74,5 +76,20 @@ class OrgsController < ApplicationController
         metadata: { member: membership.user.email_address })
     end
     redirect_to dashboard_path, notice: "Removed #{membership.user.name || membership.user.email_address} from #{publisher.name}; their tokens for this namespace are revoked."
+  end
+
+  private
+
+  # Roster AUTHORITY has the same cooldown as publishing: a just-accepted
+  # owner cannot immediately reshape the roster (add allies, remove the
+  # founder) — that's the takeover playbook.
+  def roster_authority?(publisher)
+    acting = Current.user.memberships.accepted.find_by(publisher: publisher)
+    acting.present? && (acting.founding? || acting.accepted_at <= User::PUBLISH_COOLDOWN.ago)
+  end
+
+  def roster_cooldown!
+    redirect_to dashboard_path,
+      alert: "New owners wait #{User::PUBLISH_COOLDOWN.inspect} before managing the roster."
   end
 end

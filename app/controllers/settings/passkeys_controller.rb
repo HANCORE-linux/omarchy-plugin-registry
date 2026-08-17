@@ -32,6 +32,8 @@ module Settings
         nickname: params[:nickname].presence || "Passkey"
       )
       AuditEvent.record!(actor: Current.user, action: "passkey.register", subject: Current.user)
+      # Capture BEFORE verification marks (which clear the recovery flag)
+      was_recovery = Current.user.recovery_requested_at.present?
       # Only FIRST enrollment bootstraps verification; adding a factor later
       # required step-up already and must not extend it via registration.
       if Current.user.passkeys.count == 1 && !Current.user.otp_enabled?
@@ -41,7 +43,7 @@ module Settings
       # Recovery-based enrollment closes the recovery window and applies the
       # full sensitive-change cooldown — a 72-hour hijack can't mint anything
       # for another cooldown period after it lands
-      if Current.user.recovery_requested_at
+      if was_recovery
         Current.user.update!(recovery_requested_at: nil, sensitive_change_at: Time.current)
       end
       render json: { ok: true }

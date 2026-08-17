@@ -99,9 +99,9 @@ module DataPlane
     def write_plugin_index(plugin)
       lines = [ JSON.generate({ "meta" => true }.merge(freshness(INDEX_TTL))) ]
       plugin.versions.where(state: [ :published, :yanked ]).order(:version_sort_key).each do |v|
-        # A published version whose bytes are unrecoverable must not be
-        # promised by a freshly signed index — flag it loudly instead.
-        if v.published? && !DataPlane.root.join(v.tarball_path).exist?
+        # ANY version whose bytes are unrecoverable must not be promised by a
+        # freshly signed index — flag it loudly instead.
+        if !DataPlane.root.join(v.tarball_path).exist?
           Rails.logger.error("[DataPlane] #{v.tarball_path} unrecoverable — omitted from signed index")
           AuditEvent.record!(action: "version.artifact_unrecoverable", subject: v,
             metadata: { plugin: plugin.full_name, version: v.version })

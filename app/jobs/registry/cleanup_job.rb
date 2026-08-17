@@ -32,6 +32,7 @@ module Registry
         version.tarball.purge if version.tarball.attached?
         AuditEvent.record!(action: "version.quarantine_expired", subject: version, public: true,
           metadata: { plugin: version.plugin.full_name, version: version.version })
+        version.plugin.revert_to_placeholder_if_orphaned_seed!
       end
     end
 
