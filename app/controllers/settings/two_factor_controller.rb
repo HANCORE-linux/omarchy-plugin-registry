@@ -3,6 +3,8 @@ module Settings
     # Provisioning (show displays the new secret) and confirming TOTP next to
     # an existing factor both require step-up; first enrollment stays open.
     before_action :require_step_up_if_second_factor_enrolled
+    # TOTP secrets and one-time backup codes must never land in a shared cache
+    after_action { response.headers["Cache-Control"] = "no-store" }
 
     def show
       @user = Current.user

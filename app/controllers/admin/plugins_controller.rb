@@ -4,7 +4,10 @@ module Admin
 
     # Nuclear option after confirmed malware: burn the name, revoke everything.
     def security_hold
-      reason = params[:reason].presence || "malware"
+      unless params[:reason].present?
+        return redirect_to admin_root_path, alert: "A public reason is required to security-hold a plugin."
+      end
+      reason = params[:reason]
       ApplicationRecord.transaction do
         @plugin.update!(state: :security_holding, latest_version: nil)
         @plugin.versions.published.find_each { |v| v.yank!(reason:, actor: Current.user) }

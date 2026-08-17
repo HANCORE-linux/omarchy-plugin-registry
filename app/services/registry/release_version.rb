@@ -3,6 +3,12 @@ module Registry
   # mark published, regenerate the index. Reviewed bytes are executed bytes.
   class ReleaseVersion
     def self.call(version, actor: nil)
+      # All authorization gates re-run under the row lock so a concurrent
+      # takedown can't slip between check and publish
+      version.with_lock { locked_call(version, actor:) }
+    end
+
+    def self.locked_call(version, actor:)
       raise ArgumentError, "cannot release a #{version.state} version" unless version.releasable?
       if Revocation.exists?(plugin: version.plugin, version: version.version)
         raise ArgumentError, "version is on the kill list and can never be released"
@@ -37,5 +43,6 @@ module Registry
       DataPlane::RegenerateJob.perform_later(version.plugin)
       version
     end
+    private_class_method :locked_call
   end
 end

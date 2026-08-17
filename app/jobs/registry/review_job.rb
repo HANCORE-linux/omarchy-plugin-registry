@@ -20,11 +20,14 @@ module Registry
       findings = scanner.findings.map(&:as_json)
 
       # 2. Capability fingerprint + delta vs the last version that CLEARED
-      # review (published or waiting out its hold) — comparing only against
-      # published versions would let capabilities ratchet up unreviewed through
-      # a chain of versions submitted inside one hold window.
+      # review. The baseline includes yanked and once-published-quarantined
+      # versions: a takedown must not erase the baseline and let the next
+      # submission inherit a smaller comparison surface.
       fingerprint = CapabilityFingerprint.compute(tarball)
-      previous = plugin.versions.where(state: [ :published, :held ]).where.not(id: version.id)
+      previous = plugin.versions.where.not(id: version.id)
+        .where("state IN (:cleared) OR (state = :quarantined AND published_at IS NOT NULL)",
+          cleared: [ PluginVersion.states[:published], PluginVersion.states[:held], PluginVersion.states[:yanked] ],
+          quarantined: PluginVersion.states[:quarantined])
         .order(version_sort_key: :desc).first
       growth = CapabilityFingerprint.growth(previous&.capability_fingerprint, fingerprint)
 
@@ -83,11 +86,16 @@ module Registry
         review_notes: "auto-rejected: #{findings.select { |f| f['severity'] == 'fail' }.map { |f| f['detail'] }.join('; ').first(500)}")
       AuditEvent.record!(action: "version.auto_reject", subject: version, public: true,
         metadata: { plugin: version.plugin.full_name, version: version.version })
-      # Any plugin whose only history is rejection reverts to a visible
-      # placeholder — seeded or claimed alike — so a failed correction can be
-      # resubmitted through the same reactivation path.
+      # SEEDED plugins whose only history is rejection revert to a visible
+      # placeholder (the directory promised the catalog entry exists and is
+      # uninstallable). Ordinary rejected-only submissions stay active but
+      # simply drop out of directory_visible — a failed first attempt is not
+      # a public listing.
       plugin = version.plugin
-      if plugin.active? && plugin.versions.where.not(state: :rejected).none?
+      seed_user = User.find_by(email_address: SeedCatalog::SYSTEM_EMAIL)
+      seeded = !plugin.publisher.claimed? ||
+        (seed_user && plugin.versions.exists?(user_id: seed_user.id))
+      if seeded && plugin.active? && plugin.versions.where.not(state: :rejected).none?
         plugin.update!(state: :quarantined)
       end
     end

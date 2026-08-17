@@ -49,14 +49,33 @@ module Registry
       Result.new("flag", [ "ai review errored: #{e.message.first(200)}" ])
     end
 
+    MAX_OUTPUT_BYTES = 1.megabyte
+
+    # Bounded in time AND output, with the child reliably killed on timeout —
+    # stalled adapters must not accumulate as zombie processes.
     def self.run_command(command, stdin_data)
       require "open3"
-      output = nil
-      Timeout.timeout(TIMEOUT_SECONDS) do
-        output, status = Open3.capture2(command, stdin_data: stdin_data)
-        raise "reviewer exited #{status.exitstatus}" unless status.success?
+      Open3.popen2(command) do |stdin, stdout, wait_thread|
+        writer = Thread.new do
+          stdin.write(stdin_data)
+        rescue Errno::EPIPE
+          nil
+        ensure
+          stdin.close rescue nil
+        end
+        reader = Thread.new { stdout.read(MAX_OUTPUT_BYTES + 1) }
+
+        unless wait_thread.join(TIMEOUT_SECONDS)
+          Process.kill("KILL", wait_thread.pid) rescue nil
+          wait_thread.join(5)
+          raise "reviewer timed out after #{TIMEOUT_SECONDS}s"
+        end
+        writer.join(1)
+        output = reader.value.to_s
+        raise "reviewer output exceeds #{MAX_OUTPUT_BYTES} bytes" if output.bytesize > MAX_OUTPUT_BYTES
+        raise "reviewer exited #{wait_thread.value.exitstatus}" unless wait_thread.value.success?
+        output
       end
-      output
     end
   end
 end

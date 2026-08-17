@@ -14,4 +14,8 @@
     <% end %>
     <% if @events.empty? %><li><span class="muted">Nothing yet.</span></li><% end %>
   </ul>
+  <div class="form-inline" style="margin-top: 24px;">
+    <% if @page > 1 %><%= link_to "← Newer", audit_log_path(page: @page - 1), class: "button button--ghost button--small" %><% end %>
+    <% if @more %><%= link_to "Older →", audit_log_path(page: @page + 1), class: "button button--ghost button--small" %><% end %>
+  </div>
 </div>

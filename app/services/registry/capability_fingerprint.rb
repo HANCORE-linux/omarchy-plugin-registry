@@ -21,6 +21,7 @@ module Registry
       writes = Set.new
       keybindings = false
       dynamic_exec = false
+      dynamic_network = false
 
       @tarball.contents.each do |path, content|
         ext = File.extname(path).downcase
@@ -80,6 +81,11 @@ module Registry
         end
 
         text.scan(%r{https?://([a-z0-9.-]+\.[a-z]{2,}|\d{1,3}(?:\.\d{1,3}){3})}i) { |m| hosts << m[0].downcase }
+        # Network APIs with computed URLs can reach hosts no literal scan sees
+        dynamic_network ||= text.match?(/\bfetch\s*\(\s*(?!["'])\S/) ||
+          text.match?(/\.open\s*\(\s*["'][A-Z]+["']\s*,\s*(?!["'])/) ||
+          text.match?(/new\s+WebSocket\s*\(\s*(?!["'])/) ||
+          (text.match?(/XMLHttpRequest/) && !text.match?(/\.open\s*\(\s*["'][A-Z]+["']\s*,\s*["']/))
         text.scan(%r{["'](/(?:etc|usr|var|opt|home)[^"'\s]*)["']}) { |m| paths << m[0] }
         # Filesystem WRITES are their own dimension: redirections/tee/cp into
         # $HOME are exactly the capability an update must not gain silently.
@@ -93,7 +99,8 @@ module Registry
         "paths" => capped(paths.sort, 200),
         "writes" => capped(writes.sort, 200),
         "keybindings" => keybindings,
-        "dynamic_exec" => dynamic_exec
+        "dynamic_exec" => dynamic_exec,
+        "dynamic_network" => dynamic_network
       }
     end
 
@@ -130,6 +137,7 @@ module Registry
       end
       additions << "+keybindings" if current["keybindings"] && !previous["keybindings"]
       additions << "+dynamic_exec (non-literal process commands)" if current["dynamic_exec"] && !previous["dynamic_exec"]
+      additions << "+dynamic_network (computed request URLs)" if current["dynamic_network"] && !previous["dynamic_network"]
       additions
     end
 

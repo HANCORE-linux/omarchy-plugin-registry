@@ -6,6 +6,9 @@ class TrustedPublishersController < ApplicationController
     return redirect_to dashboard_path, alert: "Only namespace owners can register trusted publishers." unless Current.user.owner_of?(publisher)
 
     repository = params[:repository].to_s.strip
+    unless repository.match?(%r{\A[\w.-]+/[\w.-]+\z})
+      return redirect_to dashboard_path, alert: "Repository must look like owner/name."
+    end
     begin
       identity = Registry::GithubRepoLookup.identity_for(repository)
     rescue Registry::GithubRepoLookup::LookupError => e

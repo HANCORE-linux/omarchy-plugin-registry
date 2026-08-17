@@ -23,10 +23,14 @@ kill list especially.
 | `GET /dl/<publisher>/<name>/<name>-<version>.tar.gz` | Immutable tarball |
 
 **Freshness (rollback protection)**: every signed file carries
-`generated_at`/`expires_at`. Reject expired files — for `revocations.json`
-(regenerated every 10 minutes, 24h expiry) fail CLOSED: an expired kill list
-means the mirror is stale or rolled back, so treat installs/updates as blocked
-until a fresh one verifies.
+`generated_at`/`expires_at`. Two rules, both mandatory:
+
+1. Reject expired files. For `revocations.json` (regenerated every 10 minutes,
+   24h expiry) fail CLOSED: an expired kill list means the mirror is stale or
+   rolled back, so treat installs/updates as blocked until a fresh one verifies.
+2. **Monotonicity**: persist the last accepted `generated_at` per file and
+   reject anything older — a still-unexpired but older signed copy is a
+   rollback and must not replace a newer kill list.
 
 ## `omarchy plugin add <publisher>/<name>`
 
