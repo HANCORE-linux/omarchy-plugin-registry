@@ -18,19 +18,23 @@ class OnboardingController < ApplicationController
     return redirect_to dashboard_path if user.onboarded?
 
     display_name = params[:name].to_s.strip.presence || user.email_address.split("@").first
-    if user.personal_publisher.present?
-      user.update!(name: display_name)
-      return redirect_to dashboard_path, notice: "Welcome back."
-    end
-
     handle = params[:handle].to_s.downcase.strip
     publisher = Publisher.new(name: handle, kind: :personal)
 
+    # The one-namespace check runs under the user row lock — parallel repeat
+    # POSTs serialize, and only one can ever claim a personal namespace
+    already_claimed = false
     ApplicationRecord.transaction do
+      user.lock!
       user.update!(name: display_name)
-      publisher.save!
-      Membership.create!(publisher:, user:, role: :owner, founding: true)
+      if user.personal_publisher.present?
+        already_claimed = true
+      else
+        publisher.save!
+        Membership.create!(publisher:, user:, role: :owner, founding: true)
+      end
     end
+    return redirect_to dashboard_path, notice: "Welcome back." if already_claimed
     AuditEvent.record!(actor: user, action: "publisher.claim", subject: publisher, public: true,
       metadata: { name: publisher.name })
     redirect_to settings_two_factor_path, notice: "Namespace #{handle} is yours. Set up two-factor auth to publish."

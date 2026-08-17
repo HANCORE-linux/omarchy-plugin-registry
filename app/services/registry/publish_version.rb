@@ -183,6 +183,7 @@ module Registry
           license: tarball.manifest["license"],
           min_omarchy_version: tarball.manifest["minOmarchyVersion"],
           provenance: token&.provenance,
+          api_token: token,
           state: :processing
         )
         version.tarball.attach(

@@ -19,18 +19,33 @@ module DataPlane
     Rails.application.config.x.registry_base_url
   end
 
-  # Every index file gets a detached Ed25519 signature at <path>.sig. Both
-  # files are written atomically (tmp + rename), signature first: a reader can
-  # never see a torn file, and the worst transient pairing (fresh sig with the
-  # old content, or vice versa) FAILS verification — clients retry, never trust
-  # a mismatched pair. Cross-generation drift is prevented by serializing
-  # RegenerateJob (limits_concurrency).
+  # Every index file gets a detached Ed25519 signature at <path>.sig. The
+  # complete new content is STAGED first under a deterministic name, then the
+  # signature promotes, then the staged content renames into place. Readers
+  # never see a torn file, and a mismatched transient pairing FAILS
+  # verification — clients retry, never trust a mismatched pair. A crash
+  # between the two promotions leaves the staged content that the live sig
+  # covers, so heal_interrupted_write! can complete the promotion; genuine
+  # tamper has no matching staged content and stays fail-closed.
   def write(relative_path, content)
     path = root.join(relative_path)
     FileUtils.mkdir_p(path.dirname)
+    atomic_write("#{relative_path}.staged", content)
     atomic_write("#{relative_path}.sig", Signer.sign_base64(content))
-    atomic_write(relative_path, content)
+    File.rename(root.join("#{relative_path}.staged"), path)
     path
+  end
+
+  # Recovery from a write interrupted between sig and content promotion: if
+  # the live pair mismatches but the staged content verifies against the live
+  # sig, finish the rename. Anything else is left for the fail-closed checks.
+  def heal_interrupted_write!(relative_path)
+    path = root.join(relative_path)
+    signature = root.join("#{relative_path}.sig")
+    staged = root.join("#{relative_path}.staged")
+    return unless staged.exist? && signature.exist?
+    return if path.exist? && Signer.verify?(path.read, signature.read)
+    File.rename(staged, path) if Signer.verify?(staged.read, signature.read)
   end
 
   def atomic_write(relative_path, content)

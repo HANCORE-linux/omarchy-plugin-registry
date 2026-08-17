@@ -11,7 +11,9 @@ class PluginVersion < ApplicationRecord
   }
 
   belongs_to :plugin
-  belongs_to :user, optional: true # submitting principal; release re-checks it
+  belongs_to :user, optional: true
+  # The credential that carried the submission — release re-checks its liveness
+  belongs_to :api_token, optional: true # submitting principal; release re-checks it
   has_many :daily_downloads, dependent: :destroy
   has_one_attached :tarball
 

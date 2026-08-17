@@ -20,8 +20,9 @@ module DataPlane
       all
     end
 
-    def self.all
-      generator = new
+    # An externally supplied generator carries pre-imported orphan revocations
+    # (registry:import_revocations) into the SAME run that writes the kill list.
+    def self.all(generator = new)
       # Reconciliation FIRST: revocations recorded on the surviving data plane
       # are re-learned and ENFORCED before anything is signed, so every file
       # written below reflects post-takedown state.
@@ -131,6 +132,7 @@ module DataPlane
     # predates them (restored from an old backup) — fail closed for operator
     # recovery instead of signing a higher-generation index that drops them.
     def verify_index_continuity!(plugin, relative)
+      DataPlane.heal_interrupted_write!(relative)
       path = DataPlane.root.join(relative)
       signature = DataPlane.root.join("#{relative}.sig")
       return unless path.exist? || signature.exist?
@@ -143,7 +145,7 @@ module DataPlane
       unless Signer.verify?(content, signature.read)
         raise IndexContinuityError, "#{relative} signature does not verify"
       end
-      known = plugin.versions.pluck(:version).to_set
+      rows = plugin.versions.index_by(&:version)
       content.each_line do |line|
         entry = begin
           JSON.parse(line)
@@ -151,10 +153,22 @@ module DataPlane
           raise IndexContinuityError, "#{relative} is signed but malformed: #{e.message}"
         end
         next if entry["meta"]
-        unless known.include?(entry["vers"])
+        row = rows[entry["vers"]]
+        if row.nil?
           raise IndexContinuityError,
             "signed index for #{plugin.full_name} lists #{entry["vers"]} but the database doesn't know it — " \
             "restore a database that includes it (or deliberately remove the index pair) before regenerating"
+        end
+        # Signed state is MONOTONIC across restores: a yank never reverts, and
+        # a promised version never slides back to pre-publication limbo. Only
+        # deliberate post-publication takedowns (quarantine/reject of a
+        # once-published version) may drop an entry from the index.
+        if entry["yanked"] && row.published?
+          row.yank!(reason: "yank restored from signed index", actor: Registry::SeedCatalog.system_user)
+        elsif !row.published? && !row.yanked? && row.published_at.blank?
+          raise IndexContinuityError,
+            "signed index for #{plugin.full_name} promises #{entry["vers"]} but the database has it #{row.state} " \
+            "and never published — the database predates its publication; restore a newer backup"
         end
       end
     end
@@ -198,7 +212,8 @@ module DataPlane
     # on-disk revocation AND re-applies its effects: versions yank, whole-plugin
     # revocations security-hold, in-flight work stops, latest refreshes.
     def reconcile_disk_revocations!
-      @orphan_revocations = []
+      @orphan_revocations ||= []
+      DataPlane.heal_interrupted_write!("revocations.json")
       path = DataPlane.root.join("revocations.json")
       signature = DataPlane.root.join("revocations.json.sig")
       return unless path.exist? || signature.exist?

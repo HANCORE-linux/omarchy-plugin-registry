@@ -33,6 +33,20 @@ module Registry
         raise ArgumentError, "submitter can no longer publish (second factor or cooldown)" unless submitter.can_publish?
       end
 
+      # The credential that carried the submission must still be alive when a
+      # PIPELINE release fires: a token revoked during the hold window (stolen
+      # token killed, trusted-publisher registration removed — which revokes
+      # its minted tokens) quarantines the version for human review instead of
+      # shipping. An explicit admin approval of a quarantined version is a
+      # human override and skips this.
+      if version.held? && version.api_token&.revoked_at&.present?
+        version.update!(state: :quarantined, hold_until: nil,
+          review_notes: "#{version.review_notes} [submitting credential revoked during hold]".strip)
+        AuditEvent.record!(action: "version.credential_revoked", subject: version,
+          metadata: { plugin: version.plugin.full_name, version: version.version })
+        return version
+      end
+
       bytes = version.tarball.download
       raise "tarball checksum mismatch at release" unless Digest::SHA256.hexdigest(bytes) == version.sha256
 
