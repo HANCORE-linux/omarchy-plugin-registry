@@ -32,7 +32,8 @@ module Registry
         # still fingerprinted — extension is a hint, not a boundary.
         smuggled_code = !CODE_EXTENSIONS.include?(ext) && !shebang &&
           content.byteslice(0, Registry::TarballInspector::MAX_SCAN_BYTES).to_s
-            .match?(/Process\s*\{|command:|bar\.run|execDetached|createQmlObject/)
+            .match?(/Process\s*\{|command\s*[:=]|bar\.run|execDetached|createQmlObject|
+                     import\s+Qt|XMLHttpRequest|\bfetch\s*\(|WebSocket|Loader\s*\{|Qt\./x)
         next unless CODE_EXTENSIONS.include?(ext) || shebang || smuggled_code
         text = content.dup.force_encoding(Encoding::UTF_8)
         text = text.scrub unless text.valid_encoding?

@@ -25,6 +25,17 @@ class LoginCode < ApplicationRecord
     OpenSSL::HMAC.hexdigest("SHA256", key, plaintext.to_s)
   end
 
+  # The mailer runs through the persistent job queue — its arguments must
+  # carry only ciphertext, never the live code.
+  def self.delivery_encryptor
+    @delivery_encryptor ||= ActiveSupport::MessageEncryptor.new(
+      Rails.application.key_generator.generate_key("login_code_delivery", 32))
+  end
+
+  def self.encrypt_for_delivery(plaintext) = delivery_encryptor.encrypt_and_sign(plaintext, expires_in: 30.minutes)
+
+  def self.decrypt_for_delivery(ciphertext) = delivery_encryptor.decrypt_and_verify(ciphertext)
+
   scope :active, -> { where(consumed_at: nil).where(created_at: EXPIRATION.ago..) }
   scope :redeemable, -> { where(attempts: ...MAX_ATTEMPTS) }
 

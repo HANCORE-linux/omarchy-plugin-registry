@@ -38,7 +38,8 @@ class User < ApplicationRecord
       return nil if login_codes.where(created_at: 1.hour.ago..).count >= MAX_LOGIN_CODES_PER_HOUR
       login_codes.active.update_all(consumed_at: Time.current)
       login_codes.create!.tap do |record|
-        LoginCodeMailer.sign_in_code(email_address, record.plaintext_code).deliver_later
+        LoginCodeMailer.sign_in_code(email_address,
+          LoginCode.encrypt_for_delivery(record.plaintext_code)).deliver_later
       end
     end
   end

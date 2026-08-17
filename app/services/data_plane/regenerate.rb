@@ -11,9 +11,13 @@ module DataPlane
 
     def self.all
       generator = new
+      # Reconciliation FIRST: revocations recorded on the surviving data plane
+      # are re-learned and ENFORCED before anything is signed, so every file
+      # written below reflects post-takedown state.
+      generator.reconcile_disk_revocations!
       generator.write_config
-      generator.write_all_listing
       generator.write_revocations
+      generator.write_all_listing
       # Artifacts BEFORE indexes: a signed index must never promise a tarball
       # the data plane can't serve
       Plugin.find_each do |p|
@@ -121,19 +125,23 @@ module DataPlane
       DataPlane.write("all.json", JSON.generate({ "plugins" => plugins }.merge(freshness(INDEX_TTL))))
     end
 
-    # The kill list is append-critical: entries the on-disk (signed) file
-    # already carries are merged back INTO the database before writing. A
-    # database restored from a pre-revocation backup therefore re-learns every
-    # revocation from the surviving data plane instead of silently reviving
-    # malware with a fresh, higher generation.
+    # The kill list is append-critical: the union of database revocations and
+    # any orphan entries preserved from the on-disk file (plugins the restored
+    # database no longer knows still stay revoked — a signed revocation is
+    # never erased just because a backup predates its plugin row).
     def write_revocations
-      reimport_disk_revocations!
       entries = Revocation.includes(plugin: :publisher).order(:created_at).map(&:as_kill_list_entry)
+      known = entries.map { |e| [ e["plugin"], e["version"] ] }.to_set
+      orphans = (@orphan_revocations || []).reject { |e| known.include?([ e["plugin"], e["version"] ]) }
       DataPlane.write("revocations.json", JSON.pretty_generate(
-        { "schemaVersion" => 1, "revocations" => entries }.merge(freshness(REVOCATIONS_TTL))))
+        { "schemaVersion" => 1, "revocations" => entries + orphans }.merge(freshness(REVOCATIONS_TTL))))
     end
 
-    def reimport_disk_revocations!
+    # A database restored from a pre-revocation backup re-learns every signed
+    # on-disk revocation AND re-applies its effects: versions yank, whole-plugin
+    # revocations security-hold, in-flight work stops, latest refreshes.
+    def reconcile_disk_revocations!
+      @orphan_revocations = []
       path = DataPlane.root.join("revocations.json")
       return unless path.exist?
       content = path.read
@@ -145,14 +153,38 @@ module DataPlane
         next if known.include?([ entry["plugin"], entry["version"] ])
         publisher_name, plugin_name = entry["plugin"].to_s.split(".", 2)
         plugin = Plugin.joins(:publisher).find_by(publishers: { name: publisher_name }, name: plugin_name)
-        next if plugin.nil?
-        Revocation.create!(plugin:, version: entry["version"], reason: entry["reason"].presence || "restored from data plane",
+        if plugin.nil?
+          # The restored DB predates this plugin — its revocation survives in
+          # the kill list verbatim rather than being silently erased
+          @orphan_revocations << entry.slice("plugin", "version", "reason", "revoked_at")
+          next
+        end
+        reason = entry["reason"].presence || "restored from data plane"
+        Revocation.create!(plugin:, version: entry["version"], reason:,
           created_by: Registry::SeedCatalog.system_user)
+        enforce_revocation!(plugin, entry["version"], reason)
         AuditEvent.record!(action: "revocation.reimported", subject: plugin, public: true,
           metadata: { plugin: entry["plugin"], version: entry["version"] })
       end
     rescue JSON::ParserError
       nil
+    end
+
+    def enforce_revocation!(plugin, version_string, reason)
+      system_user = Registry::SeedCatalog.system_user
+      if version_string.present?
+        version = plugin.versions.find_by(version: version_string)
+        version.yank!(reason:, actor: system_user) if version&.published?
+        version.update!(state: :yanked, yanked_at: Time.current, yank_reason: reason) if version && !version.yanked? && !version.rejected?
+      else
+        plugin.update!(state: :security_holding, latest_version: nil)
+        plugin.versions.published.find_each { |v| v.yank!(reason:, actor: system_user) }
+        plugin.versions.where(state: [ :processing, :held, :quarantined ], published_at: nil)
+          .update_all(state: PluginVersion.states[:rejected], review_notes: "revocation restored: #{reason}")
+        plugin.versions.where(state: [ :processing, :held, :quarantined ]).where.not(published_at: nil)
+          .update_all(state: PluginVersion.states[:yanked], yanked_at: Time.current, yank_reason: reason)
+      end
+      plugin.refresh_latest_version!
     end
 
     private

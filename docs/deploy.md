@@ -11,7 +11,7 @@ to object storage behind a CDN. Installs never touch Rails.
 | `REGISTRY_SIGNING_SEED` | Base64 32-byte Ed25519 seed — signs every index file and the kill list. Generate: `ruby -red25519 -rbase64 -e 'puts Base64.strict_encode64(Ed25519::SigningKey.generate.seed)'`. **Custody per the governance page; losing it means re-pinning every client.** |
 | `REGISTRY_BASE_URL` | `https://plugins.omarchy.org` |
 | `SMTP_ADDRESS` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` | Login-code email delivery |
-| `AI_REVIEW_COMMAND` | Optional — enables LLM review in the pipeline (escalate-only). The command runs with a scrubbed environment (no app secrets); it should call a REMOTE model API with its own credentials, and for full isolation run it under a separate UID (systemd DynamicUser or a sidecar). |
+| `AI_REVIEW_COMMAND` | Optional — enables LLM review in the pipeline (escalate-only). The command runs with a scrubbed environment (no app secrets); it should call a REMOTE model API with its own credentials, and for full isolation run it under a separate UID (systemd DynamicUser or a sidecar). Note the adapter receives UNPUBLISHED submissions and previous source — treat its endpoint as a confidential-data processor. |
 
 ## Pieces
 
