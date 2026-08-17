@@ -61,3 +61,8 @@ group :test do
   gem "capybara"
   gem "selenium-webdriver"
 end
+
+# Registry
+gem "rotp"                      # TOTP MFA (publisher accounts)
+gem "rqrcode"                   # QR codes for TOTP enrollment
+gem "commonmarker"              # Readme rendering on plugin pages
