@@ -32,7 +32,7 @@ $ curl -X POST --data-binary @weather-1.0.0.tar.gz \
     <h2>The rules</h2>
     <ul>
       <li>Strict semver, always increasing. A used version number is burned forever, even if rejected.</li>
-      <li><code>license</code> (SPDX) is required. <code>repository</code> is optional but earns a verified-repo badge.</li>
+      <li><code>license</code> (SPDX) is required. <code>repository</code> is optional and shown on your plugin page — publishing via trusted publishing adds provenance links to the exact commit.</li>
       <li>No symlinks, no entry points outside the plugin directory, 10 MB max.</li>
       <li>Manifest <code>id</code> must equal <code>yourhandle.pluginname</code>.</li>
     </ul>

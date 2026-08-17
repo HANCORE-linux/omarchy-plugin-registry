@@ -83,10 +83,11 @@ module Registry
         review_notes: "auto-rejected: #{findings.select { |f| f['severity'] == 'fail' }.map { |f| f['detail'] }.join('; ').first(500)}")
       AuditEvent.record!(action: "version.auto_reject", subject: version, public: true,
         metadata: { plugin: version.plugin.full_name, version: version.version })
-      # A seeded plugin whose only history is rejection must stay visible as a
-      # placeholder (claim + corrected upload reactivates it)
+      # Any plugin whose only history is rejection reverts to a visible
+      # placeholder — seeded or claimed alike — so a failed correction can be
+      # resubmitted through the same reactivation path.
       plugin = version.plugin
-      if !plugin.publisher.claimed? && plugin.versions.where.not(state: :rejected).none?
+      if plugin.active? && plugin.versions.where.not(state: :rejected).none?
         plugin.update!(state: :quarantined)
       end
     end

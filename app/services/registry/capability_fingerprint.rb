@@ -48,11 +48,21 @@ module Registry
           processes << "#{interpreter} -c ##{Digest::SHA256.hexdigest(script).first(8)}"
         end
 
-        # Shell scripts: leading command words on each line
+        # Shell scripts: the first command of EVERY pipeline segment — commands
+        # hidden behind `;`, `&&`, `||`, `|`, control-flow keywords, env-var
+        # prefixes, and command substitution all join the fingerprint.
         if %w[.sh .bash].include?(File.extname(path).downcase)
           text.each_line do |line|
-            word = line.strip[/\A([a-z0-9_\-\.\/]+)/, 1]
-            processes << binary_name(word) if word && !SHELL_NOISE.include?(word)
+            next if line.strip.start_with?("#")
+            line.split(/;|&&|\|\||\|/).each do |segment|
+              word = segment.strip.split(/\s+/).find do |candidate|
+                !SHELL_NOISE.include?(candidate) && candidate.match?(%r{\A[A-Za-z0-9_./-]+\z}) && candidate.exclude?("=")
+              end
+              processes << binary_name(word) if word
+            end
+            line.scan(/[$`]\(?\s*([A-Za-z0-9_.\/-]+)/) do |m|
+              processes << binary_name(m[0]) unless SHELL_NOISE.include?(m[0])
+            end
           end
         end
 

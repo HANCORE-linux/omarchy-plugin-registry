@@ -34,7 +34,10 @@ module Settings
       AuditEvent.record!(actor: Current.user, action: "passkey.register", subject: Current.user)
       # Only FIRST enrollment bootstraps verification; adding a factor later
       # required step-up already and must not extend it via registration.
-      mark_second_factor_verified! if Current.user.passkeys.count == 1 && !Current.user.otp_enabled?
+      if Current.user.passkeys.count == 1 && !Current.user.otp_enabled?
+        mark_second_factor_verified!
+        apply_first_factor_cooldown(Current.user)
+      end
       render json: { ok: true }
     rescue WebAuthn::Error, JSON::ParserError => e
       render json: { error: "Passkey registration failed: #{e.message}" }, status: :unprocessable_entity

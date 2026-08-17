@@ -19,6 +19,7 @@ module Settings
       @user = Current.user
       if (codes = @user.enable_otp!(params[:code]))
         mark_second_factor_verified!
+        apply_first_factor_cooldown(@user) unless @user.passkeys.exists?
         flash[:backup_codes] = codes
         redirect_to settings_two_factor_path, notice: "Two-factor authentication enabled. Save your backup codes now — this is the only time they're shown."
       else

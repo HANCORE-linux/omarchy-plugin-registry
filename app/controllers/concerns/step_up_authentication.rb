@@ -34,4 +34,11 @@ module StepUpAuthentication
   def mark_second_factor_verified!
     Current.session&.update!(second_factor_verified_at: Time.current)
   end
+
+  # First-factor enrollment on an ESTABLISHED account is what an email-only
+  # takeover looks like — apply the sensitive-change cooldown so the hijacker
+  # can't immediately mint credentials. Brand-new accounts enroll freely.
+  def apply_first_factor_cooldown(user)
+    user.update!(sensitive_change_at: Time.current) if user.created_at < 1.day.ago
+  end
 end

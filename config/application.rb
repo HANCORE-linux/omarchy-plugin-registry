@@ -56,6 +56,11 @@ module OmarchyPluginRegistry
     # Origin-side download counting (production uses CDN log aggregation instead)
     config.x.count_origin_downloads = true
 
+    # App-side view counting — plugin pages render at the app regardless, so
+    # this stays on in every environment (registry:import_view_counts can
+    # supplement from edge analytics)
+    config.x.count_views = true
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files

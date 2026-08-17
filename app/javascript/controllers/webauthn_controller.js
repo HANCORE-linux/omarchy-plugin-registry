@@ -14,7 +14,7 @@ export default class extends Controller {
         ? PublicKeyCredential.parseCreationOptionsFromJSON(options)
         : this.manualParseCreation(options)
       const credential = await navigator.credentials.create({ publicKey })
-      await this.verify({ credential: JSON.stringify(credential.toJSON ? credential.toJSON() : credential) })
+      await this.verify({ credential: JSON.stringify(this.serializeCredential(credential)) })
       window.location.reload()
     } catch (error) {
       this.showError(error)
@@ -28,7 +28,7 @@ export default class extends Controller {
         ? PublicKeyCredential.parseRequestOptionsFromJSON(options)
         : this.manualParseRequest(options)
       const credential = await navigator.credentials.get({ publicKey })
-      const result = await this.verify({ credential: JSON.stringify(credential.toJSON ? credential.toJSON() : credential) })
+      const result = await this.verify({ credential: JSON.stringify(this.serializeCredential(credential)) })
       window.location = result.redirect || "/"
     } catch (error) {
       this.showError(error)
@@ -92,5 +92,36 @@ export default class extends Controller {
     const padded = value.replace(/-/g, "+").replace(/_/g, "/")
     const raw = atob(padded + "=".repeat((4 - (padded.length % 4)) % 4))
     return Uint8Array.from(raw, c => c.charCodeAt(0)).buffer
+  }
+
+  bufToB64url(buffer) {
+    const bytes = new Uint8Array(buffer)
+    let raw = ""
+    for (const b of bytes) raw += String.fromCharCode(b)
+    return btoa(raw).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+  }
+
+  // Credential attributes aren't enumerable, so JSON.stringify(credential)
+  // would produce {} — build the wire format explicitly when toJSON is absent.
+  serializeCredential(credential) {
+    if (credential.toJSON) return credential.toJSON()
+    const response = credential.response
+    const out = {
+      id: credential.id,
+      rawId: this.bufToB64url(credential.rawId),
+      type: credential.type,
+      authenticatorAttachment: credential.authenticatorAttachment,
+      clientExtensionResults: credential.getClientExtensionResults ? credential.getClientExtensionResults() : {},
+      response: { clientDataJSON: this.bufToB64url(response.clientDataJSON) }
+    }
+    if (response.attestationObject) {
+      out.response.attestationObject = this.bufToB64url(response.attestationObject)
+      if (response.getTransports) out.response.transports = response.getTransports()
+    } else {
+      out.response.authenticatorData = this.bufToB64url(response.authenticatorData)
+      out.response.signature = this.bufToB64url(response.signature)
+      out.response.userHandle = response.userHandle ? this.bufToB64url(response.userHandle) : null
+    }
+    return out
   }
 }
