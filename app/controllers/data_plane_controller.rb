@@ -2,12 +2,13 @@
 # production. Installs read these paths; nothing here touches the database
 # except the download counter (which CDN log aggregation replaces at scale).
 class DataPlaneController < ActionController::API
-  def config = serve("config.json", type: "application/json")
-  def all = serve("all.json", type: "application/json")
-  def revocations = serve("revocations.json", type: "application/json")
+  def config = serve("config.json#{sig_suffix}", type: content_type_for_json)
+  def all = serve("all.json#{sig_suffix}", type: content_type_for_json)
+  def revocations = serve("revocations.json#{sig_suffix}", type: content_type_for_json)
+  def signing_key = serve("signing-key.pub", type: "text/plain")
 
   def index_file
-    serve("index/#{params[:publisher]}/#{params[:plugin]}.json", type: "application/json")
+    serve("index/#{params[:publisher]}/#{params[:plugin]}.json#{sig_suffix}", type: content_type_for_json)
   end
 
   def tarball
@@ -20,6 +21,11 @@ class DataPlaneController < ActionController::API
   end
 
   private
+
+  # ?sig=1 (or .sig-suffixed routes) serve the detached signature instead
+  def sig_suffix = params[:sig].present? ? ".sig" : ""
+
+  def content_type_for_json = params[:sig].present? ? "text/plain" : "application/json"
 
   def serve(relative_path, type:, disposition: "inline", filename: nil)
     path = DataPlane.root.join(relative_path)

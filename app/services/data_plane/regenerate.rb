@@ -16,10 +16,17 @@ module DataPlane
     end
 
     def write_config
+      # The public key is served unsigned (trust root — clients pin it);
+      # everything else carries a detached .sig made with this key.
+      key_path = DataPlane.root.join("signing-key.pub")
+      FileUtils.mkdir_p(DataPlane.root)
+      key_path.write(Signer.public_key_base64)
+
       DataPlane.write("config.json", JSON.pretty_generate(
         "dl" => "#{DataPlane.base_url}/dl/{publisher}/{name}/{name}-{version}.tar.gz",
         "index" => "#{DataPlane.base_url}/index/{publisher}/{name}.json",
         "revocations" => "#{DataPlane.base_url}/revocations.json",
+        "signing_key" => "#{DataPlane.base_url}/signing-key.pub",
         "api" => DataPlane.base_url
       ))
     end

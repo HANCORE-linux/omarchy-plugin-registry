@@ -59,6 +59,7 @@ Rails.application.routes.draw do
   get "config.json", to: "data_plane#config"
   get "all.json", to: "data_plane#all"
   get "revocations.json", to: "data_plane#revocations"
+  get "signing-key.pub", to: "data_plane#signing_key"
   get "index/:publisher/:plugin.json", to: "data_plane#index_file", as: :index_file
   get "dl/:publisher/:plugin/:plugin_file",
     to: "data_plane#tarball", as: :tarball,

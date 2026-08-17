@@ -19,10 +19,12 @@ module DataPlane
     Rails.application.config.x.registry_base_url
   end
 
+  # Every index file gets a detached Ed25519 signature at <path>.sig.
   def write(relative_path, content)
     path = root.join(relative_path)
     FileUtils.mkdir_p(path.dirname)
     path.open("wb") { |f| f.write(content) }
+    root.join("#{relative_path}.sig").open("wb") { |f| f.write(Signer.sign_base64(content)) }
     path
   end
 
