@@ -34,14 +34,32 @@ class Plugin < ApplicationRecord
     versions.exists?(version: version_string)
   end
 
+  # The monotonicity baseline. Rejected versions still burn their exact number
+  # but don't force future versions above them — a bogus 99.0.0 submission must
+  # not brick the plugin's numbering forever.
   def highest_version
-    versions.order(version_sort_key: :desc).first
+    versions.where.not(state: :rejected).order(version_sort_key: :desc).first
   end
 
   def installable? = active? && versions.published.exists?
 
+  # Keeps the public page honest: latest_version AND the metadata shown beside
+  # it always come from the latest *published* version — when that changes
+  # (release, yank, quarantine), summary/kinds/repo/readme follow it.
   def refresh_latest_version!
-    update!(latest_version: latest_published_version&.version)
+    latest = latest_published_version
+    if latest
+      readme_content = latest.tarball.attached? ? Registry::TarballInspector.inspect_bytes(latest.tarball.download).readme : nil
+      update!(
+        latest_version: latest.version,
+        summary: latest.manifest["description"],
+        kinds: latest.manifest["kinds"] || [],
+        repository_url: latest.manifest["repository"],
+        readme: readme_content
+      )
+    else
+      update!(latest_version: nil, summary: nil, readme: nil)
+    end
   end
 
   def average_rating

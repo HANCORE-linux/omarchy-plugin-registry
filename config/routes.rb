@@ -88,16 +88,18 @@ Rails.application.routes.draw do
 
   # --- Static data plane (CDN origin) ---
   # .sig routes serve real sibling objects so a dumb CDN/object store works;
-  # ?sig=1 remains a Rails-only convenience.
-  get "config.json", to: "data_plane#config"
-  get "config.json.sig", to: "data_plane#config", defaults: { sig: "1" }
-  get "all.json", to: "data_plane#all"
-  get "all.json.sig", to: "data_plane#all", defaults: { sig: "1" }
-  get "revocations.json", to: "data_plane#revocations"
-  get "revocations.json.sig", to: "data_plane#revocations", defaults: { sig: "1" }
-  get "signing-key.pub", to: "data_plane#signing_key"
-  get "index/:publisher/:plugin.json", to: "data_plane#index_file", as: :index_file
+  # ?sig=1 remains a Rails-only convenience. Signature routes come FIRST and
+  # every route is format: false, so "/x.json.sig" can never fall through to
+  # the unsigned route via an implicit format suffix.
+  get "config.json.sig", to: "data_plane#config", defaults: { sig: "1" }, format: false
+  get "config.json", to: "data_plane#config", format: false
+  get "all.json.sig", to: "data_plane#all", defaults: { sig: "1" }, format: false
+  get "all.json", to: "data_plane#all", format: false
+  get "revocations.json.sig", to: "data_plane#revocations", defaults: { sig: "1" }, format: false
+  get "revocations.json", to: "data_plane#revocations", format: false
+  get "signing-key.pub", to: "data_plane#signing_key", format: false
   get "index/:publisher/:plugin.json.sig", to: "data_plane#index_file", defaults: { sig: "1" }, format: false
+  get "index/:publisher/:plugin.json", to: "data_plane#index_file", as: :index_file, format: false
   get "dl/:publisher/:plugin/:plugin_file",
     to: "data_plane#tarball", as: :tarball,
     constraints: { plugin_file: /[^\/]+\.tar\.gz/ }

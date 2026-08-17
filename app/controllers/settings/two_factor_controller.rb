@@ -1,7 +1,8 @@
 module Settings
   class TwoFactorController < ApplicationController
-    # Adding TOTP next to an existing factor requires step-up
-    before_action :require_step_up_if_second_factor_enrolled, only: :update
+    # Provisioning (show displays the new secret) and confirming TOTP next to
+    # an existing factor both require step-up; first enrollment stays open.
+    before_action :require_step_up_if_second_factor_enrolled
 
     def show
       @user = Current.user

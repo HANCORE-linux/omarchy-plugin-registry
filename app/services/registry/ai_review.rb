@@ -32,8 +32,13 @@ module Registry
 
       output = run_command(Rails.application.config.x.ai_review_command, payload.to_json)
       parsed = JSON.parse(output)
-      verdict = parsed["verdict"] == "flag" ? "flag" : "pass"
-      Result.new(verdict, Array(parsed["reasons"]))
+      # Only an explicit "pass" passes; anything unrecognized escalates — a
+      # broken adapter must not silently wave versions through.
+      case parsed["verdict"]
+      when "pass" then Result.new("pass", Array(parsed["reasons"]))
+      when "flag" then Result.new("flag", Array(parsed["reasons"]))
+      else Result.new("flag", [ "unrecognized ai verdict: #{parsed['verdict'].inspect}" ])
+      end
     rescue StandardError => e
       # A broken reviewer must not block publishing silently or approve anything:
       # treat errors as a flag so a human looks.

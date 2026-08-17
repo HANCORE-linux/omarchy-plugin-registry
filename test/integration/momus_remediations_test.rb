@@ -109,6 +109,78 @@ class MomusRemediationsTest < ActionDispatch::IntegrationTest
     Rails.cache = original_cache
   end
 
+  test ".sig routes serve the signature, never the unsigned content" do
+    perform_enqueued_jobs { publish TarballBuilder.build }
+    get "/revocations.json.sig"
+    assert_response :success
+    signature = response.body
+    get "/revocations.json"
+    assert DataPlane::Signer.verify?(response.body, signature)
+    assert_not_equal response.body, signature
+
+    get "/index/acme/weather.json.sig"
+    sig2 = response.body
+    get "/index/acme/weather.json"
+    assert DataPlane::Signer.verify?(response.body, sig2)
+  end
+
+  test "duplicate tarball paths are rejected outright" do
+    io = StringIO.new
+    Zlib::GzipWriter.wrap(io) do |gz|
+      Gem::Package::TarWriter.new(gz) do |tar|
+        json = TarballBuilder::DEFAULT_MANIFEST.to_json
+        tar.add_file_simple("manifest.json", 0o644, json.bytesize) { |f| f.write(json) }
+        tar.add_file_simple("Widget.qml", 0o644, 10) { |f| f.write("clean     ") }
+        tar.add_file_simple("Widget.qml", 0o644, 10) { |f| f.write("evil      ") }
+      end
+    end
+    publish io.string
+    assert_response :unprocessable_entity
+    assert_match(/duplicate path/, response.parsed_body["error"])
+  end
+
+  test "invented SPDX identifiers are rejected, real expressions pass" do
+    publish TarballBuilder.build(manifest: TarballBuilder.manifest(license: "NOT-A-REAL-LICENSE"))
+    assert_response :unprocessable_entity
+    assert_match(/SPDX/, response.parsed_body["error"])
+
+    publish TarballBuilder.build(manifest: TarballBuilder.manifest(license: "MIT OR Apache-2.0"))
+    assert_response :created
+  end
+
+  test "yanking the latest version pulls its metadata off the page" do
+    perform_enqueued_jobs do
+      publish TarballBuilder.build(
+        manifest: TarballBuilder.manifest(description: "v1 summary"),
+        files: { "Widget.qml" => "import QtQuick\nItem {}\n", "README.md" => "# v1" })
+      publish TarballBuilder.build(
+        manifest: TarballBuilder.manifest(version: "1.1.0", description: "v2 summary"),
+        files: { "Widget.qml" => "import QtQuick\nItem {}\n", "README.md" => "# v2" })
+    end
+    plugin = Plugin.find_by!(name: "weather")
+    assert_equal "v2 summary", plugin.summary
+
+    admin = User.create!(email_address: "admin2@example.com", name: "Admin2", admin: true,
+      otp_secret: ROTP::Base32.random, otp_enabled_at: Time.current)
+    PluginVersion.find_by(version: "1.1.0").yank!(reason: "bad", actor: admin)
+    plugin.reload
+    assert_equal "1.0.0", plugin.latest_version
+    assert_equal "v1 summary", plugin.summary
+    assert_equal "# v1", plugin.readme
+  end
+
+  test "a rejected high version does not block future numbering" do
+    perform_enqueued_jobs do
+      publish TarballBuilder.build(manifest: TarballBuilder.manifest(version: "99.0.0"),
+        files: { "Widget.qml" => "import QtQuick\n// tot‮ally\nItem {}\n" })
+    end
+    assert PluginVersion.find_by(version: "99.0.0").rejected?
+
+    perform_enqueued_jobs { publish TarballBuilder.build(manifest: TarballBuilder.manifest(version: "1.0.0")) }
+    assert_response :created
+    assert PluginVersion.find_by(version: "1.0.0").published?
+  end
+
   test "admin cannot approve a version the pipeline has not reviewed" do
     publish TarballBuilder.build # no jobs performed -> still processing
     version = PluginVersion.last

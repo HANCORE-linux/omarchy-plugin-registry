@@ -61,6 +61,10 @@ module Registry
         unpacked += entry.header.size
         raise InvalidTarball, "unpacked size exceeds limit" if unpacked > MAX_UNPACKED_BYTES
 
+        # Duplicate paths would let reviewed bytes differ from unpacked bytes
+        # depending on which entry a consumer picks — never ambiguous.
+        raise InvalidTarball, "duplicate path in tarball: #{path}" if @contents.key?(path)
+
         @files << path
         content = entry.read.to_s
         @truncated << path if content.bytesize > MAX_SCAN_BYTES

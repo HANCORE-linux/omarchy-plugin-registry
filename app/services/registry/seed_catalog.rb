@@ -27,9 +27,11 @@ module Registry
       end
       # Never seed into a namespace someone already owns — a squatter who
       # claimed the name first must not receive the legitimate artifact under
-      # their identity. Seeding only targets publishers the seeder created.
-      if publisher.claimed? || publisher.seed_source_url != entry["repository"]
-        return { entry:, status: "skipped", reason: "namespace already claimed or seeded from a different source" }
+      # their identity. Authors with several repos are fine: the publisher's
+      # seed_source_url (their first listed repo) is only the claim-proof
+      # target; each plugin keeps its own repository in its manifest.
+      if publisher.claimed?
+        return { entry:, status: "skipped", reason: "namespace already claimed" }
       end
       return { entry:, status: "skipped", reason: "already published" } if
         publisher.plugins.find_by(name: entry.fetch("name"))&.versions&.exists?

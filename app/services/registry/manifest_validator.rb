@@ -17,7 +17,18 @@ module Registry
     }.freeze
     ALLOWED_KINDS = KIND_ENTRY_RULES.keys.freeze
     ID_FORMAT = /\A[A-Za-z0-9][A-Za-z0-9._-]*\z/
-    SPDX_FORMAT = /\A[A-Za-z0-9.+\-]+(?:\s(?:OR|AND|WITH)\s[A-Za-z0-9.+\-]+)*\z/
+
+    # Real SPDX identifiers only — token-shaped inventions must not become
+    # trusted registry metadata. (The common set; extend as publishers need.)
+    SPDX_LICENSE_IDS = %w[
+      0BSD AGPL-3.0-only AGPL-3.0-or-later Apache-2.0 Artistic-2.0 BSD-2-Clause
+      BSD-3-Clause BSD-3-Clause-Clear BlueOak-1.0.0 BSL-1.0 CC-BY-4.0 CC-BY-SA-4.0
+      CC0-1.0 CDDL-1.0 EPL-1.0 EPL-2.0 EUPL-1.2 GPL-2.0-only GPL-2.0-or-later
+      GPL-3.0-only GPL-3.0-or-later ISC LGPL-2.1-only LGPL-2.1-or-later
+      LGPL-3.0-only LGPL-3.0-or-later MIT MIT-0 MPL-2.0 MulanPSL-2.0 NCSA
+      OFL-1.1 OSL-3.0 PostgreSQL Unlicense UPL-1.0 WTFPL Zlib
+    ].to_set.freeze
+    SPDX_EXCEPTION_FORMAT = /\A[A-Za-z0-9.\-]+-exception(-[A-Za-z0-9.\-]+)?\z/i
 
     attr_reader :errors
 
@@ -82,7 +93,9 @@ module Registry
 
     def check_kinds
       kinds = manifest["kinds"]
-      return errors << "kinds must be a non-empty array" unless kinds.is_a?(Array) && kinds.any?
+      unless kinds.is_a?(Array) && kinds.any? && kinds.all? { |k| k.is_a?(String) }
+        return errors << "kinds must be a non-empty array of strings"
+      end
       unknown = kinds - ALLOWED_KINDS
       errors << "unknown kinds: #{unknown.join(', ')}" if unknown.any?
     end
@@ -92,7 +105,7 @@ module Registry
       return errors << "entryPoints must be an object" unless entry_points.is_a?(Hash)
 
       kinds = Array(manifest["kinds"])
-      if kinds.any? && entry_points.keys.sort != kinds.sort
+      if kinds.any? && kinds.all? { |k| k.is_a?(String) } && entry_points.keys.sort != kinds.sort
         errors << "entryPoints keys must exactly match kinds (kinds: #{kinds.sort.join(', ')}; entryPoints: #{entry_points.keys.sort.join(', ')})"
       end
 
@@ -113,7 +126,24 @@ module Registry
     def check_license
       license = manifest["license"].to_s
       return errors << "license is required to publish (SPDX identifier)" if license.blank?
-      errors << "license must be an SPDX expression (got #{license})" unless license.match?(SPDX_FORMAT)
+      errors << "license must be a known SPDX expression (got #{license})" unless valid_spdx_expression?(license)
+    end
+
+    # "MIT", "MIT OR Apache-2.0", "GPL-3.0-only WITH GCC-exception-3.1", …
+    # Token sequence must alternate id, operator, id, … with known ids.
+    def valid_spdx_expression?(expression)
+      tokens = expression.split(/\s+/)
+      return false if tokens.empty? || tokens.length.even?
+
+      tokens.each_with_index.all? do |token, index|
+        if index.odd?
+          %w[OR AND WITH].include?(token)
+        elsif index.positive? && tokens[index - 1] == "WITH"
+          token.match?(SPDX_EXCEPTION_FORMAT)
+        else
+          SPDX_LICENSE_IDS.include?(token)
+        end
+      end
     end
 
     # Rendered as a link on the plugin page — https only, sane length.
