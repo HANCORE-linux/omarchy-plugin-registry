@@ -68,7 +68,7 @@ module Settings
       # email-only takeover could otherwise remove-then-re-enroll its own
       # factor and inherit the account's powers.
       would_have_factor = Current.user.otp_enabled? || Current.user.passkeys.where.not(id: passkey.id).exists?
-      if !would_have_factor && (Current.user.admin? || Current.user.memberships.exists?) && !Current.user.recovery_ready?
+      if !would_have_factor && (Current.user.admin? || Current.user.memberships.accepted.exists?) && !Current.user.recovery_ready?
         return redirect_to settings_two_factor_path,
           alert: "Add a replacement factor before removing your last one."
       end

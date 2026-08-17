@@ -48,3 +48,15 @@ claims, and the admin console.
 receipts, the kill-bit check — contract in `docs/client-spec.md`), deployment
 (`docs/deploy.md`), the real omarchyplugins.com catalog for seeding, and the
 governance roster names.
+
+Verify the current state locally — no claim here substitutes for running the
+gates yourself (CI runs once the repo has a remote):
+
+```bash
+bin/rails test               # unit + integration + conformance corpus
+bin/rails test:system        # WebAuthn browser test (headless Chrome)
+bin/rubocop                  # lint
+bin/brakeman -q              # static security analysis
+bin/bundler-audit            # gem CVE audit
+bin/importmap audit          # JS dependency audit
+```

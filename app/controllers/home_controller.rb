@@ -18,7 +18,10 @@ class HomeController < ApplicationController
     scope = Plugin.directory_visible.includes(:publisher)
     if @query.present?
       like = "%#{ActiveRecord::Base.sanitize_sql_like(@query.downcase)}%"
-      scope = scope.where("plugins.name LIKE :q OR plugins.summary LIKE :q OR plugins.normalized_name LIKE :q", q: like)
+      # LOWER on both sides: SQLite LIKE is case-insensitive but PostgreSQL's
+      # is not — normalize explicitly so both adapters match the same rows
+      scope = scope.where(
+        "LOWER(plugins.name) LIKE :q OR LOWER(plugins.summary) LIKE :q OR LOWER(plugins.normalized_name) LIKE :q", q: like)
     end
     @plugins = scope.order(SORTS[@sort]).limit(60)
     @stats = {

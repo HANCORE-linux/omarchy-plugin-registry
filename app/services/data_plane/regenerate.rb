@@ -50,15 +50,17 @@ module DataPlane
         # releases still reach their signed indexes. The aggregate failure
         # still raises at the end so the run is operator-visible.
         artifact_failures = []
+        failed_plugin_ids = []
         Plugin.find_each do |p|
           generator.ensure_artifacts!(p)
           generator.write_plugin_index(p)
         rescue ArtifactIntegrityError => e
           artifact_failures << e.message
+          failed_plugin_ids << p.id
           Rails.logger.error("[DataPlane] #{e.message} — this plugin's index left untouched")
         end
         generator.warn_orphan_indexes!
-        generator.write_all_listing
+        generator.write_all_listing(failed_plugin_ids: failed_plugin_ids)
         raise ArtifactIntegrityError, artifact_failures.join("; ") if artifact_failures.any?
       end
     end
@@ -214,8 +216,16 @@ module DataPlane
       end
     end
 
-    def write_all_listing
+    # A plugin whose index write was frozen by an artifact failure must not
+    # have all.json advertise NEWER database state than its signed index —
+    # its prior aggregate entry is carried forward verbatim (or omitted when
+    # no trustworthy prior listing exists).
+    def write_all_listing(failed_plugin_ids: [])
+      prior = prior_all_entries if failed_plugin_ids.any?
       plugins = Plugin.listed.includes(:publisher).filter_map do |plugin|
+        if failed_plugin_ids.include?(plugin.id)
+          next prior&.dig("#{plugin.publisher.name}.#{plugin.name}")
+        end
         next unless plugin.latest_version
         {
           "publisher" => plugin.publisher.name,
@@ -228,6 +238,20 @@ module DataPlane
         }
       end
       DataPlane.write("all.json", JSON.generate({ "plugins" => plugins }.merge(freshness(INDEX_TTL))))
+    end
+
+    # Previous all.json entries keyed by full name — only if the pair still
+    # verifies (a tampered aggregate contributes nothing).
+    def prior_all_entries
+      DataPlane.heal_interrupted_write!("all.json")
+      path = DataPlane.root.join("all.json")
+      signature = DataPlane.root.join("all.json.sig")
+      return nil unless path.exist? && signature.exist?
+      content = path.read
+      return nil unless Signer.verify?(content, signature.read)
+      JSON.parse(content).fetch("plugins", []).index_by { |e| "#{e['publisher']}.#{e['name']}" }
+    rescue JSON::ParserError
+      nil
     end
 
     # The kill list is append-critical: the union of database revocations and

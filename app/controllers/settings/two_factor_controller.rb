@@ -65,7 +65,7 @@ module Settings
       end
       # A matured recovery may drop to zero factors — that IS the recovery
       # path for a TOTP-only publisher who lost their authenticator
-      if !user.passkeys.exists? && (user.admin? || user.memberships.exists?) && !user.recovery_ready?
+      if !user.passkeys.exists? && (user.admin? || user.memberships.accepted.exists?) && !user.recovery_ready?
         return redirect_to settings_two_factor_path, alert: "Add a passkey before removing TOTP — you can't drop to zero factors."
       end
 
