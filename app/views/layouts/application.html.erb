@@ -33,6 +33,18 @@
       </nav>
     </header>
 
+    <% if authenticated? && Current.user&.recovery_requested_at %>
+      <div class="notice-banner notice-banner--danger">
+        <strong>Account recovery in progress.</strong>
+        <% if Current.user.recovery_ready? %>
+          The window is open — factor management is unlocked.
+        <% else %>
+          Factor management unlocks <%= time_ago_in_words(Current.user.recovery_requested_at + User::RECOVERY_DELAY) %> from now.
+        <% end %>
+        Didn't request this? <%= link_to "Verify a factor now", step_up_path %> to cancel it immediately.
+      </div>
+    <% end %>
+
     <% if flash[:notice] || flash[:alert] || (Rails.env.development? && flash[:dev_login_code]) %>
       <div class="flashes">
         <% if flash[:notice] %><p class="flash flash--notice"><%= flash[:notice] %></p><% end %>

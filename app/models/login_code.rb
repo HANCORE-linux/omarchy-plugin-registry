@@ -17,7 +17,13 @@ class LoginCode < ApplicationRecord
     self.code = self.class.digest(@plaintext_code)
   end
 
-  def self.digest(plaintext) = Digest::SHA256.hexdigest(plaintext.to_s)
+  # KEYED digest (HMAC under a derived app key): six digits have only a
+  # million candidates, so an unkeyed hash would fall to offline enumeration —
+  # database access without secret_key_base must still yield nothing.
+  def self.digest(plaintext)
+    key = Rails.application.key_generator.generate_key("login_code_digest", 32)
+    OpenSSL::HMAC.hexdigest("SHA256", key, plaintext.to_s)
+  end
 
   scope :active, -> { where(consumed_at: nil).where(created_at: EXPIRATION.ago..) }
   scope :redeemable, -> { where(attempts: ...MAX_ATTEMPTS) }

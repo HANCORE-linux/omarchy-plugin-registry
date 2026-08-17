@@ -121,10 +121,38 @@ module DataPlane
       DataPlane.write("all.json", JSON.generate({ "plugins" => plugins }.merge(freshness(INDEX_TTL))))
     end
 
+    # The kill list is append-critical: entries the on-disk (signed) file
+    # already carries are merged back INTO the database before writing. A
+    # database restored from a pre-revocation backup therefore re-learns every
+    # revocation from the surviving data plane instead of silently reviving
+    # malware with a fresh, higher generation.
     def write_revocations
+      reimport_disk_revocations!
       entries = Revocation.includes(plugin: :publisher).order(:created_at).map(&:as_kill_list_entry)
       DataPlane.write("revocations.json", JSON.pretty_generate(
         { "schemaVersion" => 1, "revocations" => entries }.merge(freshness(REVOCATIONS_TTL))))
+    end
+
+    def reimport_disk_revocations!
+      path = DataPlane.root.join("revocations.json")
+      return unless path.exist?
+      content = path.read
+      signature = DataPlane.root.join("revocations.json.sig")
+      return unless signature.exist? && Signer.verify?(content, signature.read)
+
+      known = Revocation.includes(plugin: :publisher).map { |r| [ r.plugin.manifest_id, r.version ] }.to_set
+      JSON.parse(content).fetch("revocations", []).each do |entry|
+        next if known.include?([ entry["plugin"], entry["version"] ])
+        publisher_name, plugin_name = entry["plugin"].to_s.split(".", 2)
+        plugin = Plugin.joins(:publisher).find_by(publishers: { name: publisher_name }, name: plugin_name)
+        next if plugin.nil?
+        Revocation.create!(plugin:, version: entry["version"], reason: entry["reason"].presence || "restored from data plane",
+          created_by: Registry::SeedCatalog.system_user)
+        AuditEvent.record!(action: "revocation.reimported", subject: plugin, public: true,
+          metadata: { plugin: entry["plugin"], version: entry["version"] })
+      end
+    rescue JSON::ParserError
+      nil
     end
 
     private

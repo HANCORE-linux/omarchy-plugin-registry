@@ -108,7 +108,12 @@ module Registry
         fail! "account-wide publish rate limit reached (#{MAX_USER_SUBMISSIONS_PER_DAY}/day)", status: :too_many_requests
       end
 
-      retained = PluginVersion.where(user: user).where.not(state: :rejected).sum(:size_bytes)
+      # Rejected uploads count too while their bytes are still retained
+      # (CleanupJob purges them after 30 days)
+      retained = PluginVersion.where(user: user)
+        .where("state != :rejected OR updated_at >= :cutoff",
+          rejected: PluginVersion.states[:rejected], cutoff: 30.days.ago)
+        .sum(:size_bytes)
       if retained + tarball.size_bytes > MAX_RETAINED_BYTES_PER_USER
         fail! "account storage quota reached (#{MAX_RETAINED_BYTES_PER_USER / 1024 / 1024}MB of retained uploads)", status: :too_many_requests
       end

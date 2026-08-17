@@ -4,6 +4,9 @@
 class RecoveriesController < ApplicationController
   rate_limit to: 3, within: 1.day, only: :create,
     with: -> { redirect_to step_up_path, alert: "Recovery was already requested recently." }
+  # Cancelling is itself factor-proof: an email-only attacker session must not
+  # be able to repeatedly obstruct the owner's legitimate recovery
+  before_action :require_recent_second_factor, only: :destroy
 
   def create
     user = Current.user

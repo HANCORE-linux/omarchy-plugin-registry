@@ -28,8 +28,13 @@ to object storage behind a CDN. Installs never touch Rails.
    CDN, or sync the directory to object storage and point the CDN there.
    Sync index files with `--delete`; sync `/dl/` WITHOUT `--delete` (tarballs
    are immutable, and `registry:regenerate` re-freezes any missing ones from
-   the database, so the directory is always rebuildable). Keep TTLs short
-   (~60 s) on index files and long on `/dl/`.
+   Active Storage — note those blobs live on the SAME `/rails/storage` volume
+   by default, so back that volume up as one unit, or point Active Storage at
+   object storage so uploads survive volume loss independently). Keep TTLs
+   short (~60 s) on index files and long on `/dl/`.
+   The kill list is additionally self-healing: regeneration merges the signed
+   on-disk `revocations.json` back into the database, so a database restored
+   from a pre-revocation backup cannot silently revive revoked malware.
 4. **Domains**: `plugins.omarchy.org` → app/CDN; `omarchyplugins.com` → 301.
 
 ## First boot
