@@ -10,6 +10,7 @@ module Registry
 
     def self.exchange(oidc_token)
       claims = verify(oidc_token)
+      reject_replay!(claims)
 
       trusted = TrustedPublisher.where(repository: claims["repository"])
         .includes(:publisher, :created_by).detect { |tp| tp.matches?(claims) }
@@ -48,6 +49,16 @@ module Registry
       end
       if trusted.repository_id != repo_id || trusted.repository_owner_id != owner_id
         raise ExchangeError, "repository identity changed since registration — re-register trusted publishing for #{trusted.repository}"
+      end
+    end
+
+    # A single OIDC token exchanges once — replays within its lifetime are
+    # refused (the CI job already got its publish token).
+    def self.reject_replay!(claims)
+      jti = claims["jti"].to_s
+      return if jti.blank? # older tokens without jti fall back to expiry alone
+      unless Rails.cache.write("oidc_jti:#{jti}", 1, unless_exist: true, expires_in: 15.minutes)
+        raise ExchangeError, "OIDC token already exchanged"
       end
     end
 

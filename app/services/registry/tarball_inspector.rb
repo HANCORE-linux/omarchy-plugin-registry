@@ -58,6 +58,9 @@ module Registry
         case
         when entry.directory?
           next
+        when %w[g x].include?(entry.header.typeflag)
+          # PAX metadata headers — git archive always emits a global one
+          next
         when entry.symlink? || entry.header.typeflag == "1"
           raise InvalidTarball, "symlinks and hardlinks are not allowed (#{path})"
         when !entry.file?
@@ -89,13 +92,24 @@ module Registry
 
     private
 
+    # Only NUL padding may follow the tar terminator, and not much of it —
+    # anything else is a smuggling attempt (and an unbounded drain would be a
+    # decompression bomb of its own).
+    MAX_TRAILING_PADDING = 64 * 1024
+
     def each_tar_entry(&block)
       Zlib::GzipReader.wrap(StringIO.new(@bytes)) do |gz|
         Gem::Package::TarReader.new(gz) { |tar| tar.each(&block) }
         # Reviewed bytes must equal extracted bytes: a concatenated gzip could
         # hide extra tar records in a second member that gunzip would extract
-        # but this reader never saw. Drain the first member and refuse leftovers.
-        gz.read
+        # but this reader never saw. Drain boundedly and refuse leftovers.
+        drained = 0
+        while (chunk = gz.read(16 * 1024))
+          drained += chunk.bytesize
+          if drained > MAX_TRAILING_PADDING || chunk.delete("\0").present?
+            raise InvalidTarball, "trailing data after the tar archive"
+          end
+        end
         raise InvalidTarball, "trailing data after the gzip stream" if gz.unused.present?
       end
     end

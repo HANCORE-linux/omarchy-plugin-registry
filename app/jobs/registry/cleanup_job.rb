@@ -8,10 +8,21 @@ module Registry
       LoginCode.where(created_at: ...1.day.ago).delete_all
       ApiToken.where(expires_at: ...30.days.ago).delete_all
       Session.expired.delete_all
+      purge_rejected_tarballs
       resume_stuck_pipeline_work
     end
 
     private
+
+    # Rejected uploads keep their metadata row forever (the version number is
+    # burned) but not their bytes — retained tarballs would otherwise be an
+    # unbounded storage sink. Quarantined bytes stay (under investigation);
+    # published/yanked bytes stay (reproducibility).
+    def purge_rejected_tarballs
+      PluginVersion.rejected.where(updated_at: ...30.days.ago).find_each do |version|
+        version.tarball.purge if version.tarball.attached?
+      end
+    end
 
     # A lost enqueue must never strand a version: re-drive processing versions
     # through review and overdue held versions through release.

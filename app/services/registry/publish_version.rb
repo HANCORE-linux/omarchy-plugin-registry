@@ -80,10 +80,17 @@ module Registry
     MAX_PENDING_PER_PLUGIN = 5
     MAX_SUBMISSIONS_PER_DAY = 12
     MAX_PUBLISHER_SUBMISSIONS_PER_DAY = 30
+    MAX_USER_SUBMISSIONS_PER_DAY = 40
     MAX_PLUGINS_PER_PUBLISHER = 100
 
     def check_submission_limits!
       return if @system_seed
+
+      # Per-ACCOUNT ceiling: creating extra orgs must not multiply quota
+      user_daily = PluginVersion.where(user: user, created_at: 24.hours.ago..).count
+      if user_daily >= MAX_USER_SUBMISSIONS_PER_DAY
+        fail! "account-wide publish rate limit reached (#{MAX_USER_SUBMISSIONS_PER_DAY}/day)", status: :too_many_requests
+      end
 
       publisher_daily = PluginVersion.joins(:plugin)
         .where(plugins: { publisher_id: publisher.id }, created_at: 24.hours.ago..).count

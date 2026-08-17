@@ -60,6 +60,10 @@ class Plugin < ApplicationRecord
   # it always come from the latest *published* version — when that changes
   # (release, yank, quarantine), summary/kinds/repo/readme follow it.
   def refresh_latest_version!
+    # Nothing to compute for taken-down plugins (avoids re-inspecting a
+    # tarball per yank during a whole-plugin security hold)
+    return update!(latest_version: nil, summary: nil, readme: nil) unless active?
+
     latest = latest_published_version
     if latest
       readme_content = latest.tarball.attached? ? Registry::TarballInspector.inspect_bytes(latest.tarball.download).readme : nil

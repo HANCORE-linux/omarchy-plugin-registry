@@ -18,7 +18,7 @@ module Registry
 
     def self.enabled? = Rails.application.config.x.ai_review_command.present?
 
-    def self.review(version:, tarball:, fingerprint:, scan_findings:)
+    def self.review(version:, tarball:, fingerprint:, scan_findings:, previous: nil, capability_growth: [])
       return Result.new("pass", [ "ai review disabled" ]) unless enabled?
 
       payload = {
@@ -27,6 +27,10 @@ module Registry
         manifest: version.manifest,
         fingerprint: fingerprint,
         scan_findings: scan_findings,
+        # Update context: what the last reviewed version looked like, so the
+        # reviewer judges the CHANGE, not just the snapshot
+        previous: previous && { version: previous.version, fingerprint: previous.capability_fingerprint },
+        capability_growth: capability_growth,
         files: tarball.contents.transform_values { |c| c.dup.force_encoding(Encoding::UTF_8).scrub }
       }
 

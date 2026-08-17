@@ -29,7 +29,8 @@ module Registry
       growth = CapabilityFingerprint.growth(previous&.capability_fingerprint, fingerprint)
 
       # 3. AI review (escalate-only)
-      ai = AiReview.review(version:, tarball:, fingerprint:, scan_findings: findings)
+      ai = AiReview.review(version:, tarball:, fingerprint:, scan_findings: findings,
+        previous: previous, capability_growth: growth)
 
       # An admin may have rejected or security-held this version while the
       # scan ran — never overwrite a terminal state with a pipeline outcome.

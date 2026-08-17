@@ -1,6 +1,9 @@
 module Api
   module V1
     class TrustedController < BaseController
+      rate_limit to: 30, within: 15.minutes, only: :exchange, store: RATE_LIMIT_STORE,
+        with: -> { render json: { error: "slow_down" }, status: :too_many_requests }
+
       # POST /api/v1/trusted/exchange — GitHub Actions OIDC token in,
       # 30-minute scoped publish token out. No stored secrets anywhere.
       def exchange

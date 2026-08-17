@@ -39,6 +39,9 @@ module Registry
         # 1b. Literal shell invocation with a NON-literal payload:
         #     ["bash", "-c", someFunction()] runs anything too.
         dynamic_exec ||= text.match?(/command:\s*\[\s*["'](?:\/[\w\/]*\/)?(?:#{SHELL_INTERPRETERS.join('|')})["']\s*,\s*["']-c["']\s*,\s*(?!["'])/)
+        # 1c. Spawn helpers called with anything but a literal string/array —
+        #     bar.run(commandVariable) is dynamic execution too.
+        dynamic_exec ||= text.match?(/\b(?:bar\.run|execDetached|startDetached)\s*\(\s*(?!["'])(?!\[\s*["'])\S/)
         # 2. Literal shell -c payloads — the binary name "bash" hides the real
         #    program, so the script itself joins the fingerprint by digest.
         text.scan(/command:\s*\[\s*["'](?:\/[\w\/]*\/)?(#{SHELL_INTERPRETERS.join('|')})["']\s*,\s*["']-c["']\s*,\s*["'](.{0,4000}?)["']\s*\]/m) do |interpreter, script|
