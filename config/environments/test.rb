@@ -4,6 +4,7 @@
 # and recreated between test runs. Don't rely on the data there!
 
 Rails.application.configure do
+  config.x.publish_hold = 0
   config.x.registry_base_url = "http://registry.test"
   config.x.data_plane_root = Rails.root.join("tmp/test_data_plane")
   # Settings specified here will take precedence over those in config/application.rb.

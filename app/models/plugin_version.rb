@@ -23,6 +23,9 @@ class PluginVersion < ApplicationRecord
 
   def semver = Semver.parse(version)
 
+  # States an admin approval or hold expiry may publish from
+  def releasable? = held? || quarantined? || processing?
+
   def yank!(reason:, actor:)
     transaction do
       update!(state: :yanked, yanked_at: Time.current, yank_reason: reason)

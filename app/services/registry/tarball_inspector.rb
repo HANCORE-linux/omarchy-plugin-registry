@@ -14,7 +14,11 @@ module Registry
     MANIFEST_NAME = "manifest.json"
     README_CANDIDATES = %w[README.md readme.md README Readme.md].freeze
 
-    attr_reader :manifest, :readme, :files, :sha256, :size_bytes
+    # Per-file cap on content retained for scanning; larger files keep only
+    # their first MAX_SCAN_BYTES (the scanner flags oversized/binary blobs anyway).
+    MAX_SCAN_BYTES = 512.kilobytes
+
+    attr_reader :manifest, :readme, :files, :contents, :sha256, :size_bytes
 
     def self.inspect_bytes(bytes)
       new(bytes).tap(&:inspect!)
@@ -31,6 +35,7 @@ module Registry
 
       @sha256 = Digest::SHA256.hexdigest(@bytes)
       @files = []
+      @contents = {}
       manifest_json = nil
       readme_content = nil
       unpacked = 0
@@ -52,8 +57,10 @@ module Registry
         raise InvalidTarball, "unpacked size exceeds limit" if unpacked > MAX_UNPACKED_BYTES
 
         @files << path
-        manifest_json = entry.read if path == MANIFEST_NAME
-        readme_content ||= entry.read&.force_encoding(Encoding::UTF_8) if README_CANDIDATES.include?(path)
+        content = entry.read.to_s
+        @contents[path] = content.byteslice(0, MAX_SCAN_BYTES)
+        manifest_json = content if path == MANIFEST_NAME
+        readme_content ||= content.dup.force_encoding(Encoding::UTF_8) if README_CANDIDATES.include?(path)
       end
 
       raise InvalidTarball, "#{MANIFEST_NAME} missing at tarball root" if manifest_json.nil?

@@ -21,6 +21,7 @@ module Api
           version: version.version,
           sha256: version.sha256,
           state: version.state,
+          message: "Accepted — running the review pipeline. Clean versions go live after a short hold (~15 min).",
           url: "#{DataPlane.base_url}/plugins/#{version.plugin.publisher.name}/#{version.plugin.name}"
         }, status: :created
       rescue ActiveRecord::RecordNotFound

@@ -26,10 +26,14 @@ module DataPlane
     path
   end
 
-  # Tarballs are immutable: an existing file is never rewritten.
+  # Tarballs are immutable: same bytes may be re-frozen idempotently (release
+  # retries), different bytes for an existing path can never land.
   def freeze_tarball(version, bytes)
     path = root.join(version.tarball_path)
-    raise ArgumentError, "tarball already frozen: #{version.tarball_path}" if path.exist?
+    if path.exist?
+      return path if Digest::SHA256.file(path).hexdigest == Digest::SHA256.hexdigest(bytes)
+      raise ArgumentError, "refusing to overwrite frozen tarball with different bytes: #{version.tarball_path}"
+    end
     FileUtils.mkdir_p(path.dirname)
     path.open("wb") { |f| f.write(bytes) }
     path

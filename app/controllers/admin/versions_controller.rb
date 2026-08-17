@@ -2,10 +2,10 @@ module Admin
   class VersionsController < BaseController
     before_action :set_version
 
-    # Approve out of quarantine/hold
+    # Approve out of quarantine/hold — releases through the same path as the
+    # automated pipeline so frozen bytes and audit stay consistent.
     def approve
-      @version.update!(state: :published, published_at: @version.published_at || Time.current)
-      @version.plugin.refresh_latest_version!
+      Registry::ReleaseVersion.call(@version, actor: Current.user)
       audit "version.approve"
       regenerate_and_redirect "Approved and published."
     end

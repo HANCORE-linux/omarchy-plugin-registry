@@ -73,8 +73,9 @@ SAMPLES.each do |sample|
       - Tiny footprint
     MD
     bytes = build_tarball(manifest, { "Widget.qml" => "import QtQuick\nItem {}\n", "README.md" => readme })
-    Registry::PublishVersion.new(user: admin, publisher: ryan, plugin_name: sample[:name], tarball_bytes: bytes).call
-    puts "published ryanrhughes/#{sample[:name]}@#{version}"
+    created = Registry::PublishVersion.new(user: admin, publisher: ryan, plugin_name: sample[:name], tarball_bytes: bytes).call
+    Registry::ReviewJob.perform_now(created)
+    puts "published ryanrhughes/#{sample[:name]}@#{version} (#{created.reload.state})"
   end
 end
 

@@ -32,6 +32,13 @@ module OmarchyPluginRegistry
     config.x.data_plane_root = Rails.root.join("storage/data_plane")
     config.x.registry_base_url = ENV.fetch("REGISTRY_BASE_URL", "https://plugins.omarchy.org")
 
+    # Publish hold window: even clean versions wait before going live (worm brake).
+    config.x.publish_hold = 15.minutes
+
+    # Shell command for LLM review of submissions (reads JSON on stdin, prints
+    # {"verdict":..., "reasons":[...]}). Unset = AI review disabled.
+    config.x.ai_review_command = ENV["AI_REVIEW_COMMAND"]
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files

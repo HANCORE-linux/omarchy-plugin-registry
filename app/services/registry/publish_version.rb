@@ -79,6 +79,9 @@ module Registry
       fail! validator.errors.join("; ") unless validator.valid?
     end
 
+    # Structural validation is synchronous (instant CLI feedback); everything
+    # judgment-shaped runs in the ReviewJob pipeline. The version lands in
+    # `processing` and goes live only after scan + hold.
     def create_version!
       ApplicationRecord.transaction do
         plugin.save! unless plugin.persisted?
@@ -95,15 +98,18 @@ module Registry
           size_bytes: tarball.size_bytes,
           license: tarball.manifest["license"],
           min_omarchy_version: tarball.manifest["minOmarchyVersion"],
-          state: :published,
-          published_at: Time.current
+          provenance: token&.provenance,
+          state: :processing
         )
-        DataPlane.freeze_tarball(version, tarball_bytes)
-        plugin.refresh_latest_version!
-        AuditEvent.record!(actor: user, action: "version.publish", subject: version, public: true,
+        version.tarball.attach(
+          io: StringIO.new(tarball_bytes),
+          filename: version.tarball_filename,
+          content_type: "application/gzip"
+        )
+        AuditEvent.record!(actor: user, action: "version.submit", subject: version,
           metadata: { plugin: plugin.full_name, version: version.version, sha256: version.sha256 })
       end
-      DataPlane::RegenerateJob.perform_later(plugin)
+      ReviewJob.perform_later(version)
     end
 
     def fail!(message, status: :unprocessable_entity)

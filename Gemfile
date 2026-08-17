@@ -66,3 +66,6 @@ end
 gem "rotp"                      # TOTP MFA (publisher accounts)
 gem "rqrcode"                   # QR codes for TOTP enrollment
 gem "commonmarker"              # Readme rendering on plugin pages
+gem "ed25519"                   # Index/kill-list signing (minisign-style detached sigs)
+gem "jwt"                       # OIDC trusted publishing (GitHub Actions token verification)
+gem "webauthn"                  # Passkeys

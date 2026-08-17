@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_17_034007) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_17_040001) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -44,6 +44,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_034007) do
     t.datetime "expires_at", null: false
     t.datetime "last_used_at"
     t.string "plugin_name", null: false
+    t.json "provenance"
     t.integer "publisher_id", null: false
     t.datetime "revoked_at"
     t.string "token_digest", null: false
@@ -69,12 +70,41 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_034007) do
     t.index ["user_id"], name: "index_audit_events_on_user_id"
   end
 
+  create_table "comments", force: :cascade do |t|
+    t.text "body", null: false
+    t.datetime "created_at", null: false
+    t.datetime "hidden_at"
+    t.integer "plugin_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["plugin_id", "created_at"], name: "index_comments_on_plugin_id_and_created_at"
+    t.index ["plugin_id"], name: "index_comments_on_plugin_id"
+    t.index ["user_id"], name: "index_comments_on_user_id"
+  end
+
   create_table "daily_downloads", force: :cascade do |t|
     t.integer "count", default: 0, null: false
     t.date "date", null: false
     t.integer "plugin_version_id", null: false
     t.index ["plugin_version_id", "date"], name: "index_daily_downloads_on_plugin_version_id_and_date", unique: true
     t.index ["plugin_version_id"], name: "index_daily_downloads_on_plugin_version_id"
+  end
+
+  create_table "device_authorizations", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "device_code_digest", null: false
+    t.datetime "expires_at", null: false
+    t.string "plugin_name"
+    t.integer "publisher_id"
+    t.integer "status", default: 0, null: false
+    t.string "token_ciphertext"
+    t.datetime "updated_at", null: false
+    t.string "user_code", null: false
+    t.integer "user_id"
+    t.index ["device_code_digest"], name: "index_device_authorizations_on_device_code_digest", unique: true
+    t.index ["publisher_id"], name: "index_device_authorizations_on_publisher_id"
+    t.index ["user_code"], name: "index_device_authorizations_on_user_code", unique: true
+    t.index ["user_id"], name: "index_device_authorizations_on_user_id"
   end
 
   create_table "login_codes", force: :cascade do |t|
@@ -98,16 +128,32 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_034007) do
     t.index ["user_id"], name: "index_memberships_on_user_id"
   end
 
+  create_table "passkeys", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "external_id", null: false
+    t.datetime "last_used_at"
+    t.string "nickname"
+    t.string "public_key", null: false
+    t.bigint "sign_count", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["external_id"], name: "index_passkeys_on_external_id", unique: true
+    t.index ["user_id"], name: "index_passkeys_on_user_id"
+  end
+
   create_table "plugin_versions", force: :cascade do |t|
     t.json "capability_fingerprint"
     t.datetime "created_at", null: false
     t.integer "downloads_count", default: 0, null: false
+    t.datetime "hold_until"
     t.string "license"
     t.json "manifest", null: false
     t.string "min_omarchy_version"
     t.integer "plugin_id", null: false
+    t.json "provenance"
     t.datetime "published_at"
     t.text "review_notes"
+    t.json "scan_results"
     t.string "sha256", null: false
     t.integer "size_bytes", null: false
     t.integer "state", default: 0, null: false
@@ -121,6 +167,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_034007) do
   end
 
   create_table "plugins", force: :cascade do |t|
+    t.integer "comments_count", default: 0, null: false
     t.datetime "created_at", null: false
     t.integer "downloads_count", default: 0, null: false
     t.string "homepage_url"
@@ -129,11 +176,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_034007) do
     t.string "name", null: false
     t.string "normalized_name", null: false
     t.integer "publisher_id", null: false
+    t.integer "ratings_count", default: 0, null: false
+    t.integer "ratings_sum", default: 0, null: false
     t.text "readme"
     t.string "repository_url"
     t.integer "state", default: 0, null: false
     t.string "summary"
     t.datetime "updated_at", null: false
+    t.integer "views_count", default: 0, null: false
     t.index ["normalized_name"], name: "index_plugins_on_normalized_name"
     t.index ["publisher_id", "name"], name: "index_plugins_on_publisher_id_and_name", unique: true
     t.index ["publisher_id"], name: "index_plugins_on_publisher_id"
@@ -141,6 +191,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_034007) do
 
   create_table "publishers", force: :cascade do |t|
     t.text "bio"
+    t.string "claim_challenge"
     t.boolean "claimed", default: true, null: false
     t.datetime "created_at", null: false
     t.string "display_name"
@@ -154,6 +205,31 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_034007) do
     t.string "website"
     t.index ["name"], name: "index_publishers_on_name", unique: true
     t.index ["normalized_name"], name: "index_publishers_on_normalized_name", unique: true
+  end
+
+  create_table "ratings", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "plugin_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.integer "value", null: false
+    t.index ["plugin_id", "user_id"], name: "index_ratings_on_plugin_id_and_user_id", unique: true
+    t.index ["plugin_id"], name: "index_ratings_on_plugin_id"
+    t.index ["user_id"], name: "index_ratings_on_user_id"
+  end
+
+  create_table "reports", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "reason", null: false
+    t.integer "reportable_id", null: false
+    t.string "reportable_type", null: false
+    t.datetime "resolved_at"
+    t.integer "resolved_by_id"
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["reportable_type", "reportable_id"], name: "index_reports_on_reportable"
+    t.index ["resolved_by_id"], name: "index_reports_on_resolved_by_id"
+    t.index ["user_id"], name: "index_reports_on_user_id"
   end
 
   create_table "revocations", force: :cascade do |t|
@@ -177,6 +253,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_034007) do
     t.index ["user_id"], name: "index_sessions_on_user_id"
   end
 
+  create_table "trusted_publishers", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "created_by_id", null: false
+    t.string "environment", default: "release", null: false
+    t.string "plugin_name", null: false
+    t.string "provider", default: "github", null: false
+    t.integer "publisher_id", null: false
+    t.string "repository", null: false
+    t.datetime "updated_at", null: false
+    t.string "workflow", null: false
+    t.index ["created_by_id"], name: "index_trusted_publishers_on_created_by_id"
+    t.index ["publisher_id", "plugin_name"], name: "index_trusted_publishers_on_publisher_id_and_plugin_name", unique: true
+    t.index ["publisher_id"], name: "index_trusted_publishers_on_publisher_id"
+  end
+
   create_table "users", force: :cascade do |t|
     t.boolean "admin", default: false, null: false
     t.datetime "created_at", null: false
@@ -188,6 +279,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_034007) do
     t.datetime "sensitive_change_at"
     t.datetime "suspended_at"
     t.datetime "updated_at", null: false
+    t.string "webauthn_id"
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
   end
 
@@ -196,13 +288,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_034007) do
   add_foreign_key "api_tokens", "publishers"
   add_foreign_key "api_tokens", "users"
   add_foreign_key "audit_events", "users"
+  add_foreign_key "comments", "plugins"
+  add_foreign_key "comments", "users"
   add_foreign_key "daily_downloads", "plugin_versions"
+  add_foreign_key "device_authorizations", "publishers"
+  add_foreign_key "device_authorizations", "users"
   add_foreign_key "login_codes", "users"
   add_foreign_key "memberships", "publishers"
   add_foreign_key "memberships", "users"
+  add_foreign_key "passkeys", "users"
   add_foreign_key "plugin_versions", "plugins"
   add_foreign_key "plugins", "publishers"
+  add_foreign_key "ratings", "plugins"
+  add_foreign_key "ratings", "users"
+  add_foreign_key "reports", "users"
+  add_foreign_key "reports", "users", column: "resolved_by_id"
   add_foreign_key "revocations", "plugins"
   add_foreign_key "revocations", "users", column: "created_by_id"
   add_foreign_key "sessions", "users"
+  add_foreign_key "trusted_publishers", "publishers"
+  add_foreign_key "trusted_publishers", "users", column: "created_by_id"
 end
