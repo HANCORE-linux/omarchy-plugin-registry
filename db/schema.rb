@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_17_060001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_17_070001) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -159,12 +159,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_060001) do
     t.integer "size_bytes", null: false
     t.integer "state", default: 0, null: false
     t.datetime "updated_at", null: false
+    t.integer "user_id"
     t.string "version", null: false
     t.string "version_sort_key", null: false
     t.string "yank_reason"
     t.datetime "yanked_at"
     t.index ["plugin_id", "version"], name: "index_plugin_versions_on_plugin_id_and_version", unique: true
     t.index ["plugin_id"], name: "index_plugin_versions_on_plugin_id"
+    t.index ["user_id"], name: "index_plugin_versions_on_user_id"
   end
 
   create_table "plugins", force: :cascade do |t|
@@ -301,6 +303,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_060001) do
   add_foreign_key "memberships", "users"
   add_foreign_key "passkeys", "users"
   add_foreign_key "plugin_versions", "plugins"
+  add_foreign_key "plugin_versions", "users"
   add_foreign_key "plugins", "publishers"
   add_foreign_key "ratings", "plugins"
   add_foreign_key "ratings", "users"

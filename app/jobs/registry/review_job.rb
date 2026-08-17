@@ -4,6 +4,9 @@ module Registry
   # delta check -> AI review -> hold window -> live.
   class ReviewJob < ApplicationJob
     queue_as :default
+    # One review per plugin at a time: concurrent reviews of back-to-back
+    # submissions could both observe the same (or no) capability baseline.
+    limits_concurrency to: 1, key: ->(version) { "review_plugin_#{version.plugin_id}" }
 
     def perform(version)
       return unless version.processing?

@@ -16,7 +16,8 @@ class DataPlaneController < ActionController::API
     version = filename[/\A#{Regexp.escape(params[:plugin])}-(.+)\.tar\.gz\z/, 1]
     return head :not_found unless version
     served = serve("dl/#{params[:publisher]}/#{params[:plugin]}/#{filename}",
-      type: "application/gzip", disposition: "attachment", filename: filename)
+      type: "application/gzip", disposition: "attachment", filename: filename,
+      cache_control: "public, max-age=31536000, immutable")
     # Count only real deliveries of resolvable versions
     count_download(version) if served
   end
@@ -28,14 +29,15 @@ class DataPlaneController < ActionController::API
 
   def content_type_for_json = params[:sig].present? ? "text/plain" : "application/json"
 
-  # Returns truthy only when the file was actually sent
-  def serve(relative_path, type:, disposition: "inline", filename: nil)
+  # Returns truthy only when the file was actually sent. Indexes are mutable
+  # (short cache); immutable tarballs pass their own cache_control.
+  def serve(relative_path, type:, disposition: "inline", filename: nil, cache_control: "public, max-age=60")
     path = DataPlane.root.join(relative_path)
     unless path.file? && path.to_s.start_with?(DataPlane.root.to_s)
       head :not_found
       return false
     end
-    response.headers["Cache-Control"] = "public, max-age=60"
+    response.headers["Cache-Control"] = cache_control
     send_file(path, type: type, disposition: disposition, filename: filename)
     true
   end

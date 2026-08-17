@@ -48,7 +48,14 @@ class SessionsController < ApplicationController
     elsif user&.redeem_login_code(params[:code])
       session.delete(:pending_email)
       start_new_session_for user
-      redirect_to user.onboarded? ? after_authentication_url : onboarding_path
+      # A saved destination (e.g. a seeded-namespace claim link) wins over
+      # onboarding — forcing a claimant through handle-claiming first would
+      # burn an unrelated permanent namespace.
+      if session[:return_to_after_authenticating].present? || user.onboarded?
+        redirect_to after_authentication_url
+      else
+        redirect_to onboarding_path
+      end
     else
       flash.now[:alert] = "Invalid or expired code — try again."
       @email_address = email

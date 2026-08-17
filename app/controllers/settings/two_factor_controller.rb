@@ -17,9 +17,9 @@ module Settings
     # Confirm enrollment with a code from the authenticator
     def update
       @user = Current.user
-      if @user.enable_otp!(params[:code])
+      if (codes = @user.enable_otp!(params[:code]))
         mark_second_factor_verified!
-        flash[:backup_codes] = @user.otp_backup_codes
+        flash[:backup_codes] = codes
         redirect_to settings_two_factor_path, notice: "Two-factor authentication enabled. Save your backup codes now — this is the only time they're shown."
       else
         redirect_to settings_two_factor_path, alert: "That code didn't match — try again."

@@ -16,10 +16,7 @@ module Registry
         clone = File.join(dir, "repo")
         run! "git", "-c", "transfer.fsckObjects=true", "clone", "--depth", "1", "--quiet",
           "--", repo_url, clone
-        out, status = Open3.capture2("git", "-C", clone, "archive", "--format=tar.gz", "HEAD")
-        raise SnapshotError, "git archive failed for #{repo_url}" unless status.success?
-        raise SnapshotError, "snapshot exceeds size limit" if out.bytesize > TarballInspector::MAX_TARBALL_BYTES
-        out
+        bounded_archive(clone, repo_url)
       end
     end
 
@@ -37,6 +34,23 @@ module Registry
       end
     rescue URI::InvalidURIError, IPAddr::InvalidAddressError
       raise SnapshotError, "invalid repository URL: #{repo_url}"
+    end
+
+    # Reads the archive incrementally and aborts the moment it exceeds the
+    # size cap — an oversized repo can't balloon runner memory first.
+    def self.bounded_archive(clone, repo_url)
+      out = +""
+      IO.popen([ "git", "-C", clone, "archive", "--format=tar.gz", "HEAD" ], "rb") do |io|
+        while (chunk = io.read(64 * 1024))
+          out << chunk
+          if out.bytesize > TarballInspector::MAX_TARBALL_BYTES
+            Process.kill("TERM", io.pid) rescue nil
+            raise SnapshotError, "snapshot exceeds size limit"
+          end
+        end
+      end
+      raise SnapshotError, "git archive failed for #{repo_url}" unless $?.success?
+      out
     end
 
     def self.run!(*command)

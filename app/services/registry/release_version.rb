@@ -5,8 +5,15 @@ module Registry
     def self.call(version, actor: nil)
       raise ArgumentError, "cannot release a #{version.state} version" unless version.releasable?
       raise ArgumentError, "cannot release into a #{version.plugin.state} plugin" unless version.plugin.active?
-      # Suspension between submit and release must stop the release
+      # Suspension or membership loss between submit and release must stop the
+      # release — the hold window exists precisely for this.
       raise ArgumentError, "publisher is suspended" if version.plugin.publisher.suspended?
+      if (submitter = version.user)
+        raise ArgumentError, "submitter is suspended" if submitter.suspended_at.present?
+        unless submitter == Registry::SeedCatalog.system_user || submitter.member_of?(version.plugin.publisher)
+          raise ArgumentError, "submitter is no longer a member of #{version.plugin.publisher.name}"
+        end
+      end
 
       bytes = version.tarball.download
       raise "tarball checksum mismatch at release" unless Digest::SHA256.hexdigest(bytes) == version.sha256

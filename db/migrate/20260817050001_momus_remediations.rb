@@ -9,14 +9,7 @@ class MomusRemediations < ActiveRecord::Migration[8.1]
     # Step-up: sensitive actions require a second factor verified in THIS session
     add_column :sessions, :second_factor_verified_at, :datetime
 
-    # Recompute sort keys — prerelease encoding changed to order numerically
-    reversible do |direction|
-      direction.up do
-        execute("SELECT id, version FROM plugin_versions").each do |row|
-          key = Semver.parse(row["version"]).sort_key
-          execute ActiveRecord::Base.sanitize_sql([ "UPDATE plugin_versions SET version_sort_key = ? WHERE id = ?", key, row["id"] ])
-        end
-      end
-    end
+    # (A sort-key backfill lived here originally; it is superseded by the
+    # self-contained backfill in 20260817060001.)
   end
 end

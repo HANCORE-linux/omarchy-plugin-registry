@@ -8,8 +8,14 @@ class User < ApplicationRecord
   has_many :publishers, through: :memberships
   has_many :api_tokens, dependent: :destroy
   has_many :passkeys, dependent: :destroy
+  has_many :comments, dependent: :destroy
+  has_many :ratings, dependent: :destroy
+  has_many :reports, dependent: :destroy
 
   normalizes :email_address, with: ->(e) { e.strip.downcase }
+
+  # TOTP seed is encrypted at rest; backup codes are stored only as digests
+  encrypts :otp_secret
 
   validates :email_address, presence: true, uniqueness: true,
     format: { with: URI::MailTo::EMAIL_REGEXP }
@@ -67,10 +73,13 @@ class User < ApplicationRecord
     ROTP::TOTP.new(otp_secret, issuer: "plugins.omarchy.org").provisioning_uri(email_address)
   end
 
+  # Returns the plaintext backup codes exactly once, at enrollment; only their
+  # digests are persisted.
   def enable_otp!(code)
     return false unless verify_otp(code)
-    update!(otp_enabled_at: Time.current, otp_backup_codes: generate_backup_codes)
-    true
+    codes = Array.new(8) { SecureRandom.alphanumeric(10).downcase }
+    update!(otp_enabled_at: Time.current, otp_backup_codes: codes.map { |c| Digest::SHA256.hexdigest(c) })
+    codes
   end
 
   def verify_otp(code)
@@ -89,14 +98,11 @@ class User < ApplicationRecord
 
   private
 
-  def generate_backup_codes
-    Array.new(8) { SecureRandom.alphanumeric(10).downcase }
-  end
-
   def consume_backup_code(code)
-    codes = otp_backup_codes || []
-    return false unless codes.include?(code.to_s)
-    update!(otp_backup_codes: codes - [ code.to_s ])
+    digest = Digest::SHA256.hexdigest(code.to_s)
+    digests = otp_backup_codes || []
+    return false unless digests.include?(digest)
+    update!(otp_backup_codes: digests - [ digest ])
     true
   end
 end

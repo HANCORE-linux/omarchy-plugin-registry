@@ -11,6 +11,7 @@ class PluginVersion < ApplicationRecord
   }
 
   belongs_to :plugin
+  belongs_to :user, optional: true # submitting principal; release re-checks it
   has_one_attached :tarball
 
   validates :version, presence: true, uniqueness: { scope: :plugin_id }

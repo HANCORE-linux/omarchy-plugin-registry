@@ -12,11 +12,14 @@ module Registry
       @tarball = tarball
     end
 
+    SHELL_INTERPRETERS = %w[sh bash zsh dash].freeze
+
     def compute
       processes = Set.new
       hosts = Set.new
       paths = Set.new
       keybindings = false
+      dynamic_exec = false
 
       @tarball.contents.each do |path, content|
         next unless CODE_EXTENSIONS.include?(File.extname(path).downcase)
@@ -27,6 +30,16 @@ module Registry
         # bar.run("cmd ..."), execDetached(["cmd", ...])
         text.scan(/command:\s*\[\s*["']([^"']+)["']/) { |m| processes << binary_name(m[0]) }
         text.scan(/\b(?:bar\.run|execDetached|startDetached)\s*\(\s*\[?\s*["']([^"']+)["']/) { |m| processes << binary_name(m[0]) }
+
+        # Opaque execution surfaces (fingerprinted so CHANGES count as growth):
+        # 1. Non-literal command values — `command: argv` or arrays built from
+        #    expressions can run anything.
+        dynamic_exec ||= text.match?(/command:\s*(?!\[\s*["'])[a-zA-Z_\[]/)
+        # 2. Literal shell -c payloads — the binary name "bash" hides the real
+        #    program, so the script itself joins the fingerprint by digest.
+        text.scan(/command:\s*\[\s*["'](?:\/[\w\/]*\/)?(#{SHELL_INTERPRETERS.join('|')})["']\s*,\s*["']-c["']\s*,\s*["'](.{0,4000}?)["']\s*\]/m) do |interpreter, script|
+          processes << "#{interpreter} -c ##{Digest::SHA256.hexdigest(script).first(8)}"
+        end
 
         # Shell scripts: leading command words on each line
         if %w[.sh .bash].include?(File.extname(path).downcase)
@@ -45,7 +58,8 @@ module Registry
         "processes" => processes.reject(&:blank?).sort,
         "network" => hosts.sort,
         "paths" => paths.sort.first(20),
-        "keybindings" => keybindings
+        "keybindings" => keybindings,
+        "dynamic_exec" => dynamic_exec
       }
     end
 
@@ -59,6 +73,7 @@ module Registry
         additions.concat(added.map { |item| "+#{dimension.singularize}: #{item}" })
       end
       additions << "+keybindings" if current["keybindings"] && !previous["keybindings"]
+      additions << "+dynamic_exec (non-literal process commands)" if current["dynamic_exec"] && !previous["dynamic_exec"]
       additions
     end
 

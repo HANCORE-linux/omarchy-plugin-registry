@@ -50,6 +50,9 @@ module OmarchyPluginRegistry
     # Injectable raw-file fetcher for seeded-namespace claim proofs (tests stub it)
     config.x.repo_proof_fetcher = nil
 
+    # Injectable GitHub repo-identity lookup for trusted-publishing registration
+    config.x.github_repo_lookup = nil
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files

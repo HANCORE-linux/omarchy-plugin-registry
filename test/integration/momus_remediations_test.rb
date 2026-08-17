@@ -225,8 +225,8 @@ class MomusRemediationsTest < ActionDispatch::IntegrationTest
       otp_secret: ROTP::Base32.random, otp_enabled_at: Time.current)
     Membership.create!(publisher: @publisher, user:, role: :owner)
     TrustedPublisher.create!(publisher: @publisher, plugin_name: "clock",
-      repository: "acme/clock", workflow: ".github/workflows/publish.yml",
-      environment: "release", created_by: user)
+      repository: "acme/clock", repository_id: "7", repository_owner_id: "8",
+      workflow: ".github/workflows/publish.yml", environment: "release", created_by: user)
 
     rsa = OpenSSL::PKey::RSA.new(2048)
     jwk = JWT::JWK.new(rsa.public_key)

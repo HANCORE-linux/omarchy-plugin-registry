@@ -57,13 +57,34 @@ module Registry
       fail! e.message
     end
 
+    # A quarantined plugin with no versions is a seed-failure placeholder: once
+    # the namespace is claimed, its owner can publish a corrected version and
+    # the plugin reactivates through the normal pipeline.
     def find_or_build_plugin!
       @plugin = publisher.plugins.find_by(name: plugin_name)
       if plugin.nil?
         @plugin = publisher.plugins.new(name: plugin_name)
         fail! plugin.errors.full_messages.join("; ") unless plugin.valid?
+      elsif plugin.quarantined? && plugin.versions.none?
+        plugin.update!(state: :active)
       elsif !plugin.active?
         fail! "#{plugin.full_name} is #{plugin.state.humanize.downcase} and cannot accept new versions", status: :forbidden
+      end
+      check_submission_limits!
+    end
+
+    # Resource brakes: unbounded monotonic submissions would retain 10MB each
+    # and flood the review queue.
+    MAX_PENDING_PER_PLUGIN = 5
+    MAX_SUBMISSIONS_PER_DAY = 12
+
+    def check_submission_limits!
+      return if @system_seed || !plugin.persisted?
+      if plugin.versions.where(state: [ :processing, :held, :quarantined ]).count >= MAX_PENDING_PER_PLUGIN
+        fail! "too many versions awaiting review for #{plugin.full_name} — wait for the pipeline or the admin queue", status: :too_many_requests
+      end
+      if plugin.versions.where(created_at: 24.hours.ago..).count >= MAX_SUBMISSIONS_PER_DAY
+        fail! "publish rate limit reached for #{plugin.full_name} (#{MAX_SUBMISSIONS_PER_DAY}/day)", status: :too_many_requests
       end
     end
 
@@ -94,6 +115,7 @@ module Registry
       ApplicationRecord.transaction do
         plugin.save! unless plugin.persisted?
         @version = plugin.versions.create!(
+          user: user,
           version: tarball.manifest["version"],
           manifest: tarball.manifest,
           sha256: tarball.sha256,

@@ -35,17 +35,17 @@ module Registry
     end
 
     # Repository NAMES are mutable — a transferred or deleted-and-recreated
-    # owner/name must not keep minting tokens. GitHub's numeric repository_id /
-    # repository_owner_id are stable: pin them on first successful exchange,
-    # enforce them forever after.
+    # owner/name must not mint tokens. GitHub's numeric repository_id /
+    # repository_owner_id are pinned at REGISTRATION (GithubRepoLookup) and
+    # enforced on every exchange; rows predating the pin must re-register.
     def self.pin_repository_identity!(trusted, claims)
       repo_id = claims["repository_id"].to_s
       owner_id = claims["repository_owner_id"].to_s
       raise ExchangeError, "OIDC token missing repository identity claims" if repo_id.blank? || owner_id.blank?
-
       if trusted.repository_id.blank?
-        trusted.update!(repository_id: repo_id, repository_owner_id: owner_id)
-      elsif trusted.repository_id != repo_id || trusted.repository_owner_id != owner_id
+        raise ExchangeError, "registration is missing its pinned repository identity — re-register trusted publishing for #{trusted.repository}"
+      end
+      if trusted.repository_id != repo_id || trusted.repository_owner_id != owner_id
         raise ExchangeError, "repository identity changed since registration — re-register trusted publishing for #{trusted.repository}"
       end
     end

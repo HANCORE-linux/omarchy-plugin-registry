@@ -8,8 +8,8 @@ class TrustedPublishingTest < ActionDispatch::IntegrationTest
     Membership.create!(publisher: @publisher, user: @user, role: :owner)
     # Pending publisher: the plugin doesn't exist yet — first CI publish creates it
     @trusted = TrustedPublisher.create!(publisher: @publisher, plugin_name: "weather",
-      repository: "acme/weather", workflow: ".github/workflows/publish.yml",
-      environment: "release", created_by: @user)
+      repository: "acme/weather", repository_id: "424242", repository_owner_id: "1701",
+      workflow: ".github/workflows/publish.yml", environment: "release", created_by: @user)
 
     @rsa = OpenSSL::PKey::RSA.new(2048)
     jwk = JWT::JWK.new(@rsa.public_key)
@@ -99,17 +99,19 @@ class TrustedPublishingTest < ActionDispatch::IntegrationTest
     assert_response :unauthorized
   end
 
-  test "repository identity is pinned on first use — a recreated repo cannot mint" do
-    post "/api/v1/trusted/exchange", params: { token: oidc_token }
-    assert_response :created
-    assert_equal "424242", @trusted.reload.repository_id
-
+  test "repository identity is pinned at registration — a recreated repo cannot mint" do
     post "/api/v1/trusted/exchange", params: { token: oidc_token(repository_id: "999999") }
     assert_response :unauthorized
     assert_match(/identity changed/, response.parsed_body["error"])
 
     post "/api/v1/trusted/exchange", params: { token: oidc_token(repository_id: nil) }
     assert_response :unauthorized
+
+    # Rows without a pinned identity never mint — they must re-register
+    @trusted.update!(repository_id: nil, repository_owner_id: nil)
+    post "/api/v1/trusted/exchange", params: { token: oidc_token }
+    assert_response :unauthorized
+    assert_match(/re-register/, response.parsed_body["error"])
   end
 
   test "direct workflows without job_workflow_ref still exchange; delegating to a foreign reusable workflow does not" do
