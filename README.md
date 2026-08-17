@@ -11,7 +11,8 @@ Full design: [docs/design.md](docs/design.md). Branding: [docs/branding.md](docs
 
 ## Architecture in one paragraph
 
-The Rails app handles accounts (mandatory publisher MFA), namespaces
+The Rails app handles accounts (passwordless — emailed one-time codes like
+Cortex/Herald, with mandatory TOTP for publishers and passkeys planned), namespaces
 (`publisher/name`, first-claim), publishing (short-lived scoped tokens; OIDC
 trusted publishing later), review, and admin (quarantine / yank / kill-bit).
 On every accepted publish it regenerates static index files and freezes the
