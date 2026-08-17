@@ -57,11 +57,11 @@ module Registry
       # GIT_ALLOW_PROTOCOL=file: archiving must never lazy-fetch filtered blobs
       # over the network — a filtered-out oversized blob fails the archive
       # instead of bypassing the transfer limits.
-      IO.popen([ { "GIT_ALLOW_PROTOCOL" => "file" }, "git", "-C", clone, "archive", "--format=tar.gz", "HEAD" ], "rb") do |io|
+      IO.popen([ { "GIT_ALLOW_PROTOCOL" => "file" }, "git", "-C", clone, "archive", "--format=tar.gz", "HEAD" ], "rb", pgroup: true) do |io|
         while (chunk = io.read(64 * 1024))
           out << chunk
           if out.bytesize > TarballInspector::MAX_TARBALL_BYTES
-            Process.kill("TERM", io.pid) rescue nil
+            Process.kill("TERM", -io.pid) rescue (Process.kill("TERM", io.pid) rescue nil)
             raise SnapshotError, "snapshot exceeds size limit"
           end
         end
@@ -75,7 +75,7 @@ module Registry
     # ignores partial-clone filters (or a many-small-blobs repository) cannot
     # fill the disk before a post-hoc check would notice.
     def self.run_with_disk_quota!(watched_dir, *command)
-      Open3.popen3({ "GIT_TERMINAL_PROMPT" => "0" }, *command) do |stdin, _stdout, stderr, wait_thread|
+      Open3.popen3({ "GIT_TERMINAL_PROMPT" => "0" }, *command, pgroup: true) do |stdin, _stdout, stderr, wait_thread|
         stdin.close
         err_reader = Thread.new { stderr.read(64 * 1024).to_s }
         deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + CLONE_TIMEOUT
@@ -99,7 +99,9 @@ module Registry
     end
 
     def self.kill(wait_thread)
-      Process.kill("KILL", wait_thread.pid) rescue nil
+      # Whole process group — git spawns helpers (git-remote-https) that must
+      # die with it
+      Process.kill("KILL", -wait_thread.pid) rescue (Process.kill("KILL", wait_thread.pid) rescue nil)
       wait_thread.join(5)
     end
 

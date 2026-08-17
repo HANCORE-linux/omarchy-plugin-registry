@@ -28,11 +28,13 @@ class TrustedPublisher < ApplicationRecord
   # — a registered workflow delegating to an arbitrary reusable workflow does
   # not get to mint tokens.
   def matches?(claims)
-    expected_prefix = "#{repository}/#{workflow}@"
-    claims["repository"] == repository &&
-      claims["sub"] == "repo:#{repository}:environment:#{environment}" &&
-      claims["workflow_ref"].to_s.start_with?(expected_prefix) &&
-      (claims["job_workflow_ref"].blank? || claims["job_workflow_ref"].to_s.start_with?(expected_prefix)) &&
+    # GitHub repo names are case-insensitive; user-entered casing must not
+    # break the match against canonical claims
+    expected_prefix = "#{repository.downcase}/#{workflow}@"
+    claims["repository"].to_s.downcase == repository.downcase &&
+      claims["sub"].to_s.downcase == "repo:#{repository.downcase}:environment:#{environment.downcase}" &&
+      claims["workflow_ref"].to_s.downcase.start_with?(expected_prefix) &&
+      (claims["job_workflow_ref"].blank? || claims["job_workflow_ref"].to_s.downcase.start_with?(expected_prefix)) &&
       (claims["environment"].blank? || claims["environment"] == environment) &&
       # Releases publish from tags — a modified workflow on a random branch
       # (any collaborator can push one) must not mint tokens even if the

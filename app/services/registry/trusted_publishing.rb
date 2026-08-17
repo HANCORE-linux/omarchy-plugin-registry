@@ -12,7 +12,7 @@ module Registry
       claims = verify(oidc_token)
       reject_replay!(claims)
 
-      matches = TrustedPublisher.where(repository: claims["repository"])
+      matches = TrustedPublisher.where("LOWER(repository) = ?", claims["repository"].to_s.downcase)
         .includes(:publisher, :created_by).select { |tp| tp.matches?(claims) }
       raise ExchangeError, "no trusted publisher registered for #{claims['repository']} / #{claims['job_workflow_ref']}" if matches.empty?
       if matches.size > 1

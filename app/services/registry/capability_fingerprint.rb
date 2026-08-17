@@ -23,6 +23,7 @@ module Registry
       dynamic_exec_sites = Set.new
       dynamic_network_sites = Set.new
       shell_digests = Set.new
+      dynamic_path_sites = Set.new
       @referenced_tokens = Set.new
 
       @tarball.contents.each do |path, content|
@@ -116,6 +117,20 @@ module Registry
           text.scan(pattern) { |m| dynamic_network_sites << site_digest(m) }
         end
         text.scan(%r{["'](/(?:etc|usr|var|opt|home)[^"'\s]*)["']}) { |m| paths << m[0] }
+        # Filesystem paths BUILT at runtime (env() + concatenation, homePath,
+        # StandardPaths, pieces of paths glued with +) are conservatively
+        # modeled as dynamic-path sites: static analysis can't see the final
+        # target, so changes here always reach a reviewer.
+        [
+          /\benv\s*\([^\n]{0,120}/,
+          /StandardPaths[^\n]{0,120}/,
+          /\.homePath\b[^\n]{0,120}/,
+          /["'][^"']*\/[^"']*["']\s*\+[^\n]{0,120}/,
+          /\+\s*["'][^"']*\/[^"']*["'][^\n]{0,120}/,
+          /file:\/\/[^\n]{0,120}/
+        ].each do |pattern|
+          text.scan(pattern) { |m| dynamic_path_sites << site_digest(m) }
+        end
         # Filesystem WRITES are their own dimension: redirections/tee/cp into
         # $HOME are exactly the capability an update must not gain silently.
         text.scan(%r{(?:>>?|\btee\s+(?:-a\s+)?)\s*["']?((?:\$\{?HOME\}?|~)/[^\s"';|&)]+)}) { |m| writes << m[0].delete("{}") }
@@ -140,6 +155,7 @@ module Registry
         "writes" => capped(writes.sort, 200),
         "keybindings" => keybindings,
         "shell_digests" => shell_digests.sort,
+        "dynamic_paths" => capped(dynamic_path_sites.sort, 200),
         "dynamic_exec" => dynamic_exec_sites.sort,
         "dynamic_network" => dynamic_network_sites.sort
       }
@@ -194,7 +210,7 @@ module Registry
         additions.concat(added.map { |item| "+#{dimension.singularize}: #{item}" })
       end
       additions << "+keybindings" if current["keybindings"] && !previous["keybindings"]
-      %w[shell_digests dynamic_exec dynamic_network].each do |dimension|
+      %w[shell_digests dynamic_paths dynamic_exec dynamic_network].each do |dimension|
         added = Array(current[dimension]) - Array(previous[dimension])
         # Legacy boolean fingerprints compare as arrays after Array(); a true
         # baseline becomes [true] and any site list differs, forcing one

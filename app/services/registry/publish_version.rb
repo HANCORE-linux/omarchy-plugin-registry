@@ -161,6 +161,10 @@ module Registry
       # ReleaseVersion applies it when a version actually clears review, so a
       # rejected update can never deface the live page.
       ApplicationRecord.transaction do
+        # Serialize an account's submissions: quotas re-checked under the USER
+        # row lock so concurrent uploads can't all observe pre-commit counts
+        user.lock!
+        check_submission_limits!
         plugin.save! unless plugin.persisted?
         # Re-run the ordering checks under the row lock: two concurrent
         # submissions must not both pass the same pre-transaction baseline

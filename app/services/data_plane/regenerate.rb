@@ -17,13 +17,12 @@ module DataPlane
       generator.reconcile_disk_revocations!
       generator.write_config
       generator.write_revocations
-      generator.write_all_listing
-      # Artifacts BEFORE indexes: a signed index must never promise a tarball
-      # the data plane can't serve
+      # Artifacts BEFORE any index that promises them — including all.json
       Plugin.find_each do |p|
         generator.restore_missing_tarballs(p)
         generator.write_plugin_index(p)
       end
+      generator.write_all_listing
     end
 
     # Full regeneration must be able to rebuild the ENTIRE data plane from the
