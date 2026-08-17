@@ -82,7 +82,7 @@ module Settings
     def provisional_otp_secret!
       pending_otp_secret || begin
         secret = ROTP::Base32.random
-        session[:pending_otp] = { "secret" => secret, "at" => Time.current.to_i }
+        session[:pending_otp] = { "secret" => secret, "at" => Time.current.to_i, "user_id" => Current.user.id }
         secret
       end
     end
@@ -90,6 +90,8 @@ module Settings
     def pending_otp_secret
       pending = session[:pending_otp]
       return nil if pending.blank? || pending["at"].to_i < PROVISIONAL_TTL.ago.to_i
+      # Bound to the account that provisioned it — never portable across users
+      return nil unless pending["user_id"] == Current.user.id
       pending["secret"]
     end
   end

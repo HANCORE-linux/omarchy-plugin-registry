@@ -12,10 +12,13 @@ module Registry
       "panel" => %w[.qml],
       "popout" => %w[.qml],
       "service" => %w[.qml .sh],
-      "command" => %w[.sh],
-      "theme" => %w[.json .css]
+      "command" => %w[.sh]
     }.freeze
     ALLOWED_KINDS = KIND_ENTRY_RULES.keys.freeze
+    # Deferred by the design ("maybe: themes join the same registry") — no
+    # client contract or conformance fixture exists yet, so accepting the kind
+    # would promise installs Quattro can't perform.
+    DEFERRED_KINDS = %w[theme].freeze
     ID_FORMAT = /\A[A-Za-z0-9][A-Za-z0-9._-]*\z/
 
     # The complete SPDX license list, vendored from spdx.org (config/spdx.json,
@@ -105,7 +108,9 @@ module Registry
       unless kinds.is_a?(Array) && kinds.any? && kinds.all? { |k| k.is_a?(String) }
         return errors << "kinds must be a non-empty array of strings"
       end
-      unknown = kinds - ALLOWED_KINDS
+      deferred = kinds & DEFERRED_KINDS
+      errors << "kinds not yet supported: #{deferred.join(', ')} (themes are deferred until the client contract lands)" if deferred.any?
+      unknown = kinds - ALLOWED_KINDS - DEFERRED_KINDS
       errors << "unknown kinds: #{unknown.join(', ')}" if unknown.any?
     end
 

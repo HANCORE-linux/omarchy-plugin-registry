@@ -94,6 +94,12 @@ module Registry
         end
         writer.join(1)
         drainer.join(1)
+        # The parent may exit while a descendant keeps stdout open — bound the
+        # read too, killing the whole process group if it lingers
+        unless reader.join(5)
+          Process.kill("KILL", -wait_thread.pid) rescue nil
+          raise "reviewer exited but a descendant held stdout open"
+        end
         output = reader.value.to_s
         raise "reviewer output exceeds #{MAX_OUTPUT_BYTES} bytes" if output.bytesize > MAX_OUTPUT_BYTES
         raise "reviewer exited #{wait_thread.value.exitstatus}" unless wait_thread.value.success?

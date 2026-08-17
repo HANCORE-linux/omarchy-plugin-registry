@@ -17,13 +17,19 @@ module Settings
         # allowlist, so non-discoverable credentials could never sign in
         authenticator_selection: { resident_key: "required", user_verification: "required" }
       )
-      session[:webauthn_challenge] = creation_options.challenge
+      session[:webauthn_challenge] = { "c" => creation_options.challenge, "user_id" => user.id }
       render json: creation_options
     end
 
     def create
       credential = WebAuthn::Credential.from_create(JSON.parse(params.require(:credential)))
-      credential.verify(session.delete(:webauthn_challenge), user_verification: true)
+      challenge = session.delete(:webauthn_challenge)
+      # Bound to the account that requested the ceremony — defense in depth
+      # against any challenge surviving an account switch
+      unless challenge.is_a?(Hash) && challenge["user_id"] == Current.user.id
+        return render json: { error: "Enrollment expired — try again." }, status: :unprocessable_entity
+      end
+      credential.verify(challenge["c"], user_verification: true)
 
       # Enrollment + first-factor cooldown decide atomically under the user
       # row lock, sharing the serialization point with TOTP enrollment —

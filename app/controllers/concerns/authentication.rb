@@ -57,6 +57,13 @@ module Authentication
     end
 
     def start_new_session_for(user)
+      # The cookie session RESETS at every authentication boundary: pending
+      # TOTP secrets, WebAuthn challenges, and step-up breadcrumbs from a
+      # previous browser occupant must never leak into the new account. Only
+      # the validated return path survives.
+      return_to = session[:return_to_after_authenticating]
+      reset_session
+      session[:return_to_after_authenticating] = return_to if return_to.present?
       user.sessions.create!(user_agent: request.user_agent, ip_address: request.remote_ip).tap do |session|
         Current.session = session
         cookies.signed[:session_id] = { value: session.id, httponly: true, same_site: :lax,
@@ -66,6 +73,8 @@ module Authentication
 
     def terminate_session
       Current.session.destroy
+      Current.session = nil
       cookies.delete(:session_id)
+      reset_session
     end
 end

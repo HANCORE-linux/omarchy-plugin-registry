@@ -36,12 +36,12 @@ class InitialSchema < ActiveRecord::Migration[8.1]
       t.datetime "last_used_at"
       t.string "plugin_name", null: false
       t.json "provenance"
-      t.integer "publisher_id", null: false
+      t.bigint "publisher_id", null: false
       t.datetime "revoked_at"
       t.string "token_digest", null: false
       t.string "token_hint", null: false
       t.datetime "updated_at", null: false
-      t.integer "user_id", null: false
+      t.bigint "user_id", null: false
       t.index [ "publisher_id" ], name: "index_api_tokens_on_publisher_id"
       t.index [ "token_digest" ], name: "index_api_tokens_on_token_digest", unique: true
       t.index [ "user_id" ], name: "index_api_tokens_on_user_id"
@@ -52,10 +52,10 @@ class InitialSchema < ActiveRecord::Migration[8.1]
       t.datetime "created_at", null: false
       t.json "metadata", default: {}, null: false
       t.boolean "public", default: false, null: false
-      t.integer "subject_id", null: false
+      t.bigint "subject_id", null: false
       t.string "subject_type", null: false
       t.datetime "updated_at", null: false
-      t.integer "user_id"
+      t.bigint "user_id"
       t.index [ "public", "created_at" ], name: "index_audit_events_on_public_and_created_at"
       t.index [ "subject_type", "subject_id" ], name: "index_audit_events_on_subject"
       t.index [ "user_id" ], name: "index_audit_events_on_user_id"
@@ -65,9 +65,9 @@ class InitialSchema < ActiveRecord::Migration[8.1]
       t.text "body", null: false
       t.datetime "created_at", null: false
       t.datetime "hidden_at"
-      t.integer "plugin_id", null: false
+      t.bigint "plugin_id", null: false
       t.datetime "updated_at", null: false
-      t.integer "user_id", null: false
+      t.bigint "user_id", null: false
       t.index [ "plugin_id", "created_at" ], name: "index_comments_on_plugin_id_and_created_at"
       t.index [ "plugin_id" ], name: "index_comments_on_plugin_id"
       t.index [ "user_id" ], name: "index_comments_on_user_id"
@@ -76,7 +76,7 @@ class InitialSchema < ActiveRecord::Migration[8.1]
     create_table "daily_downloads", force: :cascade do |t|
       t.integer "count", default: 0, null: false
       t.date "date", null: false
-      t.integer "plugin_version_id", null: false
+      t.bigint "plugin_version_id", null: false
       t.index [ "plugin_version_id", "date" ], name: "index_daily_downloads_on_plugin_version_id_and_date", unique: true
       t.index [ "plugin_version_id" ], name: "index_daily_downloads_on_plugin_version_id"
     end
@@ -86,12 +86,12 @@ class InitialSchema < ActiveRecord::Migration[8.1]
       t.string "device_code_digest", null: false
       t.datetime "expires_at", null: false
       t.string "plugin_name"
-      t.integer "publisher_id"
+      t.bigint "publisher_id"
       t.integer "status", default: 0, null: false
       t.string "token_ciphertext"
       t.datetime "updated_at", null: false
       t.string "user_code", null: false
-      t.integer "user_id"
+      t.bigint "user_id"
       t.index [ "device_code_digest" ], name: "index_device_authorizations_on_device_code_digest", unique: true
       t.index [ "publisher_id" ], name: "index_device_authorizations_on_publisher_id"
       t.index [ "user_code" ], name: "index_device_authorizations_on_user_code", unique: true
@@ -104,7 +104,7 @@ class InitialSchema < ActiveRecord::Migration[8.1]
       t.datetime "consumed_at"
       t.datetime "created_at", null: false
       t.datetime "updated_at", null: false
-      t.integer "user_id", null: false
+      t.bigint "user_id", null: false
       t.index [ "user_id", "code" ], name: "index_login_codes_on_user_id_and_code"
       t.index [ "user_id" ], name: "index_login_codes_on_user_id"
     end
@@ -112,10 +112,10 @@ class InitialSchema < ActiveRecord::Migration[8.1]
     create_table "memberships", force: :cascade do |t|
       t.datetime "created_at", null: false
       t.boolean "founding", default: false, null: false
-      t.integer "publisher_id", null: false
+      t.bigint "publisher_id", null: false
       t.integer "role", default: 0, null: false
       t.datetime "updated_at", null: false
-      t.integer "user_id", null: false
+      t.bigint "user_id", null: false
       t.index [ "publisher_id", "user_id" ], name: "index_memberships_on_publisher_id_and_user_id", unique: true
       t.index [ "publisher_id" ], name: "index_memberships_on_publisher_id"
       t.index [ "user_id" ], name: "index_memberships_on_user_id"
@@ -129,7 +129,7 @@ class InitialSchema < ActiveRecord::Migration[8.1]
       t.string "public_key", null: false
       t.bigint "sign_count", default: 0, null: false
       t.datetime "updated_at", null: false
-      t.integer "user_id", null: false
+      t.bigint "user_id", null: false
       t.index [ "external_id" ], name: "index_passkeys_on_external_id", unique: true
       t.index [ "user_id" ], name: "index_passkeys_on_user_id"
     end
@@ -142,7 +142,7 @@ class InitialSchema < ActiveRecord::Migration[8.1]
       t.string "license"
       t.json "manifest", null: false
       t.string "min_omarchy_version"
-      t.integer "plugin_id", null: false
+      t.bigint "plugin_id", null: false
       t.json "provenance"
       t.datetime "published_at"
       t.text "review_notes"
@@ -151,7 +151,7 @@ class InitialSchema < ActiveRecord::Migration[8.1]
       t.integer "size_bytes", null: false
       t.integer "state", default: 0, null: false
       t.datetime "updated_at", null: false
-      t.integer "user_id"
+      t.bigint "user_id"
       t.string "version", null: false
       t.string "version_sort_key", null: false
       t.string "yank_reason"
@@ -170,7 +170,7 @@ class InitialSchema < ActiveRecord::Migration[8.1]
       t.string "latest_version"
       t.string "name", null: false
       t.string "normalized_name", null: false
-      t.integer "publisher_id", null: false
+      t.bigint "publisher_id", null: false
       t.integer "ratings_count", default: 0, null: false
       t.integer "ratings_sum", default: 0, null: false
       t.text "readme"
@@ -203,9 +203,9 @@ class InitialSchema < ActiveRecord::Migration[8.1]
 
     create_table "ratings", force: :cascade do |t|
       t.datetime "created_at", null: false
-      t.integer "plugin_id", null: false
+      t.bigint "plugin_id", null: false
       t.datetime "updated_at", null: false
-      t.integer "user_id", null: false
+      t.bigint "user_id", null: false
       t.integer "value", null: false
       t.index [ "plugin_id", "user_id" ], name: "index_ratings_on_plugin_id_and_user_id", unique: true
       t.index [ "plugin_id" ], name: "index_ratings_on_plugin_id"
@@ -221,12 +221,12 @@ class InitialSchema < ActiveRecord::Migration[8.1]
     create_table "reports", force: :cascade do |t|
       t.datetime "created_at", null: false
       t.string "reason", null: false
-      t.integer "reportable_id", null: false
+      t.bigint "reportable_id", null: false
       t.string "reportable_type", null: false
       t.datetime "resolved_at"
-      t.integer "resolved_by_id"
+      t.bigint "resolved_by_id"
       t.datetime "updated_at", null: false
-      t.integer "user_id", null: false
+      t.bigint "user_id", null: false
       t.index [ "reportable_type", "reportable_id" ], name: "index_reports_on_reportable"
       t.index [ "resolved_by_id" ], name: "index_reports_on_resolved_by_id"
       t.index [ "user_id" ], name: "index_reports_on_user_id"
@@ -234,8 +234,8 @@ class InitialSchema < ActiveRecord::Migration[8.1]
 
     create_table "revocations", force: :cascade do |t|
       t.datetime "created_at", null: false
-      t.integer "created_by_id", null: false
-      t.integer "plugin_id", null: false
+      t.bigint "created_by_id", null: false
+      t.bigint "plugin_id", null: false
       t.string "reason", null: false
       t.datetime "updated_at", null: false
       t.string "version"
@@ -250,17 +250,17 @@ class InitialSchema < ActiveRecord::Migration[8.1]
       t.datetime "second_factor_verified_at"
       t.datetime "updated_at", null: false
       t.string "user_agent"
-      t.integer "user_id", null: false
+      t.bigint "user_id", null: false
       t.index [ "user_id" ], name: "index_sessions_on_user_id"
     end
 
     create_table "trusted_publishers", force: :cascade do |t|
       t.datetime "created_at", null: false
-      t.integer "created_by_id", null: false
+      t.bigint "created_by_id", null: false
       t.string "environment", default: "release", null: false
       t.string "plugin_name", null: false
       t.string "provider", default: "github", null: false
-      t.integer "publisher_id", null: false
+      t.bigint "publisher_id", null: false
       t.string "repository", null: false
       t.string "repository_id"
       t.string "repository_owner_id"

@@ -3,7 +3,7 @@
 <% if @plugin.security_holding? %>
   <div class="notice-banner notice-banner--danger">
     <strong>Security holding.</strong> This plugin was removed for malware and its name is permanently retired.
-    Installed copies have been disabled via the revocation list.
+    Every version is on the signed revocation list; clients disable installed copies when they next sync it.
   </div>
 <% elsif @plugin.quarantined? %>
   <div class="notice-banner notice-banner--warning">
@@ -16,7 +16,7 @@
   </div>
 <% elsif @revoked %>
   <div class="notice-banner notice-banner--danger">
-    <strong>Security notice.</strong> One or more versions of this plugin were revoked. Affected installs have been disabled.
+    <strong>Security notice.</strong> One or more versions of this plugin are on the signed revocation list; clients disable affected installs when they next sync it.
   </div>
 <% elsif (withdrawn = @versions.select(&:yanked?)).any? %>
   <div class="notice-banner notice-banner--warning">
