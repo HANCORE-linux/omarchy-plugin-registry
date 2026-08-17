@@ -101,12 +101,13 @@ class User < ApplicationRecord
     totp_matches?(code) || consume_backup_code(code)
   end
 
+  # Only ACCEPTED memberships confer anything — an invitation is not an affiliation
   def owner_of?(publisher)
-    memberships.exists?(publisher: publisher, role: :owner)
+    memberships.accepted.exists?(publisher: publisher, role: :owner)
   end
 
   def member_of?(publisher)
-    memberships.exists?(publisher: publisher)
+    memberships.accepted.exists?(publisher: publisher)
   end
 
   private

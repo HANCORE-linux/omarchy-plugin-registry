@@ -39,4 +39,35 @@ class IndexSigningTest < ActionDispatch::IntegrationTest
     signature = DataPlane.read("all.json.sig")
     assert_not DataPlane::Signer.verify?(content + " ", signature)
   end
+
+  test "signed files carry strictly increasing millisecond-anchored generations with expiry" do
+    first = JSON.parse(DataPlane.read("revocations.json"))
+    assert_kind_of Integer, first["generation"]
+    assert_operator first["generation"], :>=, (Time.current.to_f * 1000).to_i - 60_000
+    assert Time.parse(first["expires_at"]).future?
+
+    DataPlane::Regenerate.all
+    second = JSON.parse(DataPlane.read("revocations.json"))
+    assert_operator second["generation"], :>, first["generation"]
+
+    # every signed file of one run carries the same generation; the index meta
+    # line carries it too
+    config = JSON.parse(DataPlane.read("config.json"))
+    all = JSON.parse(DataPlane.read("all.json"))
+    meta = JSON.parse(DataPlane.read("index/acme/weather.json").lines.first)
+    assert meta["meta"]
+    assert_equal second["generation"], config["generation"]
+    assert_equal second["generation"], all["generation"]
+    assert_equal second["generation"], meta["generation"]
+    assert Time.parse(meta["expires_at"]).future?
+  end
+
+  test "a changed signing key refuses to replace the trust root" do
+    original_pub = DataPlane.root.join("signing-key.pub").read
+    DataPlane.root.join("signing-key.pub").write("SOMEONE-ELSES-KEY")
+    error = assert_raises(RuntimeError) { DataPlane::Regenerate.all }
+    assert_match(/refusing to replace the trust root/, error.message)
+  ensure
+    DataPlane.root.join("signing-key.pub").write(original_pub)
+  end
 end

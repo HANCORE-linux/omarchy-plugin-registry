@@ -23,6 +23,7 @@ module Registry
       dynamic_exec_sites = Set.new
       dynamic_network_sites = Set.new
       shell_digests = Set.new
+      @referenced_tokens = Set.new
 
       @tarball.contents.each do |path, content|
         ext = File.extname(path).downcase
@@ -40,7 +41,7 @@ module Registry
         # fingerprint as a whole (argv digest) — swapping ["env","date"] for
         # ["env","sh","-c",…], or any other argv change, is growth. Individual
         # binaries are also recorded, looking through wrapper commands.
-        text.scan(/command:\s*\[([^\]]*)\]/m) do |m|
+        text.scan(/command\s*[:=]\s*\[([^\]]*)\]/m) do |m|
           record_command_array(m[0], processes, dynamic_exec_sites)
         end
         text.scan(/\b(?:bar\.run|execDetached|startDetached)\s*\(\s*\[([^\]]*)\]/m) do |m|
@@ -56,8 +57,8 @@ module Registry
           /Qt\.createQmlObject\s*\([^\n]{0,160}/,
           /Qt\.createComponent\s*\(\s*(?!["'])[^\n]{0,160}/,
           /\bsetSource\s*\([^\n]{0,160}/,
-          /command:\s*(?!\[\s*["'])[a-zA-Z_\[][^\n]{0,160}/,
-          /command:\s*\[\s*["'](?:\/[\w\/]*\/)?(?:#{SHELL_INTERPRETERS.join('|')})["']\s*,\s*["']-c["']\s*,\s*(?!["'])[^\n]{0,160}/,
+          /command\s*[:=]\s*(?!\[\s*["'])[a-zA-Z_\[][^\n]{0,160}/,
+          /command\s*[:=]\s*\[\s*["'](?:\/[\w\/]*\/)?(?:#{SHELL_INTERPRETERS.join('|')})["']\s*,\s*["']-c["']\s*,\s*(?!["'])[^\n]{0,160}/,
           /\b(?:bar\.run|execDetached|startDetached)\s*\(\s*(?!["'])(?!\[\s*["'])[^\n]{0,160}/
         ].each do |pattern|
           text.scan(pattern) { |m| dynamic_exec_sites << site_digest(m) }
@@ -79,7 +80,9 @@ module Registry
           text.each_line do |line|
             next if line.strip.start_with?("#")
             line.split(/;|&&|\|\||\|/).each do |segment|
-              word = segment.strip.split(/\s+/).find do |candidate|
+              words = segment.strip.split(/\s+/)
+              words.each { |w| @referenced_tokens << w }
+              word = words.find do |candidate|
                 !SHELL_NOISE.include?(candidate) && candidate.match?(%r{\A[A-Za-z0-9_./-]+\z}) && candidate.exclude?("=")
               end
               processes << binary_name(word) if word
@@ -104,6 +107,17 @@ module Registry
         # $HOME are exactly the capability an update must not gain silently.
         text.scan(%r{(?:>>?|\btee\s+(?:-a\s+)?)\s*["']?((?:\$\{?HOME\}?|~)/[^\s"';|&)]+)}) { |m| writes << m[0].delete("{}") }
         keybindings ||= text.match?(/\bShortcut\b|keybinding|GlobalShortcut/i)
+      end
+
+      # Any in-tarball file that an invocation references by name is itself
+      # executable content: its digest joins the fingerprint, so changing
+      # payload.txt behind an unchanged `bash payload.txt` is growth.
+      @tarball.files.each do |file_path|
+        basename = File.basename(file_path)
+        if @referenced_tokens.include?(file_path) || @referenced_tokens.include?(basename) ||
+           @referenced_tokens.include?("./#{file_path}")
+          shell_digests << "#{file_path}##{Digest::SHA256.hexdigest(@tarball.contents[file_path].to_s).first(12)}"
+        end
       end
 
       {
@@ -134,6 +148,7 @@ module Registry
       elements = raw.scan(/["']([^"']*)["']/).flatten
       residue = raw.gsub(/["'][^"']*["']/, "").gsub(/[\s,]/, "")
       dynamic_exec_sites << site_digest(raw) if residue.present?
+      elements.each { |e| e.split(/\s+/).each { |w| @referenced_tokens << w } }
       record_argv(elements, processes) if elements.any?
     end
 

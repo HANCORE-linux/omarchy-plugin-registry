@@ -28,10 +28,12 @@ Rails.application.routes.draw do
   resources :trusted_publishers, only: %i[create destroy]
   resources :orgs, only: %i[new create] do
     member do
-      post :add_member
+      post :invite_member
       post :remove_member
     end
   end
+  post "invitations/:id/accept", to: "invitations#accept", as: :accept_invitation
+  post "invitations/:id/decline", to: "invitations#decline", as: :decline_invitation
 
   # Public directory
   get "plugins/:publisher/:name", to: "plugins#show", as: :plugin

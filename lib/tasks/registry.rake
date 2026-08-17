@@ -89,7 +89,7 @@ namespace :registry do
     Plugin.find_each do |plugin|
       plugin.update_columns(downloads_count: plugin.versions.sum(:downloads_count))
     end
-    DataPlane::Regenerate.all
-    puts "Imported #{imported} rows (#{skipped} skipped); rollups refreshed."
+    DataPlane::RegenerateJob.perform_later
+    puts "Imported #{imported} rows (#{skipped} skipped); rollups refreshed, regeneration queued."
   end
 end

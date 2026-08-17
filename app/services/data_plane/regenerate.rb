@@ -55,9 +55,16 @@ module DataPlane
 
     def write_config
       # The public key is served unsigned (trust root — clients pin it);
-      # everything else carries a detached .sig made with this key.
+      # everything else carries a detached .sig made with this key. A CHANGED
+      # key aborts regeneration outright: an accidental seed swap must never
+      # silently replace the trust root and strand every pinned client.
       key_path = DataPlane.root.join("signing-key.pub")
       FileUtils.mkdir_p(DataPlane.root)
+      if key_path.exist? && key_path.read != Signer.public_key_base64 &&
+          ENV["REGISTRY_ALLOW_KEY_ROTATION"] != "1"
+        raise "signing key changed since the data plane was written — refusing to replace the trust root " \
+              "(set REGISTRY_ALLOW_KEY_ROTATION=1 only for a deliberate, announced rotation)"
+      end
       key_path.write(Signer.public_key_base64)
 
       DataPlane.write("config.json", JSON.pretty_generate({

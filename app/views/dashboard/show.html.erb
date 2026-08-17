@@ -10,6 +10,26 @@
     <% end %>
   </p>
 
+  <% pending_invites = @user.memberships.pending.includes(:publisher) %>
+  <% if pending_invites.any? %>
+    <section>
+      <h2>Invitations</h2>
+      <table class="table" style="max-width: 560px;">
+        <tbody>
+          <% pending_invites.each do |invite| %>
+            <tr>
+              <td><strong><%= invite.publisher.name %></strong> invited you as <%= invite.role %></td>
+              <td class="actions">
+                <%= button_to "Accept", accept_invitation_path(invite), class: "button button--small" %>
+                <%= button_to "Decline", decline_invitation_path(invite), class: "button button--ghost button--small" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </section>
+  <% end %>
+
   <% if flash[:minted_token] %>
     <div class="token-reveal">
       <p class="eyebrow">Copy this token now — it won't be shown again</p>
@@ -27,7 +47,7 @@
             <% publisher.memberships.includes(:user).each do |membership| %>
               <tr>
                 <td><%= membership.user.name || membership.user.email_address %></td>
-                <td><%= membership.role %></td>
+                <td><%= membership.role %><%= ' <span class="badge badge--warning">invited</span>'.html_safe if membership.pending? %></td>
                 <td class="actions">
                   <%= button_to "Remove", remove_member_org_path(publisher, membership_id: membership.id),
                         class: "button button--ghost button--small" %>
@@ -36,16 +56,16 @@
             <% end %>
           </tbody>
         </table>
-        <%= form_with url: add_member_org_path(publisher), class: "form-inline", style: "margin-bottom: 24px;" do %>
+        <%= form_with url: invite_member_org_path(publisher), class: "form-inline", style: "margin-bottom: 24px;" do %>
           <div class="field">
-            <label>Add member by email</label>
+            <label>Invite member by email</label>
             <input type="email" name="email_address" required placeholder="dev@example.com">
           </div>
           <div class="field">
             <label>Role</label>
             <select name="role" class="select"><option value="publisher">publisher</option><option value="owner">owner</option></select>
           </div>
-          <button type="submit" class="button button--small">Add</button>
+          <button type="submit" class="button button--small">Invite</button>
         <% end %>
       <% end %>
       <% if publisher.plugins.any? %>

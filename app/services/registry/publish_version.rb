@@ -45,13 +45,13 @@ module Registry
       return if @system_seed
       fail! "account is suspended", status: :forbidden if user.suspended_at.present?
       fail! "namespace is unclaimed — prove control of the source repo to claim it", status: :forbidden unless publisher.claimed?
-      membership = user.memberships.find_by(publisher: publisher)
+      membership = user.memberships.accepted.find_by(publisher: publisher)
       fail! "you are not a member of #{publisher.name}", status: :forbidden if membership.nil?
-      # Roster changes are an account-takeover vector: freshly ADDED members
+      # Roster changes are an account-takeover vector: freshly ACCEPTED members
       # wait out a cooldown before publishing through the namespace. Exemption
       # is the explicit founding marker set when the namespace was created —
       # never inferred, never drifting.
-      if membership.created_at > User::PUBLISH_COOLDOWN.ago && !membership.founding?
+      if membership.accepted_at > User::PUBLISH_COOLDOWN.ago && !membership.founding?
         fail! "recently added members wait #{User::PUBLISH_COOLDOWN.inspect} before publishing to #{publisher.name}", status: :forbidden
       end
       fail! "add a passkey or enable two-factor authentication to publish", status: :forbidden unless user.second_factor?
