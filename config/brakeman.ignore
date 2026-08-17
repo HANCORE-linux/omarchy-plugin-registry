@@ -1,0 +1,8 @@
+{
+  "ignored_warnings": [
+    {
+      "fingerprint": "d73c38032d6699d71b9e074e8b61ac56d7cdc5d4dfeea792b2dbc1d48a35ca3f",
+      "note": "False positive: rqrcode as_svg(use_path: true) emits only machine-generated QR path data — no user-controlled content reaches the SVG output."
+    }
+  ]
+}

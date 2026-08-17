@@ -17,7 +17,7 @@ class OrgsController < ApplicationController
 
   # Add a member by email (owner only)
   def add_member
-    publisher = Publisher.org.find_by!(name: params[:id])
+    publisher = Publisher.org.find(params[:id])
     return head :forbidden unless Current.user.owner_of?(publisher)
 
     user = User.find_by(email_address: params[:email_address].to_s.strip.downcase)

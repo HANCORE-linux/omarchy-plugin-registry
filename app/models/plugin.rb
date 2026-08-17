@@ -15,8 +15,6 @@ class Plugin < ApplicationRecord
 
   scope :listed, -> { where(state: :active) }
 
-  def to_param = name
-
   # The manifest id installed clients use: today's dot-convention made a rule.
   def manifest_id = "#{publisher.name}.#{name}"
 

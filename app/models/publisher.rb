@@ -17,8 +17,6 @@ class Publisher < ApplicationRecord
 
   scope :claimed, -> { where(claimed: true) }
 
-  def to_param = name
-
   def owners = users.merge(Membership.owner)
 
   def suspended? = suspended_at.present?
