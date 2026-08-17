@@ -55,7 +55,11 @@ module Registry
           if text_like?(content)
             text = content.dup.force_encoding(Encoding::UTF_8)
             text = text.scrub unless text.valid_encoding?
-            scan_file(path, text.delete_prefix("\uFEFF"))
+            # Docs legitimately carry RTL/formatting marks — they flag for a
+            # human instead of auto-rejecting; CODE never needs them.
+            docs = %w[.md .txt].include?(File.extname(path).downcase) ||
+              PLAIN_FILENAMES.include?(File.basename(path, ".*").downcase)
+            scan_file(path, text.delete_prefix("\uFEFF"), strict: !docs)
           else
             # Binary bytes hiding behind a code extension: pattern rules can't
             # see into it, so a human must.

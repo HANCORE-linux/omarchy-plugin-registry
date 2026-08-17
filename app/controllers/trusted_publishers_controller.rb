@@ -41,7 +41,13 @@ class TrustedPublishersController < ApplicationController
   def destroy
     trusted = TrustedPublisher.find(params[:id])
     return head :forbidden unless Current.user.owner_of?(trusted.publisher)
-    trusted.destroy!
+    ApplicationRecord.transaction do
+      # Tokens the registration minted die with it — a token exchanged seconds
+      # before removal must not keep publishing for its remaining lifetime
+      ApiToken.usable.where(publisher: trusted.publisher, plugin_name: trusted.plugin_name)
+        .where.not(provenance: nil).find_each(&:revoke!)
+      trusted.destroy!
+    end
     AuditEvent.record!(actor: Current.user, action: "trusted_publisher.remove", subject: trusted.publisher,
       metadata: { scope: "#{trusted.publisher.name}/#{trusted.plugin_name}" })
     redirect_to dashboard_path, notice: "Trusted publisher removed."

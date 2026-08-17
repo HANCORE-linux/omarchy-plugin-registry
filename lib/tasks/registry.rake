@@ -42,6 +42,20 @@ namespace :registry do
     puts "View counts imported."
   end
 
+  desc "Import + enforce a signed revocations.json from ANY surviving copy (CDN cache, object storage, a client mirror) after a restore"
+  task :import_revocations, [ :path ] => :environment do |_t, args|
+    abort "usage: rails registry:import_revocations[revocations.json] (with its .sig alongside)" if args[:path].blank?
+    content = File.read(args[:path])
+    signature_path = "#{args[:path]}.sig"
+    abort "#{signature_path} missing — only SIGNED kill lists can be imported" unless File.exist?(signature_path)
+    abort "signature verification failed" unless DataPlane::Signer.verify?(content, File.read(signature_path))
+
+    generator = DataPlane::Regenerate.new
+    generator.import_revocation_entries(JSON.parse(content).fetch("revocations", []))
+    DataPlane::RegenerateJob.perform_later
+    puts "Revocations imported and enforced; regeneration queued."
+  end
+
   desc "Regenerate the entire static data plane (queued — respects the single-regenerator lock)"
   task regenerate: :environment do
     DataPlane::RegenerateJob.perform_later

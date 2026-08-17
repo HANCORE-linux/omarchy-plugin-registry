@@ -4,47 +4,38 @@ class OrgsController < ApplicationController
   # Namespaces are first-claim and burned forever. The durable control is a
   # per-ACCOUNT ledger (founding org memberships), not a rotatable IP limit.
   MAX_ORGS_PER_WEEK = 3
-  before_action only: :create do
-    # Counted from the audit ledger — membership rows can be deleted, audit
-    # events cannot
-    recent = AuditEvent.where(user: Current.user, action: "org.create", created_at: 7.days.ago..).count
-    if recent >= MAX_ORGS_PER_WEEK
-      redirect_to dashboard_path, alert: "Org creation is limited to #{MAX_ORGS_PER_WEEK} per week per account."
-    end
-  end
 
   def new
     @publisher = Publisher.new(kind: :org)
   end
 
+  # Quota check and creation are ONE atomic unit under the user row lock —
+  # parallel requests serialize, and the audit ledger (which member removal
+  # can't erase) commits with the namespace or not at all.
   def create
     @publisher = Publisher.new(name: params.dig(:publisher, :name).to_s.downcase.strip,
       display_name: params.dig(:publisher, :display_name), kind: :org)
-    if @publisher.save
+    quota_hit = false
+    ApplicationRecord.transaction do
+      Current.user.lock!
+      recent = AuditEvent.where(user: Current.user, action: "org.create", created_at: 7.days.ago..).count
+      if recent >= MAX_ORGS_PER_WEEK
+        quota_hit = true
+        raise ActiveRecord::Rollback
+      end
+      unless @publisher.save
+        raise ActiveRecord::Rollback
+      end
       Membership.create!(publisher: @publisher, user: Current.user, role: :owner, founding: true)
       AuditEvent.record!(actor: Current.user, action: "org.create", subject: @publisher,
         public: true, metadata: { name: @publisher.name })
+    end
+    if quota_hit
+      redirect_to dashboard_path, alert: "Org creation is limited to #{MAX_ORGS_PER_WEEK} per week per account."
+    elsif @publisher.persisted?
       redirect_to dashboard_path, notice: "Org #{@publisher.name} created."
     else
       render :new, status: :unprocessable_entity
-    end
-  end
-
-  # Add a member by email (owner only)
-  def add_member
-    publisher = Publisher.org.find(params[:id])
-    return head :forbidden unless Current.user.owner_of?(publisher)
-
-    user = User.find_by(email_address: params[:email_address].to_s.strip.downcase)
-    if user.nil?
-      redirect_to dashboard_path, alert: "No account with that email."
-    elsif publisher.memberships.exists?(user:)
-      redirect_to dashboard_path, alert: "Already a member."
-    else
-      Membership.create!(publisher:, user:, role: params[:role] == "owner" ? :owner : :publisher)
-      AuditEvent.record!(actor: Current.user, action: "org.member_add", subject: publisher,
-        metadata: { member: user.email_address })
-      redirect_to dashboard_path, notice: "Added #{user.name} to #{publisher.name}."
     end
   end
 

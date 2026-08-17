@@ -62,6 +62,14 @@ module Registry
       if publisher.claimed?
         return { entry:, status: "skipped", reason: "namespace already claimed" }
       end
+      # ONE forge identity per seeded namespace: the same username on GitHub
+      # and Codeberg is two unrelated people — proving one repo must never
+      # grant plugins seeded from the other forge.
+      if publisher.seed_source_url.present? &&
+          URI(publisher.seed_source_url).host != URI(entry["repository"].to_s).host
+        return { entry:, status: "failed",
+                 reason: "conflicting forge identity: namespace already seeded from #{URI(publisher.seed_source_url).host}" }
+      end
       return { entry:, status: "skipped", reason: "already published" } if
         publisher.plugins.find_by(name: entry.fetch("name"))&.versions&.exists?
 

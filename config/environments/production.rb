@@ -69,7 +69,8 @@ Rails.application.configure do
       user_name: ENV["SMTP_USERNAME"],
       password: ENV["SMTP_PASSWORD"],
       authentication: :plain,
-      enable_starttls_auto: true
+      # REQUIRED TLS — credentials and login codes never travel plaintext
+      enable_starttls: true
     }.compact
   end
 

@@ -78,7 +78,11 @@ module DataPlane
         raise "signing key changed since the data plane was written — refusing to replace the trust root " \
               "(set REGISTRY_ALLOW_KEY_ROTATION=1 only for a deliberate, announced rotation)"
       end
-      key_path.write(Signer.public_key_base64)
+      # Atomic, and only when it actually changed — a recurring rewrite must
+      # never risk a truncated trust root
+      unless key_path.exist? && key_path.read == Signer.public_key_base64
+        DataPlane.atomic_write("signing-key.pub", Signer.public_key_base64)
+      end
 
       DataPlane.write("config.json", JSON.pretty_generate({
         "dl" => "#{DataPlane.base_url}/dl/{publisher}/{name}/{name}-{version}.tar.gz",
@@ -148,9 +152,18 @@ module DataPlane
       signature = DataPlane.root.join("revocations.json.sig")
       return unless signature.exist? && Signer.verify?(content, signature.read)
 
-      known = Revocation.includes(plugin: :publisher).map { |r| [ r.plugin.manifest_id, r.version ] }.to_set
-      JSON.parse(content).fetch("revocations", []).each do |entry|
-        next if known.include?([ entry["plugin"], entry["version"] ])
+      import_revocation_entries(JSON.parse(content).fetch("revocations", []))
+    rescue JSON::ParserError
+      nil
+    end
+
+    # Idempotent, enforcement-first: every entry is re-ENFORCED on every run
+    # (a crash between row creation and enforcement heals on the next pass),
+    # and the row is created only after enforcement held. Shared with
+    # registry:import_revocations for recovery from any surviving signed copy.
+    def import_revocation_entries(entries)
+      @orphan_revocations ||= []
+      entries.each do |entry|
         publisher_name, plugin_name = entry["plugin"].to_s.split(".", 2)
         plugin = Plugin.joins(:publisher).find_by(publishers: { name: publisher_name }, name: plugin_name)
         if plugin.nil?
@@ -160,24 +173,27 @@ module DataPlane
           next
         end
         reason = entry["reason"].presence || "restored from data plane"
+        enforce_revocation!(plugin, entry["version"], reason)
+        next if Revocation.exists?(plugin:, version: entry["version"])
         Revocation.create!(plugin:, version: entry["version"], reason:,
           created_by: Registry::SeedCatalog.system_user)
-        enforce_revocation!(plugin, entry["version"], reason)
         AuditEvent.record!(action: "revocation.reimported", subject: plugin, public: true,
           metadata: { plugin: entry["plugin"], version: entry["version"] })
       end
-    rescue JSON::ParserError
-      nil
     end
 
     def enforce_revocation!(plugin, version_string, reason)
       system_user = Registry::SeedCatalog.system_user
       if version_string.present?
         version = plugin.versions.find_by(version: version_string)
-        version.yank!(reason:, actor: system_user) if version&.published?
-        version.update!(state: :yanked, yanked_at: Time.current, yank_reason: reason) if version && !version.yanked? && !version.rejected?
+        return if version.nil? || version.yanked? || version.rejected? # already enforced
+        if version.published?
+          version.yank!(reason:, actor: system_user)
+        else
+          version.update!(state: :yanked, yanked_at: Time.current, yank_reason: reason)
+        end
       else
-        plugin.update!(state: :security_holding, latest_version: nil)
+        plugin.update!(state: :security_holding, latest_version: nil) unless plugin.security_holding?
         plugin.versions.published.find_each { |v| v.yank!(reason:, actor: system_user) }
         plugin.versions.where(state: [ :processing, :held, :quarantined ], published_at: nil)
           .update_all(state: PluginVersion.states[:rejected], review_notes: "revocation restored: #{reason}")
