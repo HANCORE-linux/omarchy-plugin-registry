@@ -26,7 +26,11 @@ class DeviceController < ApplicationController
       return redirect_to device_path(code: params[:code]), alert: "Pick a namespace and a valid plugin name."
     end
 
-    authorization.approve!(user: Current.user, publisher:, plugin_name:)
+    begin
+      authorization.approve!(user: Current.user, publisher:, plugin_name:)
+    rescue ActiveRecord::RecordInvalid => e
+      return redirect_to dashboard_path, alert: e.record.errors.full_messages.join("; ")
+    end
     AuditEvent.record!(actor: Current.user, action: "device.approve", subject: authorization,
       metadata: { scope: "#{publisher.name}/#{plugin_name}" })
     redirect_to dashboard_path, notice: "Approved — your terminal has its token. It expires in 7 days."

@@ -83,6 +83,10 @@ module Registry
       version = manifest["version"].to_s
       return if version.blank?
       errors << "version must be strict semver (got #{version})" unless Semver.valid?(version)
+      # Build metadata is ignored in semver precedence — 1.0.0+a and 1.0.0+b
+      # would be "equal" versions with different bytes, which immutability
+      # cannot allow
+      errors << "version must not carry build metadata (+...)" if version.include?("+")
     end
 
     # Part of the signed compatibility contract — clients resolve against it,

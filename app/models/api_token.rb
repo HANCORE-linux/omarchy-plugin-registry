@@ -20,6 +20,7 @@ class ApiToken < ApplicationRecord
   validates :expires_at, presence: true
   validate :ttl_within_bounds, on: :create
   validate :usable_quota, on: :create
+  validate :publisher_not_suspended, on: :create
 
   scope :usable, -> { where(revoked_at: nil).where(expires_at: Time.current..) }
 
@@ -62,5 +63,11 @@ class ApiToken < ApplicationRecord
     if user && user.api_tokens.usable.count >= MAX_USABLE_PER_USER
       errors.add(:base, "too many active tokens — revoke some first")
     end
+  end
+
+  # No stockpiling seven-day tokens against a suspended namespace to spend
+  # the moment it's reinstated
+  def publisher_not_suspended
+    errors.add(:base, "publisher is suspended") if publisher&.suspended?
   end
 end

@@ -27,7 +27,8 @@ namespace :registry do
       Registry::ReviewJob.perform_now(version)
       puts "#{version.plugin.full_name}@#{version.version}: #{version.reload.state}"
     end
-    DataPlane::Regenerate.all
+    DataPlane::RegenerateJob.perform_later
+    puts "Data-plane regeneration queued."
   end
 
   desc "Import page-view counts from edge analytics (JSONL: {publisher,name,count})"
@@ -41,10 +42,20 @@ namespace :registry do
     puts "View counts imported."
   end
 
-  desc "Regenerate the entire static data plane"
+  desc "Regenerate the entire static data plane (queued — respects the single-regenerator lock)"
   task regenerate: :environment do
-    DataPlane::Regenerate.all
-    puts "Data plane regenerated at #{DataPlane.root}"
+    DataPlane::RegenerateJob.perform_later
+    puts "Regeneration queued (bin/jobs must be running); output: #{DataPlane.root}"
+  end
+
+  desc "Rewrite encrypted secrets under the CURRENT key (run after rotating SECRET_KEY_BASE, before dropping OLD_SECRET_KEY_BASE)"
+  task reencrypt_secrets: :environment do
+    count = 0
+    User.where.not(otp_secret: nil).find_each do |user|
+      user.update_columns(otp_secret: User.new(otp_secret: user.otp_secret).attribute_for_database(:otp_secret).to_s)
+      count += 1
+    end
+    puts "Re-encrypted #{count} TOTP seeds under the current primary key."
   end
 
   desc <<~DESC

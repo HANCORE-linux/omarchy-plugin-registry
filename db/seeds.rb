@@ -32,7 +32,7 @@ end
 admin.update!(admin: true) unless admin.admin?
 
 ryan = Publisher.find_or_create_by!(name: "ryanrhughes") { |p| p.kind = :personal }
-Membership.find_or_create_by!(publisher: ryan, user: admin) { |m| m.role = :owner }
+Membership.find_or_create_by!(publisher: ryan, user: admin) { |m| m.role = :owner; m.founding = true }
 
 SAMPLES = [
   { name: "weather", summary: "Current conditions and forecast in your bar, without the bloat.",

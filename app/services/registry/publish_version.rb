@@ -149,6 +149,14 @@ module Registry
       # rejected update can never deface the live page.
       ApplicationRecord.transaction do
         plugin.save! unless plugin.persisted?
+        # Re-run the ordering checks under the row lock: two concurrent
+        # submissions must not both pass the same pre-transaction baseline
+        plugin.lock!
+        candidate = tarball.manifest["version"].to_s
+        fail! "#{plugin.full_name}@#{candidate} already exists — versions are immutable", status: :conflict if plugin.version_burned?(candidate)
+        if (highest = plugin.highest_version) && Semver.parse(candidate) <= highest.semver
+          fail! "version #{candidate} must be greater than #{highest.version}"
+        end
         @version = plugin.versions.create!(
           user: user,
           version: tarball.manifest["version"],

@@ -12,6 +12,8 @@ class TokensController < ApplicationController
     token = ApiToken.mint!(user: Current.user, publisher:, plugin_name:)
     flash[:minted_token] = token.plaintext_token
     redirect_to dashboard_path, notice: "Token minted — copy it now, it won't be shown again. Expires in 7 days."
+  rescue ActiveRecord::RecordInvalid => e
+    redirect_to dashboard_path, alert: e.record.errors.full_messages.join("; ")
   end
 
   def destroy

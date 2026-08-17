@@ -23,7 +23,12 @@ module NameRules
     folded
   end
 
+  # Checked on BOTH the raw and the confusable-normalized form — "0marchy" and
+  # "omarch-y" normalize onto reserved ground and must not squat it.
   def reserved?(name)
-    RESERVED.include?(name.to_s.downcase) || name.to_s.downcase.start_with?("omarchy")
+    [ name.to_s.downcase, normalize(name) ].any? do |candidate|
+      RESERVED.include?(candidate) || candidate.start_with?("omarchy") ||
+        RESERVED.any? { |word| normalize(word) == candidate }
+    end
   end
 end
