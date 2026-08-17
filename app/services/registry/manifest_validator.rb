@@ -124,22 +124,55 @@ module Registry
     end
 
     # "MIT", "(MIT OR Apache-2.0)", "GPL-3.0-only WITH GCC-exception-3.1", …
-    # Parentheses are grouping-only (precedence doesn't affect validity);
-    # tokens must alternate id, operator, id, and WITH must join a license to
-    # an exception exactly once — no chained WITH.
+    # Recursive-descent over the SPDX expression grammar:
+    #   expr := term ((OR|AND) term)* ; term := ID [WITH EXC] | "(" expr ")"
     def valid_spdx_expression?(expression)
-      return false unless expression.count("(") == expression.count(")")
-      tokens = expression.tr("()", " ").split(/\s+/)
-      return false if tokens.empty? || tokens.length.even?
+      parser = SpdxExpressionParser.new(expression)
+      parser.valid?
+    end
 
-      tokens.each_with_index.all? do |token, index|
-        if index.odd?
-          %w[OR AND WITH].include?(token) &&
-            (token != "WITH" || index < 2 || tokens[index - 2] != "WITH")
-        elsif index.positive? && tokens[index - 1] == "WITH"
-          SPDX_EXCEPTION_IDS.include?(token)
+    class SpdxExpressionParser
+      def initialize(expression)
+        @tokens = expression.to_s.gsub("(", " ( ").gsub(")", " ) ").split(/\s+/).reject(&:empty?)
+        @position = 0
+      end
+
+      def valid?
+        return false if @tokens.empty?
+        parse_expr && @position == @tokens.length
+      end
+
+      private
+
+      def peek = @tokens[@position]
+      def advance = @tokens[@position].tap { @position += 1 }
+
+      def parse_expr
+        return false unless parse_term
+        while %w[OR AND].include?(peek)
+          advance
+          return false unless parse_term
+        end
+        true
+      end
+
+      def parse_term
+        if peek == "("
+          advance
+          return false unless parse_expr
+          return false unless peek == ")"
+          advance
+          true
+        elsif SPDX_LICENSE_IDS.include?(peek)
+          advance
+          if peek == "WITH"
+            advance
+            return false unless SPDX_EXCEPTION_IDS.include?(peek)
+            advance
+          end
+          true
         else
-          SPDX_LICENSE_IDS.include?(token)
+          false
         end
       end
     end

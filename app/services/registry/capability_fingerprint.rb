@@ -23,7 +23,9 @@ module Registry
       dynamic_exec = false
 
       @tarball.contents.each do |path, content|
-        next unless CODE_EXTENSIONS.include?(File.extname(path).downcase)
+        ext = File.extname(path).downcase
+        shebang = ext.empty? && content.byteslice(0, 2) == "#!"
+        next unless CODE_EXTENSIONS.include?(ext) || shebang
         text = content.dup.force_encoding(Encoding::UTF_8)
         text = text.scrub unless text.valid_encoding?
 
@@ -48,10 +50,11 @@ module Registry
           processes << "#{interpreter} -c ##{Digest::SHA256.hexdigest(script).first(8)}"
         end
 
-        # Shell scripts: the first command of EVERY pipeline segment — commands
-        # hidden behind `;`, `&&`, `||`, `|`, control-flow keywords, env-var
-        # prefixes, and command substitution all join the fingerprint.
-        if %w[.sh .bash].include?(File.extname(path).downcase)
+        # Shell scripts — including extensionless shebang helpers a QML file
+        # might invoke by name: the first command of EVERY pipeline segment,
+        # commands behind `;`, `&&`, `||`, `|`, control flow, env-var prefixes,
+        # and command substitution all join the fingerprint.
+        if %w[.sh .bash].include?(ext) || shebang
           text.each_line do |line|
             next if line.strip.start_with?("#")
             line.split(/;|&&|\|\||\|/).each do |segment|

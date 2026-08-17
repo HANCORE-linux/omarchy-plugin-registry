@@ -100,7 +100,11 @@
   <aside class="sidebar">
     <section>
       <h4>Install</h4>
-      <div class="install-cmd"><span class="prompt">$</span> omarchy plugin add <%= @plugin.full_name %></div>
+      <% if @latest && @plugin.active? %>
+        <div class="install-cmd"><span class="prompt">$</span> omarchy plugin add <%= @plugin.full_name %></div>
+      <% else %>
+        <p class="muted">Not installable — no version has cleared review.</p>
+      <% end %>
     </section>
     <section>
       <h4>Details</h4>

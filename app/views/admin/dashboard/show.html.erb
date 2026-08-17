@@ -20,7 +20,7 @@
               <td class="actions">
                 <% if version.quarantined? %>
                   <%= button_to "Approve", approve_admin_version_path(version), class: "button button--small" %>
-                  <%= button_to "Reject", reject_admin_version_path(version), class: "button button--ghost button--small" %>
+                  <%= link_to "Review →", admin_version_path(version), class: "button button--ghost button--small" %>
                 <% else %>
                   <span class="muted">pipeline running…</span>
                 <% end %>

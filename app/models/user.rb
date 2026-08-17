@@ -36,19 +36,19 @@ class User < ApplicationRecord
     login_codes.create!.tap { |code| LoginCodeMailer.sign_in_code(code).deliver_later }
   end
 
+  # Atomic one-shot redemption: the UPDATE both finds and consumes the code in
+  # one statement, so concurrent requests can't both redeem the same code.
   def redeem_login_code(code)
-    match = login_codes.active.redeemable.find_by(code: code.to_s.strip)
-    if match
-      match.consume!
-      match
+    consumed = login_codes.active.redeemable.where(code: code.to_s.strip)
+      .update_all(consumed_at: Time.current)
+    if consumed == 1
+      true
     else
       # A wrong guess burns an attempt on every active code; codes lock after
       # LoginCode::MAX_ATTEMPTS so 6 digits can't be brute-forced.
       login_codes.active.update_all("attempts = attempts + 1")
       nil
     end
-  rescue ActiveRecord::RecordInvalid
-    nil
   end
 
   # Name + a claimed personal namespace = onboarded

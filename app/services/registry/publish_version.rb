@@ -43,7 +43,15 @@ module Registry
       fail! "account is suspended", status: :forbidden if user.suspended_at.present?
       return if @system_seed
       fail! "namespace is unclaimed — prove control of the source repo to claim it", status: :forbidden unless publisher.claimed?
-      fail! "you are not a member of #{publisher.name}", status: :forbidden unless user.member_of?(publisher)
+      membership = user.memberships.find_by(publisher: publisher)
+      fail! "you are not a member of #{publisher.name}", status: :forbidden if membership.nil?
+      # Roster changes are an account-takeover vector: freshly ADDED members
+      # wait out a cooldown before publishing through the namespace. Founding
+      # members (created with the namespace) are exempt.
+      if membership.created_at > User::PUBLISH_COOLDOWN.ago &&
+          membership.created_at - publisher.created_at > 5.minutes
+        fail! "recently added members wait #{User::PUBLISH_COOLDOWN.inspect} before publishing to #{publisher.name}", status: :forbidden
+      end
       fail! "add a passkey or enable two-factor authentication to publish", status: :forbidden unless user.second_factor?
       fail! "publishing is paused after a recent account change — try again later", status: :forbidden if user.in_publish_cooldown?
       if token && !token.authorizes?(publisher, plugin_name)
