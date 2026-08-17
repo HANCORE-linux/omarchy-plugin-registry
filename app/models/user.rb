@@ -50,6 +50,9 @@ class User < ApplicationRecord
     consumed = login_codes.active.redeemable.where(code: LoginCode.digest(code.to_s.strip))
       .update_all(consumed_at: Time.current)
     if consumed == 1
+      # Proof of mailbox ownership — flips the account out of the
+      # pending-purge window forever
+      update!(verified_at: Time.current) if verified_at.nil?
       true
     else
       # A wrong guess burns an attempt on every active code; codes lock after

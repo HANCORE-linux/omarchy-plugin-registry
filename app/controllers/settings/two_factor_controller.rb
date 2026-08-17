@@ -19,13 +19,24 @@ module Settings
     # Confirm enrollment with a code from the authenticator
     def update
       @user = Current.user
-      # Capture BEFORE verification marks — mark_second_factor_verified!
-      # clears the recovery flag, and the cooldown decision must not miss that
-      was_recovery = @user.recovery_requested_at.present?
-      if (codes = @user.enable_otp!(params[:code]))
+      # The whole enrollment decision runs under the user row lock: the
+      # pre-enrollment factor state, the enable, and the first-factor cooldown
+      # commit atomically — a concurrent passkey enrollment can't make both
+      # paths see "another factor exists" and both skip the cooldown.
+      codes = was_first_factor = was_recovery = nil
+      @user.with_lock do
+        # Captured BEFORE verification marks — mark_second_factor_verified!
+        # clears the recovery flag, and the cooldown must not miss that
+        was_recovery = @user.recovery_requested_at.present?
+        was_first_factor = !@user.otp_enabled? && !@user.passkeys.exists?
+        codes = @user.enable_otp!(params[:code])
+        if codes
+          apply_first_factor_cooldown(@user) if was_first_factor
+          @user.update!(recovery_requested_at: nil, sensitive_change_at: Time.current) if was_recovery
+        end
+      end
+      if codes
         mark_second_factor_verified!
-        apply_first_factor_cooldown(@user) unless @user.passkeys.exists?
-        @user.update!(recovery_requested_at: nil, sensitive_change_at: Time.current) if was_recovery
         flash[:backup_codes] = codes
         redirect_to settings_two_factor_path, notice: "Two-factor authentication enabled. Save your backup codes now — this is the only time they're shown."
       else

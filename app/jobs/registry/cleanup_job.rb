@@ -13,12 +13,27 @@ module Registry
         .where.not(id: PluginVersion.where.not(api_token_id: nil).select(:api_token_id))
         .delete_all
       Session.expired.delete_all
+      purge_unverified_users
       purge_rejected_tarballs
       resume_stuck_pipeline_work
       Plugin.find_each(&:flush_cached_views!) if Rails.env.production?
     end
 
     private
+
+    # A sign-in request creates the user row BEFORE mailbox ownership is
+    # proven; rows that never redeem a code are pending, not permanent.
+    # Membership/admin guards keep seeded principals and invitees safe.
+    def purge_unverified_users
+      User.where(verified_at: nil, admin: false)
+        .where(created_at: ...2.days.ago)
+        .where.missing(:memberships)
+        .find_each do |user|
+        user.destroy
+      rescue ActiveRecord::InvalidForeignKey, ActiveRecord::DeleteRestrictionError
+        nil
+      end
+    end
 
     # Storage retention is bounded for everything that never shipped:
     # - rejected uploads lose their bytes after 30 days (rows stay burned)

@@ -25,27 +25,32 @@ module Settings
       credential = WebAuthn::Credential.from_create(JSON.parse(params.require(:credential)))
       credential.verify(session.delete(:webauthn_challenge), user_verification: true)
 
-      Current.user.passkeys.create!(
-        external_id: credential.id,
-        public_key: credential.public_key,
-        sign_count: credential.sign_count,
-        nickname: params[:nickname].presence || "Passkey"
-      )
+      # Enrollment + first-factor cooldown decide atomically under the user
+      # row lock, sharing the serialization point with TOTP enrollment —
+      # concurrent factor creation can't make both paths skip the cooldown.
+      was_first_factor = was_recovery = nil
+      Current.user.with_lock do
+        # Captured BEFORE verification marks (which clear the recovery flag)
+        was_recovery = Current.user.recovery_requested_at.present?
+        was_first_factor = !Current.user.otp_enabled? && !Current.user.passkeys.exists?
+        Current.user.passkeys.create!(
+          external_id: credential.id,
+          public_key: credential.public_key,
+          sign_count: credential.sign_count,
+          nickname: params[:nickname].presence || "Passkey"
+        )
+        apply_first_factor_cooldown(Current.user) if was_first_factor
+        # Recovery-based enrollment closes the recovery window and applies the
+        # full sensitive-change cooldown — a 72-hour hijack can't mint
+        # anything for another cooldown period after it lands
+        if was_recovery
+          Current.user.update!(recovery_requested_at: nil, sensitive_change_at: Time.current)
+        end
+      end
       AuditEvent.record!(actor: Current.user, action: "passkey.register", subject: Current.user)
-      # Capture BEFORE verification marks (which clear the recovery flag)
-      was_recovery = Current.user.recovery_requested_at.present?
       # Only FIRST enrollment bootstraps verification; adding a factor later
       # required step-up already and must not extend it via registration.
-      if Current.user.passkeys.count == 1 && !Current.user.otp_enabled?
-        mark_second_factor_verified!
-        apply_first_factor_cooldown(Current.user)
-      end
-      # Recovery-based enrollment closes the recovery window and applies the
-      # full sensitive-change cooldown — a 72-hour hijack can't mint anything
-      # for another cooldown period after it lands
-      if was_recovery
-        Current.user.update!(recovery_requested_at: nil, sensitive_change_at: Time.current)
-      end
+      mark_second_factor_verified! if was_first_factor
       render json: { ok: true }
     rescue WebAuthn::Error, JSON::ParserError => e
       render json: { error: "Passkey registration failed: #{e.message}" }, status: :unprocessable_entity

@@ -84,12 +84,38 @@ class ReviewPipelineTest < ActionDispatch::IntegrationTest
     Rails.application.config.x.publish_hold = 0
   end
 
-  test "ai review flag quarantines but ai errors never publish silently" do
+  test "ai review flag quarantines" do
     Rails.application.config.x.ai_review_command =
       %q(ruby -rjson -e 'puts({verdict: "flag", reasons: ["exfiltrates tokens"]}.to_json)')
     version = publish! TarballBuilder.build
     assert version.quarantined?
     assert_match(/ai review flagged: exfiltrates tokens/, version.review_notes)
+  ensure
+    Rails.application.config.x.ai_review_command = nil
+  end
+
+  test "ai reviewer failures never publish silently — nonzero exit quarantines" do
+    Rails.application.config.x.ai_review_command = "ruby -e 'exit 1'"
+    version = publish! TarballBuilder.build
+    assert version.quarantined?
+    assert_match(/ai review/, version.review_notes)
+  ensure
+    Rails.application.config.x.ai_review_command = nil
+  end
+
+  test "ai reviewer failures never publish silently — malformed JSON quarantines" do
+    Rails.application.config.x.ai_review_command = %q(ruby -e 'puts "not json at all"')
+    version = publish! TarballBuilder.build
+    assert version.quarantined?
+  ensure
+    Rails.application.config.x.ai_review_command = nil
+  end
+
+  test "ai reviewer failures never publish silently — unknown verdict quarantines" do
+    Rails.application.config.x.ai_review_command =
+      %q(ruby -rjson -e 'puts({verdict: "definitely_fine", reasons: []}.to_json)')
+    version = publish! TarballBuilder.build
+    assert version.quarantined?
   ensure
     Rails.application.config.x.ai_review_command = nil
   end

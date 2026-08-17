@@ -54,6 +54,10 @@
   --success: #237a59;
   --warning: #9a6a1d;
   --danger: #c23232;
+  --accent-soft: rgba(237, 76, 200, 0.12);
+  --success-soft: var(--success-soft);
+  --warning-soft: var(--warning-soft);
+  --danger-soft: var(--danger-soft);
   --info: #4d5bc9;
 
   --bg: var(--paper);
@@ -97,6 +101,9 @@
     --success: #3dbd8c;
     --warning: #efb35a;
     --danger: #e96a6a;
+    --success-soft: rgba(61, 189, 140, 0.16);
+    --warning-soft: rgba(239, 179, 90, 0.16);
+    --danger-soft: rgba(233, 106, 106, 0.16);
     --info: #8b96f0;
 
     --rule-shadow: 0 1px 0 rgba(248, 245, 242, 0.9);
@@ -104,8 +111,6 @@
   .qr-box { background: #ffffff; } /* QR must stay scannable */
   .badge { background: rgba(255, 138, 255, 0.16); }
   .badge--ok { background: rgba(61, 189, 140, 0.16); }
-  .badge--warning { background: rgba(239, 179, 90, 0.16); }
-  .badge--danger { background: rgba(233, 106, 106, 0.16); }
   pre, .install-cmd, .token-reveal { border: 1px solid var(--hairline-soft); }
   /* Lifted danger red needs dark text for contrast on destructive controls */
   .button--danger, button.button--danger { color: #0d0826; }
@@ -177,11 +182,11 @@ pre code { background: none; padding: 0; }
 .badge {
   display: inline-block; border-radius: 9999px; padding: 5px 12px;
   font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
-  background: rgba(237, 76, 200, 0.12); color: var(--magenta);
+  background: var(--accent-soft); color: var(--magenta);
 }
-.badge--ok { background: rgba(35, 122, 89, 0.12); color: var(--success); }
-.badge--warning { background: rgba(154, 106, 29, 0.14); color: var(--warning); }
-.badge--danger { background: rgba(194, 50, 50, 0.12); color: var(--danger); }
+.badge--ok { background: var(--success-soft); color: var(--success); }
+.badge--warning { background: var(--warning-soft); color: var(--warning); }
+.badge--danger { background: var(--danger-soft); color: var(--danger); }
 
 /* ---------- Header ---------- */
 
@@ -208,7 +213,7 @@ pre code { background: none; padding: 0; }
 .flashes { border-bottom: 1px solid var(--hairline-soft); }
 .flash { padding: 12px 24px; font-size: 13px; }
 .flash--notice { background: var(--surface-tint); }
-.flash--alert { background: rgba(194, 50, 50, 0.1); color: var(--danger); }
+.flash--alert { background: var(--danger-soft); color: var(--danger); }
 
 /* ---------- Dark sections (with noise) ---------- */
 
@@ -318,8 +323,8 @@ pre code { background: none; padding: 0; }
 /* ---------- Notices ---------- */
 
 .notice-banner { padding: 14px 24px; font-size: 13px; border-bottom: 1px solid var(--hairline); }
-.notice-banner--danger { background: rgba(194, 50, 50, 0.1); color: var(--danger); }
-.notice-banner--warning { background: rgba(154, 106, 29, 0.12); color: var(--warning); }
+.notice-banner--danger { background: var(--danger-soft); color: var(--danger); }
+.notice-banner--warning { background: var(--warning-soft); color: var(--warning); }
 
 /* ---------- Forms ---------- */
 
