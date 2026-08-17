@@ -37,14 +37,16 @@ class User < ApplicationRecord
     with_lock do
       return nil if login_codes.where(created_at: 1.hour.ago..).count >= MAX_LOGIN_CODES_PER_HOUR
       login_codes.active.update_all(consumed_at: Time.current)
-      login_codes.create!.tap { |code| LoginCodeMailer.sign_in_code(code).deliver_later }
+      login_codes.create!.tap do |record|
+        LoginCodeMailer.sign_in_code(email_address, record.plaintext_code).deliver_later
+      end
     end
   end
 
   # Atomic one-shot redemption: the UPDATE both finds and consumes the code in
   # one statement, so concurrent requests can't both redeem the same code.
   def redeem_login_code(code)
-    consumed = login_codes.active.redeemable.where(code: code.to_s.strip)
+    consumed = login_codes.active.redeemable.where(code: LoginCode.digest(code.to_s.strip))
       .update_all(consumed_at: Time.current)
     if consumed == 1
       true

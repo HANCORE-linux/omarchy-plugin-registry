@@ -22,7 +22,7 @@ class MomusRemediationsTest < ActionDispatch::IntegrationTest
 
   test "login codes lock after repeated wrong guesses" do
     user = User.create!(email_address: "guess@example.com")
-    code = user.send_login_code.code
+    code = user.send_login_code.plaintext_code
     LoginCode::MAX_ATTEMPTS.times { assert_nil user.redeem_login_code("000000") }
     assert_nil user.redeem_login_code(code), "code should be locked out after max attempts"
   end

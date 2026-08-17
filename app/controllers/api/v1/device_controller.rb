@@ -1,6 +1,9 @@
 module Api
   module V1
     class DeviceController < BaseController
+      # Bearer tokens must never land in any cache
+      after_action { response.headers["Cache-Control"] = "no-store" }
+
       # Anonymous endpoints: throttle row creation and polling per IP
       rate_limit to: 10, within: 15.minutes, only: :code, store: RATE_LIMIT_STORE,
         with: -> { render json: { error: "slow_down" }, status: :too_many_requests }

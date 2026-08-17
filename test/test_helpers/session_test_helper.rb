@@ -13,6 +13,13 @@ module SessionTestHelper
     end
   end
 
+  # Digested at rest — the only place plaintext exists is the email; drain the
+  # mailer queue and read it from the delivery.
+  def emailed_login_code
+    perform_enqueued_jobs
+    ActionMailer::Base.deliveries.last.subject[/\b(\d{6})\b/, 1]
+  end
+
   def sign_out
     Current.session&.destroy!
     cookies.delete("session_id")

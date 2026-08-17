@@ -5,8 +5,9 @@ class OrgsController < ApplicationController
   # per-ACCOUNT ledger (founding org memberships), not a rotatable IP limit.
   MAX_ORGS_PER_WEEK = 3
   before_action only: :create do
-    recent = Current.user.memberships.where(founding: true, created_at: 7.days.ago..)
-      .joins(:publisher).where(publishers: { kind: :org }).count
+    # Counted from the audit ledger — membership rows can be deleted, audit
+    # events cannot
+    recent = AuditEvent.where(user: Current.user, action: "org.create", created_at: 7.days.ago..).count
     if recent >= MAX_ORGS_PER_WEEK
       redirect_to dashboard_path, alert: "Org creation is limited to #{MAX_ORGS_PER_WEEK} per week per account."
     end

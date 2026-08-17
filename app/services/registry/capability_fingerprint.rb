@@ -105,7 +105,12 @@ module Registry
         [
           /\bfetch\s*\(\s*(?!["'])[^\n]{0,160}/,
           /\.open\s*\(\s*["'][A-Z]+["']\s*,\s*(?!["'])[^\n]{0,160}/,
-          /new\s+WebSocket\s*\(\s*(?!["'])[^\n]{0,160}/
+          /new\s+WebSocket\s*\(\s*(?!["'])[^\n]{0,160}/,
+          # Concatenation-built URLs: a literal fragment followed by `+`
+          # ("https://" + host) is a computed destination, not a literal host
+          /\b(?:fetch|WebSocket)\s*\(\s*["'][^"']*["']\s*\+[^\n]{0,160}/,
+          /\.open\s*\(\s*["'][A-Z]+["']\s*,\s*["'][^"']*["']\s*\+[^\n]{0,160}/,
+          /["']https?:\/\/[^"']*["']\s*\+[^\n]{0,160}/
         ].each do |pattern|
           text.scan(pattern) { |m| dynamic_network_sites << site_digest(m) }
         end

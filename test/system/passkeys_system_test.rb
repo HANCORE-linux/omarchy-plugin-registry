@@ -29,7 +29,8 @@ class PasskeysSystemTest < ApplicationSystemTestCase
     fill_in "email_address", with: @user.email_address
     click_button "Email me a code"
     assert_text "Enter your code" # wait for the request to complete
-    fill_in "code", with: @user.reload.login_codes.last.code
+    perform_enqueued_jobs
+    fill_in "code", with: ActionMailer::Base.deliveries.last.subject[/\b(\d{6})\b/, 1]
     click_button "Sign in"
   end
 

@@ -44,8 +44,12 @@ module StepUpAuthentication
     Current.session&.second_factor_verified_at&.after?(FRESHNESS.ago) || false
   end
 
+  # Any successful second-factor proof also cancels a pending recovery — the
+  # factor evidently isn't lost, so an attacker-started countdown dies here
+  # (TOTP and passkey paths alike).
   def mark_second_factor_verified!
     Current.session&.update!(second_factor_verified_at: Time.current)
+    Current.user.update!(recovery_requested_at: nil) if Current.user&.recovery_requested_at
   end
 
   # First-factor enrollment on an ESTABLISHED account is what an email-only

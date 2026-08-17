@@ -14,10 +14,7 @@ class StepUpController < ApplicationController
   def create
     if Current.user.verify_otp(params[:code])
       Current.session.update!(step_up_failures: 0)
-      # A successful step-up proves the factor isn't lost — cancel any
-      # recovery countdown (the real owner wins)
-      Current.user.update!(recovery_requested_at: nil) if Current.user.recovery_requested_at
-      mark_second_factor_verified!
+      mark_second_factor_verified! # also cancels any pending recovery
       redirect_to session.delete(:after_step_up) || dashboard_path, notice: "Verified."
     else
       Current.session.increment!(:step_up_failures)

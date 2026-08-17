@@ -1,6 +1,7 @@
 require "test_helper"
 
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
+  include ActiveJob::TestHelper
   # Selenium-manager's cached Chrome (no system-wide install needed)
   SELENIUM_CHROME = Dir[File.expand_path("~/.cache/selenium/chrome/linux64/*/chrome")].max
 

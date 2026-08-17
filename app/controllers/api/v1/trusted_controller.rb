@@ -1,6 +1,9 @@
 module Api
   module V1
     class TrustedController < BaseController
+      # Bearer tokens must never land in any cache
+      after_action { response.headers["Cache-Control"] = "no-store" }
+
       rate_limit to: 30, within: 15.minutes, only: :exchange, store: RATE_LIMIT_STORE,
         with: -> { render json: { error: "slow_down" }, status: :too_many_requests }
 

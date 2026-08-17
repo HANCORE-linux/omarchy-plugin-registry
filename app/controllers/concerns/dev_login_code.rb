@@ -12,8 +12,8 @@ module DevLoginCode
 
   def expose_login_code_in_dev(login_code)
     return unless Rails.env.development? && login_code.present?
-    flash[:dev_login_code] = login_code.code
-    response.set_header("X-Login-Code", login_code.code)
+    flash[:dev_login_code] = login_code.plaintext_code
+    response.set_header("X-Login-Code", login_code.plaintext_code)
   end
 
   def ensure_login_code_not_leaked

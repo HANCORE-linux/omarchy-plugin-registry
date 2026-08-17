@@ -73,6 +73,9 @@ module Registry
       AuditEvent.record!(action: "plugin.seed", subject: version.plugin, public: true,
         metadata: { plugin: version.plugin.full_name, source: entry["repository"] })
       { entry:, status: "submitted", version: version.version }
+    rescue ActiveRecord::RecordInvalid => e
+      # A reserved/confusable publisher name fails ITS entry, not the batch
+      { entry:, status: "failed", reason: e.message }
     rescue PublishVersion::PublishError, RepoSnapshot::SnapshotError => e
       # A legacy plugin whose snapshot fails validation must remain VISIBLE and
       # uninstallable, not silently vanish from the directory it came from.
@@ -83,7 +86,7 @@ module Registry
     end
 
     def self.placeholder_plugin(entry, reason)
-      publisher = Publisher.find_by(name: entry["publisher"])
+      publisher = Publisher.find_by(name: entry["publisher"].to_s.downcase)
       return if publisher.nil? || publisher.claimed?
       plugin = publisher.plugins.find_or_create_by!(name: entry["name"]) do |p|
         p.summary = entry["summary"]

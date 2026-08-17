@@ -95,6 +95,9 @@ module Registry
     MAX_PUBLISHER_SUBMISSIONS_PER_DAY = 30
     MAX_USER_SUBMISSIONS_PER_DAY = 40
     MAX_PLUGINS_PER_PUBLISHER = 100
+    # Bytes, not just rows: retained uploads (anything whose tarball we still
+    # hold) are capped per account so deliberate quarantines can't fill the disk
+    MAX_RETAINED_BYTES_PER_USER = 400 * 1024 * 1024
 
     def check_submission_limits!
       return if @system_seed
@@ -103,6 +106,11 @@ module Registry
       user_daily = PluginVersion.where(user: user, created_at: 24.hours.ago..).count
       if user_daily >= MAX_USER_SUBMISSIONS_PER_DAY
         fail! "account-wide publish rate limit reached (#{MAX_USER_SUBMISSIONS_PER_DAY}/day)", status: :too_many_requests
+      end
+
+      retained = PluginVersion.where(user: user).where.not(state: :rejected).sum(:size_bytes)
+      if retained + tarball.size_bytes > MAX_RETAINED_BYTES_PER_USER
+        fail! "account storage quota reached (#{MAX_RETAINED_BYTES_PER_USER / 1024 / 1024}MB of retained uploads)", status: :too_many_requests
       end
 
       publisher_daily = PluginVersion.joins(:plugin)
