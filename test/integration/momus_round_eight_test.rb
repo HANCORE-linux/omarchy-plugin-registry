@@ -52,7 +52,7 @@ class MomusRoundEightTest < ActionDispatch::IntegrationTest
     end
     version = PluginVersion.last
     assert version.quarantined?
-    assert_includes version.scan_results["findings"].map { |f| f["rule"] }, "dotfile-write"
+    assert_includes version.scan_results["findings"].map { |f| f["rule"] }, "home-write"
     assert_includes version.capability_fingerprint["writes"].join, ".bashrc"
   end
 

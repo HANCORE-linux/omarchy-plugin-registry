@@ -20,8 +20,8 @@ module Registry
       paths = Set.new
       writes = Set.new
       keybindings = false
-      dynamic_exec = false
-      dynamic_network = false
+      dynamic_exec_sites = Set.new
+      dynamic_network_sites = Set.new
 
       @tarball.contents.each do |path, content|
         ext = File.extname(path).downcase
@@ -45,16 +45,17 @@ module Registry
         end
         text.scan(/\b(?:bar\.run|execDetached|startDetached)\s*\(\s*["']([^"']+)["']/) { |m| processes << binary_name(m[0]) }
 
-        # Opaque execution surfaces (fingerprinted so CHANGES count as growth):
-        # 1. Non-literal command values — `command: argv` or arrays built from
-        #    expressions can run anything.
-        dynamic_exec ||= text.match?(/command:\s*(?!\[\s*["'])[a-zA-Z_\[]/)
-        # 1b. Literal shell invocation with a NON-literal payload:
-        #     ["bash", "-c", someFunction()] runs anything too.
-        dynamic_exec ||= text.match?(/command:\s*\[\s*["'](?:\/[\w\/]*\/)?(?:#{SHELL_INTERPRETERS.join('|')})["']\s*,\s*["']-c["']\s*,\s*(?!["'])/)
-        # 1c. Spawn helpers called with anything but a literal string/array —
-        #     bar.run(commandVariable) is dynamic execution too.
-        dynamic_exec ||= text.match?(/\b(?:bar\.run|execDetached|startDetached)\s*\(\s*(?!["'])(?!\[\s*["'])\S/)
+        # Opaque execution surfaces are recorded per CALL SITE (digest of the
+        # matched snippet), never as a saturating boolean — a second dynamic
+        # call, or a change to an existing one, is growth even when the
+        # baseline already had one.
+        [
+          /command:\s*(?!\[\s*["'])[a-zA-Z_\[][^\n]{0,160}/,
+          /command:\s*\[\s*["'](?:\/[\w\/]*\/)?(?:#{SHELL_INTERPRETERS.join('|')})["']\s*,\s*["']-c["']\s*,\s*(?!["'])[^\n]{0,160}/,
+          /\b(?:bar\.run|execDetached|startDetached)\s*\(\s*(?!["'])(?!\[\s*["'])[^\n]{0,160}/
+        ].each do |pattern|
+          text.scan(pattern) { |m| dynamic_exec_sites << site_digest(m) }
+        end
         # 2. Literal shell -c payloads — the binary name "bash" hides the real
         #    program, so the script itself joins the fingerprint by digest.
         text.scan(/command:\s*\[\s*["'](?:\/[\w\/]*\/)?(#{SHELL_INTERPRETERS.join('|')})["']\s*,\s*["']-c["']\s*,\s*["'](.{0,4000}?)["']\s*\]/m) do |interpreter, script|
@@ -81,11 +82,14 @@ module Registry
         end
 
         text.scan(%r{https?://([a-z0-9.-]+\.[a-z]{2,}|\d{1,3}(?:\.\d{1,3}){3})}i) { |m| hosts << m[0].downcase }
-        # Network APIs with computed URLs can reach hosts no literal scan sees
-        dynamic_network ||= text.match?(/\bfetch\s*\(\s*(?!["'])\S/) ||
-          text.match?(/\.open\s*\(\s*["'][A-Z]+["']\s*,\s*(?!["'])/) ||
-          text.match?(/new\s+WebSocket\s*\(\s*(?!["'])/) ||
-          (text.match?(/XMLHttpRequest/) && !text.match?(/\.open\s*\(\s*["'][A-Z]+["']\s*,\s*["']/))
+        # Network APIs with computed URLs, also per call site
+        [
+          /\bfetch\s*\(\s*(?!["'])[^\n]{0,160}/,
+          /\.open\s*\(\s*["'][A-Z]+["']\s*,\s*(?!["'])[^\n]{0,160}/,
+          /new\s+WebSocket\s*\(\s*(?!["'])[^\n]{0,160}/
+        ].each do |pattern|
+          text.scan(pattern) { |m| dynamic_network_sites << site_digest(m) }
+        end
         text.scan(%r{["'](/(?:etc|usr|var|opt|home)[^"'\s]*)["']}) { |m| paths << m[0] }
         # Filesystem WRITES are their own dimension: redirections/tee/cp into
         # $HOME are exactly the capability an update must not gain silently.
@@ -99,9 +103,15 @@ module Registry
         "paths" => capped(paths.sort, 200),
         "writes" => capped(writes.sort, 200),
         "keybindings" => keybindings,
-        "dynamic_exec" => dynamic_exec,
-        "dynamic_network" => dynamic_network
+        "dynamic_exec" => dynamic_exec_sites.sort,
+        "dynamic_network" => dynamic_network_sites.sort
       }
+    end
+
+    # A stable identifier for one opaque call site: whitespace-normalized text
+    def site_digest(match)
+      text = match.is_a?(Array) ? match.join : match.to_s
+      Digest::SHA256.hexdigest(text.gsub(/\s+/, " ").strip).first(12)
     end
 
     # Wrappers whose real payload is the next argv element
@@ -136,8 +146,13 @@ module Registry
         additions.concat(added.map { |item| "+#{dimension.singularize}: #{item}" })
       end
       additions << "+keybindings" if current["keybindings"] && !previous["keybindings"]
-      additions << "+dynamic_exec (non-literal process commands)" if current["dynamic_exec"] && !previous["dynamic_exec"]
-      additions << "+dynamic_network (computed request URLs)" if current["dynamic_network"] && !previous["dynamic_network"]
+      %w[dynamic_exec dynamic_network].each do |dimension|
+        added = Array(current[dimension]) - Array(previous[dimension])
+        # Legacy boolean fingerprints compare as arrays after Array(); a true
+        # baseline becomes [true] and any site list differs, forcing one
+        # re-review — safe in the conservative direction.
+        additions.concat(added.map { |site| "+#{dimension}: #{site}" })
+      end
       additions
     end
 

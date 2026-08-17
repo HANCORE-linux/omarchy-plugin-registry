@@ -150,9 +150,15 @@ module Registry
         "touches credential or key storage"
       check path, text, "shell-history-tamper", :flag, /HISTFILE=|history\s+-c\b|shred\b.*bash_history/,
         "tampers with shell history"
-      check path, text, "dotfile-write", :flag,
-        %r{(?:>>?|\btee\s+(?:-a\s+)?)\s*["']?(?:\$\{?HOME\}?|~)/\.(?!config/omarchy)[\w.]|\b(?:cp|mv|install)\b[^\n]*\s["']?(?:\$\{?HOME\}?|~)/\.(?!config/omarchy)[\w.]},
-        "writes to home dotfiles outside the plugin's own config"
+      # Only the plugin's OWN storage (~/.config/omarchy/plugins/...) is a
+      # legitimate write target; anything else in $HOME — dotfile or not — and
+      # any system path needs a human look.
+      check path, text, "home-write", :flag,
+        %r{(?:>>?|\btee\s+(?:-a\s+)?)\s*["']?(?:\$\{?HOME\}?|~)/(?!\.config/omarchy/plugins/)\S|\b(?:cp|mv|install)\b[^\n]*\s["']?(?:\$\{?HOME\}?|~)/(?!\.config/omarchy/plugins/)\S},
+        "writes into the home directory outside the plugin's own storage"
+      check path, text, "system-write", :flag,
+        %r{(?:>>?|\btee\s+(?:-a\s+)?)\s*["']?/(?:etc|usr|var|boot|opt|srv)/|\b(?:cp|mv|install)\b[^\n]*\s["']?/(?:etc|usr|var|boot|opt|srv)/},
+        "writes to system paths"
       check path, text, "embedded-shebang", :flag, /\n#!\s*\/(bin|usr)\//, "script payload embedded past the file header" if !entropy
       check_entropy(path, text) if entropy
     end

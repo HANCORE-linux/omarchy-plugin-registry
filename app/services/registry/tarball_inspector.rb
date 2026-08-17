@@ -90,6 +90,18 @@ module Registry
         readme_content ||= content.dup.force_encoding(Encoding::UTF_8) if README_CANDIDATES.include?(path)
       end
 
+      # A file whose path is also a directory prefix of another entry can't be
+      # extracted by any normal tool — an unextractable archive must never
+      # become an immutable release.
+      file_set = @files.to_set
+      @files.each do |candidate|
+        prefix = candidate.rpartition("/").first
+        until prefix.empty?
+          raise InvalidTarball, "path conflict: #{prefix} is both a file and a directory" if file_set.include?(prefix)
+          prefix = prefix.rpartition("/").first
+        end
+      end
+
       raise InvalidTarball, "#{MANIFEST_NAME} missing at tarball root" if manifest_json.nil?
       @manifest = parse_manifest(manifest_json)
       @readme = readme_content&.valid_encoding? ? readme_content : nil

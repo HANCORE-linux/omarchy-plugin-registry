@@ -53,7 +53,7 @@
 
   <section>
     <h2>Identity</h2>
-    <dl class="sidebar" style="max-width: 640px;">
+    <dl class="sidebar u-max-narrow">
       <div><dt class="eyebrow">SHA-256</dt><dd><code><%= @version.sha256 %></code></dd></div>
       <div><dt class="eyebrow">Size</dt><dd><%= number_to_human_size(@version.size_bytes) %></dd></div>
       <div><dt class="eyebrow">Submitted</dt><dd><%= @version.created_at %></dd></div>
@@ -85,21 +85,21 @@
     <% end %>
     <% ai = @version.scan_results&.dig("ai") %>
     <% if ai %>
-      <p style="margin-top: 12px;"><span class="eyebrow">AI review</span> <%= ai["verdict"] %> — <%= Array(ai["reasons"]).join("; ") %></p>
+      <p class="u-gap-top"><span class="eyebrow">AI review</span> <%= ai["verdict"] %> — <%= Array(ai["reasons"]).join("; ") %></p>
     <% end %>
   </section>
 
   <section>
     <h2>Capability fingerprint</h2>
     <% if @version.capability_fingerprint.present? %>
-      <dl class="sidebar" style="max-width: 640px;">
+      <dl class="sidebar u-max-narrow">
         <% @version.capability_fingerprint.each do |capability, value| %>
           <div><dt class="eyebrow"><%= capability %></dt><dd><%= Array(value).join(", ").presence || "—" %></dd></div>
         <% end %>
       </dl>
       <% growth = @version.scan_results&.dig("capability_growth") || [] %>
       <% if growth.any? %>
-        <p style="margin-top: 12px;"><span class="badge badge--warning">Growth vs baseline</span> <%= growth.join(" · ") %></p>
+        <p class="u-gap-top"><span class="badge badge--warning">Growth vs baseline</span> <%= growth.join(" · ") %></p>
       <% end %>
     <% else %>
       <p class="muted">Not computed yet.</p>

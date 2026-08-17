@@ -10,6 +10,7 @@ module Registry
       Session.expired.delete_all
       purge_rejected_tarballs
       resume_stuck_pipeline_work
+      Plugin.find_each(&:flush_cached_views!) if Rails.env.production?
     end
 
     private

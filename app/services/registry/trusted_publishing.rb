@@ -12,9 +12,13 @@ module Registry
       claims = verify(oidc_token)
       reject_replay!(claims)
 
-      trusted = TrustedPublisher.where(repository: claims["repository"])
-        .includes(:publisher, :created_by).detect { |tp| tp.matches?(claims) }
-      raise ExchangeError, "no trusted publisher registered for #{claims['repository']} / #{claims['job_workflow_ref']}" unless trusted
+      matches = TrustedPublisher.where(repository: claims["repository"])
+        .includes(:publisher, :created_by).select { |tp| tp.matches?(claims) }
+      raise ExchangeError, "no trusted publisher registered for #{claims['repository']} / #{claims['job_workflow_ref']}" if matches.empty?
+      if matches.size > 1
+        raise ExchangeError, "OIDC claims match #{matches.size} registrations — use a distinct environment per plugin so the intended scope is unambiguous"
+      end
+      trusted = matches.first
       raise ExchangeError, "publisher #{trusted.publisher.name} is suspended" if trusted.publisher.suspended?
       pin_repository_identity!(trusted, claims)
 
@@ -84,9 +88,14 @@ module Registry
 
       Rails.cache.fetch("github_oidc_jwks", expires_in: 1.hour) do
         require "net/http"
-        response = Net::HTTP.get_response(URI("#{GITHUB_ISSUER}/.well-known/jwks"))
+        uri = URI("#{GITHUB_ISSUER}/.well-known/jwks")
+        response = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 5, read_timeout: 5) do |http|
+          http.request(Net::HTTP::Get.new(uri))
+        end
         raise ExchangeError, "could not fetch GitHub JWKS" unless response.is_a?(Net::HTTPSuccess)
         JSON.parse(response.body)
+      rescue SocketError, SystemCallError, Timeout::Error, OpenSSL::SSL::SSLError, JSON::ParserError => e
+        raise ExchangeError, "could not fetch GitHub JWKS: #{e.class}"
       end
     end
   end

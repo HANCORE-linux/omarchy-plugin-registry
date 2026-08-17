@@ -69,13 +69,21 @@ module Registry
       out
     end
 
+    # Timeout enforcement actually KILLS the child — a hung clone must not
+    # outlive its deadline as an orphaned git process.
     def self.run!(*command)
-      Timeout.timeout(CLONE_TIMEOUT) do
-        _out, err, status = Open3.capture3({ "GIT_TERMINAL_PROMPT" => "0" }, *command)
-        raise SnapshotError, "#{command.first} failed: #{err.strip.first(200)}" unless status.success?
+      Open3.popen3({ "GIT_TERMINAL_PROMPT" => "0" }, *command) do |stdin, _stdout, stderr, wait_thread|
+        stdin.close
+        err_reader = Thread.new { stderr.read(64 * 1024).to_s }
+        unless wait_thread.join(CLONE_TIMEOUT)
+          Process.kill("KILL", wait_thread.pid) rescue nil
+          wait_thread.join(5)
+          raise SnapshotError, "clone timed out"
+        end
+        unless wait_thread.value.success?
+          raise SnapshotError, "#{command.first} failed: #{err_reader.value.strip.first(200)}"
+        end
       end
-    rescue Timeout::Error
-      raise SnapshotError, "clone timed out"
     end
   end
 end

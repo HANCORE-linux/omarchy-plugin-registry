@@ -36,10 +36,15 @@ build step.
 
 ## Status
 
-Phases 1–3 of `docs/design.md` §11 are built: publish pipeline with deterministic
-scanning, capability fingerprints + delta holds, escalate-only AI review hook,
-publish hold window, Ed25519-signed index + kill list, device-flow CLI login,
-OIDC trusted publishing with provenance, passkeys, community
-(ratings/comments/views/reports + moderation), seeding + repo-proof claims, and
-the admin console. Remaining: deploy it (see `docs/deploy.md`), implement the
-client side in Quattro (`docs/client-spec.md`), assign the governance roster.
+The **registry side** of `docs/design.md` §11's three phases is built: publish
+pipeline with deterministic scanning, capability fingerprints + delta holds,
+escalate-only AI review hook, publish hold window, Ed25519-signed index + kill
+list, device-flow CLI login, OIDC trusted publishing with provenance, passkeys,
+community (ratings/comments/views/reports + moderation), seeding + repo-proof
+claims, and the admin console.
+
+**Not yet done, and required before launch**: the Quattro-side client
+(`omarchy plugin add/update/publish`, signature + freshness verification,
+receipts, the kill-bit check — contract in `docs/client-spec.md`), deployment
+(`docs/deploy.md`), the real omarchyplugins.com catalog for seeding, and the
+governance roster names.

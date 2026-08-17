@@ -4,8 +4,8 @@ namespace :registry do
     abort "usage: rails registry:grant_admin[you@example.com]" if args[:email].blank?
     user = User.find_or_create_by!(email_address: args[:email].strip.downcase)
     user.update!(admin: true)
-    AuditEvent.record!(action: "user.grant_admin", subject: user, public: true,
-      metadata: { email: user.email_address })
+    # Not public: the transparency log must not disclose admin login emails
+    AuditEvent.record!(action: "user.grant_admin", subject: user)
     puts "#{user.email_address} is an admin. They must sign in and enroll a second factor before admin actions work."
   end
 

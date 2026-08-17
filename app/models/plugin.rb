@@ -84,8 +84,22 @@ class Plugin < ApplicationRecord
     (ratings_sum.to_f / ratings_count).round(1)
   end
 
+  # Production batches view increments through the cache store (Solid Cache —
+  # its own database, no contention on the primary) and CleanupJob flushes
+  # hourly; elsewhere the write is direct so counts are immediately visible.
   def record_view!
-    self.class.where(id: id).update_all("views_count = views_count + 1")
+    if Rails.env.production?
+      Rails.cache.increment("plugin_views:#{id}", 1, initial: 0, expires_in: 3.hours)
+    else
+      self.class.where(id: id).update_all("views_count = views_count + 1")
+    end
+  end
+
+  def flush_cached_views!
+    pending = Rails.cache.read("plugin_views:#{id}", raw: true).to_i
+    return if pending.zero?
+    Rails.cache.decrement("plugin_views:#{id}", pending)
+    self.class.where(id: id).update_all([ "views_count = views_count + ?", pending ])
   end
 
   private
