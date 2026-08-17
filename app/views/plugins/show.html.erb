@@ -67,8 +67,11 @@
             <% if comment.from_publisher? %><span class="badge">publisher</span><% end %>
             <span class="muted"><%= time_ago_in_words(comment.created_at) %> ago</span>
             <span class="comment__actions">
-              <% if authenticated? && (comment.user == Current.user || Current.user.admin?) %>
+              <% if authenticated? && comment.user == Current.user %>
                 <%= button_to "delete", comment_path(comment), method: :delete, class: "linklike" %>
+              <% end %>
+              <% if authenticated? && Current.user.admin? && comment.user != Current.user %>
+                <%= button_to "hide", hide_admin_comment_path(comment), class: "linklike" %>
               <% end %>
               <% if authenticated? && comment.user != Current.user %>
                 <%= button_to "report", reports_path(reportable_type: "Comment", reportable_id: comment.id, reason: "inappropriate"), class: "linklike" %>

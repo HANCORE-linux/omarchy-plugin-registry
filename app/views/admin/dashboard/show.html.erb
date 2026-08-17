@@ -46,16 +46,7 @@
             <td><%= state_badge(version.state) %></td>
             <td class="muted"><%= version.published_at&.strftime("%Y-%m-%d %H:%M") %></td>
             <td class="actions">
-              <% if version.published? %>
-                <%= button_to "Quarantine", quarantine_admin_version_path(version), class: "button button--ghost button--small" %>
-                <%= button_to "Yank", yank_admin_version_path(version), class: "button button--ghost button--small" %>
-                <%= button_to "Revoke", revoke_admin_version_path(version), class: "button button--danger button--small",
-                      form: { data: { turbo_confirm: "Kill-bit #{version.plugin.full_name}@#{version.version}? Installed copies will be disabled." } } %>
-              <% end %>
-              <% if version.plugin.active? %>
-                <%= button_to "Burn plugin", security_hold_admin_plugin_path(version.plugin), class: "button button--danger button--small",
-                      form: { data: { turbo_confirm: "Security-hold #{version.plugin.full_name}? This burns the name forever and revokes every version." } } %>
-              <% end %>
+              <%= link_to "Review →", admin_version_path(version), class: "button button--ghost button--small" %>
             </td>
           </tr>
         <% end %>

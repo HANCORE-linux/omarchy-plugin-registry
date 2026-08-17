@@ -37,27 +37,31 @@ module Admin
     end
 
     def reject
+      return require_reason! unless params[:reason].present?
       @version.update!(state: :rejected, review_notes: params[:reason])
       @version.plugin.refresh_latest_version!
-      audit "version.reject", public: true
+      audit "version.reject", public: true, metadata: { reason: params[:reason] }
       regenerate_and_redirect "Rejected — version number stays burned."
     end
 
     def quarantine
+      return require_reason! unless params[:reason].present?
       @version.update!(state: :quarantined, review_notes: params[:reason])
       @version.plugin.refresh_latest_version!
-      audit "version.quarantine", public: true
+      audit "version.quarantine", public: true, metadata: { reason: params[:reason] }
       regenerate_and_redirect "Quarantined — drops from the index on regen."
     end
 
     def yank
-      @version.yank!(reason: params[:reason].presence || "yanked by admin", actor: Current.user)
+      return require_reason! unless params[:reason].present?
+      @version.yank!(reason: params[:reason], actor: Current.user)
       regenerate_and_redirect "Yanked."
     end
 
     # The kill-bit: yank + revocation entry reaching already-installed copies.
     def revoke
-      reason = params[:reason].presence || "security"
+      return require_reason! unless params[:reason].present?
+      reason = params[:reason]
       ApplicationRecord.transaction do
         @version.yank!(reason:, actor: Current.user) unless @version.yanked?
         Revocation.create!(plugin: @version.plugin, version: @version.version,
@@ -76,6 +80,10 @@ module Admin
     def audit(action, public: false, metadata: {})
       AuditEvent.record!(actor: Current.user, action:, subject: @version, public:,
         metadata: { plugin: @version.plugin.full_name, version: @version.version }.merge(metadata))
+    end
+
+    def require_reason!
+      redirect_to admin_version_path(@version), alert: "A public reason is required for takedown actions."
     end
 
     def regenerate_and_redirect(notice)

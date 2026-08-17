@@ -1,4 +1,5 @@
 require "net/http"
+require "resolv"
 
 module Registry
   # One-time proof of control of a seeded plugin's source repo: the claimant
@@ -47,13 +48,40 @@ module Registry
       nil
     end
 
+    OPEN_TIMEOUT = 5
+    READ_TIMEOUT = 5
+    MAX_BODY_BYTES = 64 * 1024
+
+    # Bounded and revalidated per hop: explicit timeouts, a body-size cap, and
+    # every redirect target re-checked as https-to-a-public-host, so slow or
+    # oversized responses (or a redirect into internal address space) go nowhere.
     def self.http_get(url, limit = 3)
       return nil if limit.zero?
-      response = Net::HTTP.get_response(URI(url))
-      case response
-      when Net::HTTPSuccess then response.body
-      when Net::HTTPRedirection then http_get(response["location"], limit - 1)
+      uri = URI(url)
+      return nil unless safe_target?(uri)
+
+      Net::HTTP.start(uri.host, uri.port, use_ssl: true,
+        open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT) do |http|
+        response = http.request_get(uri.request_uri)
+        case response
+        when Net::HTTPSuccess then response.body.to_s.byteslice(0, MAX_BODY_BYTES)
+        when Net::HTTPRedirection then http_get(response["location"], limit - 1)
+        end
       end
+    rescue Timeout::Error, SystemCallError, OpenSSL::SSL::SSLError, SocketError
+      nil
+    end
+
+    def self.safe_target?(uri)
+      return false unless uri.is_a?(URI::HTTPS) && uri.host.present?
+      Resolv.getaddresses(uri.host).then do |addresses|
+        addresses.any? && addresses.none? do |address|
+          ip = IPAddr.new(address)
+          ip.loopback? || ip.private? || ip.link_local?
+        end
+      end
+    rescue IPAddr::InvalidAddressError, Resolv::ResolvError
+      false
     end
   end
 end

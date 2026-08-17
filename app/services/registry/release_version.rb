@@ -5,6 +5,8 @@ module Registry
     def self.call(version, actor: nil)
       raise ArgumentError, "cannot release a #{version.state} version" unless version.releasable?
       raise ArgumentError, "cannot release into a #{version.plugin.state} plugin" unless version.plugin.active?
+      # Suspension between submit and release must stop the release
+      raise ArgumentError, "publisher is suspended" if version.plugin.publisher.suspended?
 
       bytes = version.tarball.download
       raise "tarball checksum mismatch at release" unless Digest::SHA256.hexdigest(bytes) == version.sha256

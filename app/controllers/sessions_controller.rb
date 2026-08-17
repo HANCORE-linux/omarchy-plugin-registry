@@ -16,7 +16,8 @@ class SessionsController < ApplicationController
     redirect_to dashboard_path, notice: "You are already signed in." if authenticated?
   end
 
-  # Step 1: email in, code out
+  # Step 1: email in, code out. The email travels in the server session, never
+  # a query string — URLs land in browser history and proxy/CDN logs.
   def create
     email = params[:email_address].to_s.strip.downcase
     unless email.match?(URI::MailTo::EMAIL_REGEXP)
@@ -26,24 +27,26 @@ class SessionsController < ApplicationController
 
     user = User.find_or_create_by!(email_address: email)
     expose_login_code_in_dev user.send_login_code
+    session[:pending_email] = email
 
-    redirect_to verify_session_path(email_address: email), notice: "Check your email for a sign-in code."
+    redirect_to verify_session_path, notice: "Check your email for a sign-in code."
   end
 
   # Step 2: code form
   def verify
-    @email_address = params[:email_address]
+    @email_address = session[:pending_email]
     redirect_to new_session_path, alert: "Enter your email first." if @email_address.blank?
   end
 
   # Step 3: redeem code, start session
   def authenticate
-    email = params[:email_address].to_s.strip.downcase
+    email = session[:pending_email].to_s
     user = User.find_by(email_address: email)
 
     if user&.suspended_at&.present?
       redirect_to new_session_path, alert: "This account is suspended. Contact registry@omarchy.org."
     elsif user&.redeem_login_code(params[:code])
+      session.delete(:pending_email)
       start_new_session_for user
       redirect_to user.onboarded? ? after_authentication_url : onboarding_path
     else

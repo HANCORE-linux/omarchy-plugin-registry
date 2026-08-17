@@ -44,8 +44,26 @@ module Registry
       AuditEvent.record!(action: "plugin.seed", subject: version.plugin, public: true,
         metadata: { plugin: version.plugin.full_name, source: entry["repository"] })
       { entry:, status: "submitted", version: version.version }
-    rescue PublishVersion::PublishError, RepoSnapshot::SnapshotError, KeyError => e
+    rescue PublishVersion::PublishError, RepoSnapshot::SnapshotError => e
+      # A legacy plugin whose snapshot fails validation must remain VISIBLE and
+      # uninstallable, not silently vanish from the directory it came from.
+      placeholder_plugin(entry, e.message)
       { entry:, status: "failed", reason: e.message }
+    rescue KeyError => e
+      { entry:, status: "failed", reason: e.message }
+    end
+
+    def self.placeholder_plugin(entry, reason)
+      publisher = Publisher.find_by(name: entry["publisher"])
+      return if publisher.nil? || publisher.claimed?
+      plugin = publisher.plugins.find_or_create_by!(name: entry["name"]) do |p|
+        p.summary = entry["summary"]
+        p.state = :quarantined
+      end
+      AuditEvent.record!(action: "plugin.seed_failed", subject: plugin, public: true,
+        metadata: { plugin: plugin.full_name, source: entry["repository"], reason: reason.first(300) })
+    rescue ActiveRecord::RecordInvalid
+      nil
     end
   end
 end

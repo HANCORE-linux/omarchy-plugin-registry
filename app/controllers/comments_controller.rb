@@ -12,9 +12,10 @@ class CommentsController < ApplicationController
     end
   end
 
+  # Authors delete their own comments; moderation (hiding others') lives in the
+  # MFA-gated admin controllers and always leaves an audit trail.
   def destroy
-    comment = Comment.find(params[:id])
-    return head :forbidden unless comment.user == Current.user || Current.user.admin?
+    comment = Current.user.comments.find(params[:id])
     comment.destroy!
     redirect_back fallback_location: root_path, notice: "Comment removed."
   end

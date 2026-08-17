@@ -4,7 +4,6 @@
   <h1>Enter your code.</h1>
   <p>We sent a 6-digit code to <strong><%= @email_address %></strong>. It expires in 15 minutes.</p>
   <%= form_with url: authenticate_session_path do |form| %>
-    <input type="hidden" name="email_address" value="<%= @email_address %>">
     <div class="field">
       <label for="code">Code</label>
       <input type="text" name="code" id="code" class="code-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" required autofocus autocomplete="one-time-code">

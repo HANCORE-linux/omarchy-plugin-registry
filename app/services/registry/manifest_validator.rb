@@ -28,7 +28,11 @@ module Registry
       LGPL-3.0-only LGPL-3.0-or-later MIT MIT-0 MPL-2.0 MulanPSL-2.0 NCSA
       OFL-1.1 OSL-3.0 PostgreSQL Unlicense UPL-1.0 WTFPL Zlib
     ].to_set.freeze
-    SPDX_EXCEPTION_FORMAT = /\A[A-Za-z0-9.\-]+-exception(-[A-Za-z0-9.\-]+)?\z/i
+    SPDX_EXCEPTION_IDS = %w[
+      Classpath-exception-2.0 GCC-exception-3.1 GCC-exception-2.0 LLVM-exception
+      Linux-syscall-note OpenJDK-assembly-exception-1.0 GPL-3.0-linking-exception
+      Autoconf-exception-3.0 Bison-exception-2.2 Font-exception-2.0
+    ].to_set.freeze
 
     attr_reader :errors
 
@@ -139,7 +143,7 @@ module Registry
         if index.odd?
           %w[OR AND WITH].include?(token)
         elsif index.positive? && tokens[index - 1] == "WITH"
-          token.match?(SPDX_EXCEPTION_FORMAT)
+          SPDX_EXCEPTION_IDS.include?(token)
         else
           SPDX_LICENSE_IDS.include?(token)
         end

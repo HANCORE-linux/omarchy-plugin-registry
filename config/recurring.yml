@@ -16,3 +16,8 @@ production:
   registry_cleanup:
     class: Registry::CleanupJob
     schedule: every hour at minute 27
+  # Reconciliation: if a post-takedown regen enqueue was ever lost, the signed
+  # index and kill list converge with the database within minutes.
+  data_plane_reconcile:
+    class: DataPlane::RegenerateJob
+    schedule: every 10 minutes

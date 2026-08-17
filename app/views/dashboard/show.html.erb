@@ -20,6 +20,34 @@
   <% @publishers.each do |publisher| %>
     <section>
       <h2><%= publisher.name %> <% if publisher.org? %><span class="badge">org</span><% end %></h2>
+      <% if publisher.org? && @user.owner_of?(publisher) %>
+        <table class="table" style="max-width: 640px; margin-bottom: 18px;">
+          <thead><tr><th>Member</th><th>Role</th><th></th></tr></thead>
+          <tbody>
+            <% publisher.memberships.includes(:user).each do |membership| %>
+              <tr>
+                <td><%= membership.user.name || membership.user.email_address %></td>
+                <td><%= membership.role %></td>
+                <td class="actions">
+                  <%= button_to "Remove", remove_member_org_path(publisher, membership_id: membership.id),
+                        class: "button button--ghost button--small" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+        <%= form_with url: add_member_org_path(publisher), class: "form-inline", style: "margin-bottom: 24px;" do %>
+          <div class="field">
+            <label>Add member by email</label>
+            <input type="email" name="email_address" required placeholder="dev@example.com">
+          </div>
+          <div class="field">
+            <label>Role</label>
+            <select name="role" class="select"><option value="publisher">publisher</option><option value="owner">owner</option></select>
+          </div>
+          <button type="submit" class="button button--small">Add</button>
+        <% end %>
+      <% end %>
       <% if publisher.plugins.any? %>
         <table class="table">
           <thead><tr><th>Plugin</th><th>Latest</th><th>Downloads</th><th>State</th></tr></thead>

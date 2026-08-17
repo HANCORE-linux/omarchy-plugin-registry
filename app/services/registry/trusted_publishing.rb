@@ -28,7 +28,7 @@ module Registry
         "repository" => claims["repository"],
         "ref" => claims["ref"],
         "sha" => claims["sha"],
-        "workflow" => claims["job_workflow_ref"],
+        "workflow" => claims["workflow_ref"].presence || claims["job_workflow_ref"],
         "run_id" => claims["run_id"]
       })
       token

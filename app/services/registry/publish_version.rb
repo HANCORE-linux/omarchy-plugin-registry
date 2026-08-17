@@ -112,6 +112,10 @@ module Registry
           metadata: { plugin: plugin.full_name, version: version.version, sha256: version.sha256 })
       end
       ReviewJob.perform_later(version)
+    rescue ActiveRecord::RecordNotUnique
+      # Two concurrent publishes of the same version: the loser gets the same
+      # answer a sequential attempt would
+      fail! "#{plugin.full_name}@#{tarball.manifest['version']} already exists — versions are immutable", status: :conflict
     end
 
     def fail!(message, status: :unprocessable_entity)

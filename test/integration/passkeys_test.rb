@@ -11,7 +11,7 @@ class PasskeysTest < ActionDispatch::IntegrationTest
     post options_settings_passkeys_path
     assert_response :success
     challenge = response.parsed_body["challenge"]
-    credential = @fake_client.create(challenge: challenge)
+    credential = @fake_client.create(challenge: challenge, user_verified: true)
     post settings_passkeys_path, params: { credential: credential.to_json, nickname: "YubiKey" }
     assert_response :success
   end

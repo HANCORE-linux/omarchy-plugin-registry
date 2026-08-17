@@ -8,10 +8,12 @@ module Settings
       user = Current.user
       user.update!(webauthn_id: WebAuthn.generate_user_id) if user.webauthn_id.blank?
 
+      # UV required at registration too — a presence-only credential must never
+      # become a factor that sign-in and step-up would then have to honor.
       creation_options = WebAuthn::Credential.options_for_create(
         user: { id: user.webauthn_id, name: user.email_address, display_name: user.name.to_s },
         exclude: user.passkeys.pluck(:external_id),
-        authenticator_selection: { resident_key: "preferred", user_verification: "preferred" }
+        authenticator_selection: { resident_key: "preferred", user_verification: "required" }
       )
       session[:webauthn_challenge] = creation_options.challenge
       render json: creation_options
@@ -19,7 +21,7 @@ module Settings
 
     def create
       credential = WebAuthn::Credential.from_create(JSON.parse(params.require(:credential)))
-      credential.verify(session.delete(:webauthn_challenge))
+      credential.verify(session.delete(:webauthn_challenge), user_verification: true)
 
       Current.user.passkeys.create!(
         external_id: credential.id,

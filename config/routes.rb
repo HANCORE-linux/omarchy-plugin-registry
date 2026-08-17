@@ -29,6 +29,7 @@ Rails.application.routes.draw do
   resources :orgs, only: %i[new create] do
     member do
       post :add_member
+      post :remove_member
     end
   end
 
@@ -65,6 +66,11 @@ Rails.application.routes.draw do
     resources :reports, only: [] do
       member do
         post :resolve
+      end
+    end
+    resources :comments, only: [] do
+      member do
+        post :hide
       end
     end
   end

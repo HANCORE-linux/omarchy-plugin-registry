@@ -33,6 +33,13 @@
         <% end %>
       <% end %>
       <%= link_to "Download exact tarball", download_tarball_admin_version_path(@version), class: "button button--ghost" %>
+      <% if @plugin.active? %>
+        <%= form_with url: security_hold_admin_plugin_path(@plugin), class: "form-inline",
+              data: { turbo_confirm: "Security-hold #{@plugin.full_name}? This burns the name forever and revokes every version." } do %>
+          <input type="text" name="reason" class="select" placeholder="Reason (public)" required>
+          <button type="submit" class="button button--danger">Burn plugin</button>
+        <% end %>
+      <% end %>
     </div>
   </section>
 
