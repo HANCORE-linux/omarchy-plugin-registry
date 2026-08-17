@@ -46,7 +46,7 @@
     <% else %>
       <p class="lede">Scan with any TOTP app, then confirm with a code.</p>
       <div class="qr-box"><%= @qr_svg.html_safe %></div>
-      <p class="muted">Or enter the secret manually: <code><%= @user.otp_secret %></code></p>
+      <p class="muted">Or enter the secret manually: <code><%= @provisional_secret %></code></p>
       <%= form_with url: settings_two_factor_path, method: :patch do |form| %>
         <div class="field u-max-field u-gap-top">
           <label for="code">Code from your app</label>

@@ -12,7 +12,8 @@ class MomusRoundThirtySevenTest < ActionDispatch::IntegrationTest
     Membership.create!(publisher:, user:, role: :owner, founding: true)
 
     sign_in_as user, second_factor_verified: false
-    user.update!(otp_secret: secret)
+    get settings_two_factor_path
+    secret = response.body[/Or enter the secret manually: <code>([A-Z2-7]+)<\/code>/, 1]
     patch settings_two_factor_path, params: { code: ROTP::TOTP.new(secret).now }
     assert_response :redirect
 

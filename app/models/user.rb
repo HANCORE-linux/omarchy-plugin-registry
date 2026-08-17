@@ -93,23 +93,22 @@ class User < ApplicationRecord
     sensitive_change_at.present? && sensitive_change_at > PUBLISH_COOLDOWN.ago
   end
 
-  def provision_otp!
-    update!(otp_secret: ROTP::Base32.random)
-    otp_secret
-  end
-
-  def otp_provisioning_uri
-    ROTP::TOTP.new(otp_secret, issuer: "plugins.omarchy.org").provisioning_uri(email_address)
+  def otp_provisioning_uri(secret)
+    ROTP::TOTP.new(secret, issuer: "plugins.omarchy.org").provisioning_uri(email_address)
   end
 
   # Returns the plaintext backup codes exactly once, at enrollment; only their
   # digests are persisted.
-  def enable_otp!(code)
-    # Enrollment confirms against the PROVISIONAL secret — the only place an
-    # unconfirmed secret may ever satisfy a check
-    return false unless totp_matches?(code)
+  def enable_otp!(code, secret:)
+    # Enrollment confirms against the SESSION-BOUND provisional secret — it is
+    # persisted to the account only in the same moment its confirmation lands,
+    # so a transient session snoop can never pre-record a seed the real user
+    # later confirms.
+    return false if secret.blank? ||
+      ROTP::TOTP.new(secret).verify(code.to_s.remove(/\s/), drift_behind: 15).blank?
     codes = Array.new(8) { SecureRandom.alphanumeric(10).downcase }
-    update!(otp_enabled_at: Time.current, otp_backup_codes: codes.map { |c| Digest::SHA256.hexdigest(c) })
+    update!(otp_secret: secret, otp_enabled_at: Time.current,
+      otp_backup_codes: codes.map { |c| Digest::SHA256.hexdigest(c) })
     codes
   end
 

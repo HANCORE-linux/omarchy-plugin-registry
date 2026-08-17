@@ -10,7 +10,8 @@ class MomusRoundFortyFiveTest < ActionDispatch::IntegrationTest
 
     # First factor (TOTP) → cooldown starts
     get settings_two_factor_path
-    patch settings_two_factor_path, params: { code: ROTP::TOTP.new(user.reload.otp_secret).now }
+    secret = response.body[/Or enter the secret manually: <code>([A-Z2-7]+)<\/code>/, 1]
+    patch settings_two_factor_path, params: { code: ROTP::TOTP.new(secret).now }
     assert_response :redirect
     first_stamp = user.reload.sensitive_change_at
     assert first_stamp.present?, "first factor must start the containment window"

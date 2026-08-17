@@ -55,9 +55,9 @@
   --warning: #9a6a1d;
   --danger: #c23232;
   --accent-soft: rgba(237, 76, 200, 0.12);
-  --success-soft: var(--success-soft);
-  --warning-soft: var(--warning-soft);
-  --danger-soft: var(--danger-soft);
+  --success-soft: rgba(35, 122, 89, 0.12);
+  --warning-soft: rgba(154, 106, 29, 0.14);
+  --danger-soft: rgba(194, 50, 50, 0.12);
   --info: #4d5bc9;
 
   --bg: var(--paper);

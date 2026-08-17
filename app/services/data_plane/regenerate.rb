@@ -44,13 +44,22 @@ module DataPlane
         # corrupt artifact failing the preflight below.
         generator.write_config
         generator.write_revocations
-        # Every promised artifact is verified (and restored if needed) BEFORE
-        # any index is written — an unrecoverable artifact aborts the rest of
-        # the run with every prior index intact, kill list already out.
-        Plugin.find_each { |p| generator.ensure_artifacts!(p) }
-        Plugin.find_each { |p| generator.write_plugin_index(p) }
+        # Artifact verification is scoped PER PLUGIN: a corrupt artifact
+        # freezes only its own plugin's index (prior signed pair preserved
+        # byte-for-byte) while every healthy plugin's takedowns, yanks, and
+        # releases still reach their signed indexes. The aggregate failure
+        # still raises at the end so the run is operator-visible.
+        artifact_failures = []
+        Plugin.find_each do |p|
+          generator.ensure_artifacts!(p)
+          generator.write_plugin_index(p)
+        rescue ArtifactIntegrityError => e
+          artifact_failures << e.message
+          Rails.logger.error("[DataPlane] #{e.message} — this plugin's index left untouched")
+        end
         generator.warn_orphan_indexes!
         generator.write_all_listing
+        raise ArtifactIntegrityError, artifact_failures.join("; ") if artifact_failures.any?
       end
     end
 

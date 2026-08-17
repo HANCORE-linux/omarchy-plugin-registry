@@ -6,11 +6,17 @@ module Settings
     # TOTP secrets and one-time backup codes must never land in a shared cache
     after_action { response.headers["Cache-Control"] = "no-store" }
 
+    # The provisional secret lives ONLY in this browser's encrypted session
+    # and expires — it reaches the account solely when THIS enrollment
+    # confirms it, so nothing recordable-in-advance ever becomes the seed.
+    PROVISIONAL_TTL = 30.minutes
+
     def show
       @user = Current.user
-      @user.provision_otp! if @user.otp_secret.blank? && !@user.otp_enabled?
       if !@user.otp_enabled?
-        @qr_svg = RQRCode::QRCode.new(@user.otp_provisioning_uri).as_svg(module_size: 4, use_path: true)
+        @provisional_secret = provisional_otp_secret!
+        @qr_svg = RQRCode::QRCode.new(@user.otp_provisioning_uri(@provisional_secret))
+          .as_svg(module_size: 4, use_path: true)
       end
       # Backup codes are shown exactly once, right after enrollment
       @backup_codes = flash[:backup_codes]
@@ -23,19 +29,25 @@ module Settings
       # pre-enrollment factor state, the enable, and the first-factor cooldown
       # commit atomically — a concurrent passkey enrollment can't make both
       # paths see "another factor exists" and both skip the cooldown.
+      secret = pending_otp_secret
+      if secret.blank?
+        return redirect_to settings_two_factor_path,
+          alert: "Enrollment expired — scan the fresh code and try again."
+      end
       codes = was_first_factor = was_recovery = nil
       @user.with_lock do
         # Captured BEFORE verification marks — mark_second_factor_verified!
         # clears the recovery flag, and the cooldown must not miss that
         was_recovery = @user.recovery_requested_at.present?
         was_first_factor = !@user.otp_enabled? && !@user.passkeys.exists?
-        codes = @user.enable_otp!(params[:code])
+        codes = @user.enable_otp!(params[:code], secret:)
         if codes
           apply_first_factor_cooldown(@user) if was_first_factor
           @user.update!(recovery_requested_at: nil, sensitive_change_at: Time.current) if was_recovery
         end
       end
       if codes
+        session.delete(:pending_otp)
         mark_second_factor_verified!
         flash[:backup_codes] = codes
         redirect_to settings_two_factor_path, notice: "Two-factor authentication enabled. Save your backup codes now — this is the only time they're shown."
@@ -61,6 +73,24 @@ module Settings
         sensitive_change_at: Time.current)
       AuditEvent.record!(actor: user, action: "totp.disable", subject: user)
       redirect_to settings_two_factor_path, notice: "TOTP disabled. Re-enroll any time (a fresh secret will be generated); the security cooldown applies."
+    end
+
+    private
+
+    # Fresh (or still-fresh) provisional secret, session-bound and expiring.
+    # Regenerating on expiry also invalidates any prior pending enrollment.
+    def provisional_otp_secret!
+      pending_otp_secret || begin
+        secret = ROTP::Base32.random
+        session[:pending_otp] = { "secret" => secret, "at" => Time.current.to_i }
+        secret
+      end
+    end
+
+    def pending_otp_secret
+      pending = session[:pending_otp]
+      return nil if pending.blank? || pending["at"].to_i < PROVISIONAL_TTL.ago.to_i
+      pending["secret"]
     end
   end
 end

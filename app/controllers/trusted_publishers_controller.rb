@@ -42,9 +42,10 @@ class TrustedPublishersController < ApplicationController
     trusted = TrustedPublisher.find(params[:id])
     return head :forbidden unless Current.user.owner_of?(trusted.publisher)
     ApplicationRecord.transaction do
-      # Tokens the registration minted die with it — a token exchanged seconds
-      # before removal must not keep publishing for its remaining lifetime
-      ApiToken.usable.where(publisher: trusted.publisher, plugin_name: trusted.plugin_name)
+      # Tokens the registration minted die with it — including EXPIRED ones:
+      # a held submission re-checks its token's revoked_at at release, and an
+      # expired-but-unrevoked token must not let that release proceed
+      ApiToken.where(revoked_at: nil, publisher: trusted.publisher, plugin_name: trusted.plugin_name)
         .where.not(provenance: nil).find_each(&:revoke!)
       trusted.destroy!
     end

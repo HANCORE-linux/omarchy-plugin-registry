@@ -66,9 +66,12 @@ module Registry
           /Qt\.createQmlObject\s*\([^\n]{0,160}/,
           /Qt\.createComponent\s*\(\s*(?!["'])[^\n]{0,160}/,
           /\bsetSource\s*\([^\n]{0,160}/,
-          /command\s*[:=]\s*(?!\[\s*["'])[a-zA-Z_\[][^\n]{0,160}/,
+          # ANY command binding that isn't a recognized literal array is
+          # opaque execution — parens, comments, multiline expressions,
+          # function calls, whatever: unrecognized means a human looks
+          /command\s*[:=]\s*(?!\[\s*["'])[^\s][^\n]{0,160}/,
           /command\s*[:=]\s*\[\s*["'](?:\/[\w\/]*\/)?(?:#{SHELL_INTERPRETERS.join('|')})["']\s*,\s*["']-c["']\s*,\s*(?!["'])[^\n]{0,160}/,
-          /\b(?:bar\.run|execDetached|startDetached)\s*\(\s*(?!["'])(?!\[\s*["'])[^\n]{0,160}/,
+          /\b(?:bar\.run|execDetached|startDetached)\s*\(\s*(?!["'])(?!\[\s*["'])[^\s][^\n]{0,159}/,
           /\beval\s*\([^\n]{0,160}/,
           /new\s+Function\s*\([^\n]{0,160}/
         ].each do |pattern|

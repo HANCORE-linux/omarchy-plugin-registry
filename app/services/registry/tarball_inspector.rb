@@ -145,6 +145,13 @@ module Registry
     # detection can be sidestepped. Escapes are refused outright.
     def clean_path(raw)
       raise InvalidTarball, "illegal path in tarball: #{raw.inspect}" if raw.include?("\0") || raw.start_with?("/")
+      # Names must be valid UTF-8 with no control characters — anything else
+      # would poison fingerprint/scan JSON persistence downstream (and is a
+      # smuggling vector in listings)
+      utf8 = raw.dup.force_encoding(Encoding::UTF_8)
+      unless utf8.valid_encoding? && !utf8.match?(/[\x00-\x1f\x7f]/)
+        raise InvalidTarball, "tarball path is not clean UTF-8: #{raw.inspect}"
+      end
       segments = raw.split("/").reject { |segment| segment == "." || segment.empty? }
       raise InvalidTarball, "illegal path in tarball: #{raw.inspect}" if segments.empty? || segments.include?("..")
       segments.join("/")
