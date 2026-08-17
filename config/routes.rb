@@ -47,8 +47,9 @@ Rails.application.routes.draw do
 
   namespace :admin do
     root "dashboard#show"
-    resources :versions, only: [] do
+    resources :versions, only: :show do
       member do
+        get :download_tarball
         post :approve
         post :reject
         post :quarantine
@@ -86,11 +87,17 @@ Rails.application.routes.draw do
   post "device/approve", to: "device#approve", as: :approve_device
 
   # --- Static data plane (CDN origin) ---
+  # .sig routes serve real sibling objects so a dumb CDN/object store works;
+  # ?sig=1 remains a Rails-only convenience.
   get "config.json", to: "data_plane#config"
+  get "config.json.sig", to: "data_plane#config", defaults: { sig: "1" }
   get "all.json", to: "data_plane#all"
+  get "all.json.sig", to: "data_plane#all", defaults: { sig: "1" }
   get "revocations.json", to: "data_plane#revocations"
+  get "revocations.json.sig", to: "data_plane#revocations", defaults: { sig: "1" }
   get "signing-key.pub", to: "data_plane#signing_key"
   get "index/:publisher/:plugin.json", to: "data_plane#index_file", as: :index_file
+  get "index/:publisher/:plugin.json.sig", to: "data_plane#index_file", defaults: { sig: "1" }, format: false
   get "dl/:publisher/:plugin/:plugin_file",
     to: "data_plane#tarball", as: :tarball,
     constraints: { plugin_file: /[^\/]+\.tar\.gz/ }

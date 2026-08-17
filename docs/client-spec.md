@@ -7,9 +7,10 @@ dev escape hatch behind `--unsafe`.
 ## Trust root
 
 Pin the registry public key (fetch once from `GET /signing-key.pub`, ship a
-copy with Omarchy). Every JSON file below has a detached Ed25519 signature at
-the same URL with `?sig=1` (base64 over the exact file bytes). Verify before
-trusting; the kill list especially.
+copy with Omarchy). Every JSON file below has a detached Ed25519 signature as a
+real sibling object at `<path>.sig` (base64 over the exact file bytes) — works
+identically from Rails or a dumb object store/CDN. Verify before trusting; the
+kill list especially.
 
 ## Endpoints (all static, CDN-cached)
 

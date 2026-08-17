@@ -15,9 +15,10 @@ class DataPlaneController < ActionController::API
     filename = params[:plugin_file]
     version = filename[/\A#{Regexp.escape(params[:plugin])}-(.+)\.tar\.gz\z/, 1]
     return head :not_found unless version
-    count_download(version)
-    serve("dl/#{params[:publisher]}/#{params[:plugin]}/#{filename}",
+    served = serve("dl/#{params[:publisher]}/#{params[:plugin]}/#{filename}",
       type: "application/gzip", disposition: "attachment", filename: filename)
+    # Count only real deliveries of resolvable versions
+    count_download(version) if served
   end
 
   private
@@ -27,15 +28,20 @@ class DataPlaneController < ActionController::API
 
   def content_type_for_json = params[:sig].present? ? "text/plain" : "application/json"
 
+  # Returns truthy only when the file was actually sent
   def serve(relative_path, type:, disposition: "inline", filename: nil)
     path = DataPlane.root.join(relative_path)
-    return head :not_found unless path.file? && path.to_s.start_with?(DataPlane.root.to_s)
+    unless path.file? && path.to_s.start_with?(DataPlane.root.to_s)
+      head :not_found
+      return false
+    end
     response.headers["Cache-Control"] = "public, max-age=60"
-    send_file path, type:, disposition:, filename:
+    send_file(path, type: type, disposition: disposition, filename: filename)
+    true
   end
 
   def count_download(version_string)
-    version = PluginVersion.joins(plugin: :publisher).find_by(
+    version = PluginVersion.published.joins(plugin: :publisher).find_by(
       plugins: { name: params[:plugin] }, publishers: { name: params[:publisher] },
       version: version_string
     )

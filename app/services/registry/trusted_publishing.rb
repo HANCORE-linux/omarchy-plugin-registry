@@ -15,6 +15,7 @@ module Registry
         .includes(:publisher, :created_by).detect { |tp| tp.matches?(claims) }
       raise ExchangeError, "no trusted publisher registered for #{claims['repository']} / #{claims['job_workflow_ref']}" unless trusted
       raise ExchangeError, "publisher #{trusted.publisher.name} is suspended" if trusted.publisher.suspended?
+      pin_repository_identity!(trusted, claims)
 
       token = ApiToken.mint!(
         user: trusted.created_by,
@@ -31,6 +32,22 @@ module Registry
         "run_id" => claims["run_id"]
       })
       token
+    end
+
+    # Repository NAMES are mutable — a transferred or deleted-and-recreated
+    # owner/name must not keep minting tokens. GitHub's numeric repository_id /
+    # repository_owner_id are stable: pin them on first successful exchange,
+    # enforce them forever after.
+    def self.pin_repository_identity!(trusted, claims)
+      repo_id = claims["repository_id"].to_s
+      owner_id = claims["repository_owner_id"].to_s
+      raise ExchangeError, "OIDC token missing repository identity claims" if repo_id.blank? || owner_id.blank?
+
+      if trusted.repository_id.blank?
+        trusted.update!(repository_id: repo_id, repository_owner_id: owner_id)
+      elsif trusted.repository_id != repo_id || trusted.repository_owner_id != owner_id
+        raise ExchangeError, "repository identity changed since registration — re-register trusted publishing for #{trusted.repository}"
+      end
     end
 
     def self.verify(oidc_token)

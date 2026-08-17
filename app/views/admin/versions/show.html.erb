@@ -1,0 +1,109 @@
+<% content_for :title, "Review #{@plugin.full_name}@#{@version.version} — Admin" %>
+<div class="content-page container">
+  <p class="eyebrow">Human review</p>
+  <h1><%= @plugin.full_name %>@<%= @version.version %></h1>
+  <p class="lede">
+    <%= state_badge(@version.state) %>
+    <% if @version.review_notes.present? %> — <%= @version.review_notes %><% end %>
+  </p>
+
+  <section>
+    <h2>Actions</h2>
+    <div class="form-inline">
+      <% if @version.releasable? %>
+        <%= button_to "Approve and publish", approve_admin_version_path(@version), class: "button" %>
+        <%= button_to "Reject", reject_admin_version_path(@version), class: "button button--ghost" %>
+      <% end %>
+      <% if @version.published? %>
+        <%= button_to "Quarantine", quarantine_admin_version_path(@version), class: "button button--ghost" %>
+        <%= button_to "Yank", yank_admin_version_path(@version), class: "button button--ghost" %>
+        <%= button_to "Revoke (kill-bit)", revoke_admin_version_path(@version), class: "button button--danger",
+              form: { data: { turbo_confirm: "Kill-bit this version? Installed copies will be disabled." } } %>
+      <% end %>
+      <%= link_to "Download exact tarball", download_tarball_admin_version_path(@version), class: "button button--ghost" %>
+    </div>
+  </section>
+
+  <section>
+    <h2>Identity</h2>
+    <dl class="sidebar" style="max-width: 640px;">
+      <div><dt class="eyebrow">SHA-256</dt><dd><code><%= @version.sha256 %></code></dd></div>
+      <div><dt class="eyebrow">Size</dt><dd><%= number_to_human_size(@version.size_bytes) %></dd></div>
+      <div><dt class="eyebrow">Submitted</dt><dd><%= @version.created_at %></dd></div>
+      <% if @version.provenance.present? %>
+        <div><dt class="eyebrow">Provenance</dt><dd><code><%= @version.provenance.to_json %></code></dd></div>
+      <% end %>
+    </dl>
+  </section>
+
+  <section>
+    <h2>Scan findings (<%= (@version.scan_results&.dig("findings") || []).size %>)</h2>
+    <% findings = @version.scan_results&.dig("findings") || [] %>
+    <% if findings.any? %>
+      <table class="table">
+        <thead><tr><th>Rule</th><th>Severity</th><th>File</th><th>Detail</th></tr></thead>
+        <tbody>
+          <% findings.each do |finding| %>
+            <tr>
+              <td><code><%= finding["rule"] %></code></td>
+              <td><%= state_badge(finding["severity"] == "fail" ? :rejected : :quarantined) %></td>
+              <td><code><%= finding["file"] %></code></td>
+              <td><%= finding["detail"] %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <p class="muted">No deterministic findings.</p>
+    <% end %>
+    <% ai = @version.scan_results&.dig("ai") %>
+    <% if ai %>
+      <p style="margin-top: 12px;"><span class="eyebrow">AI review</span> <%= ai["verdict"] %> — <%= Array(ai["reasons"]).join("; ") %></p>
+    <% end %>
+  </section>
+
+  <section>
+    <h2>Capability fingerprint</h2>
+    <% if @version.capability_fingerprint.present? %>
+      <dl class="sidebar" style="max-width: 640px;">
+        <% @version.capability_fingerprint.each do |capability, value| %>
+          <div><dt class="eyebrow"><%= capability %></dt><dd><%= Array(value).join(", ").presence || "—" %></dd></div>
+        <% end %>
+      </dl>
+      <% growth = @version.scan_results&.dig("capability_growth") || [] %>
+      <% if growth.any? %>
+        <p style="margin-top: 12px;"><span class="badge badge--warning">Growth vs baseline</span> <%= growth.join(" · ") %></p>
+      <% end %>
+    <% else %>
+      <p class="muted">Not computed yet.</p>
+    <% end %>
+  </section>
+
+  <section>
+    <h2>Files<%= " — diff vs #{@previous.version}" if @previous %></h2>
+    <% if @tarball %>
+      <ul class="audit-list">
+        <% @tarball.files.each do |file| %>
+          <li>
+            <span class="action"><code><%= file %></code></span>
+            <span class="muted"><%= number_to_human_size(@tarball.contents[file].to_s.bytesize) %></span>
+            <% if @previous %>
+              <% if @added_files&.include?(file) %><span class="badge badge--ok">new</span>
+              <% elsif @changed_files&.include?(file) %><span class="badge badge--warning">changed</span><% end %>
+            <% end %>
+          </li>
+        <% end %>
+        <% (@removed_files || []).each do |file| %>
+          <li><span class="action"><code><del><%= file %></del></code></span><span class="badge badge--danger">removed</span></li>
+        <% end %>
+      </ul>
+    <% else %>
+      <p class="muted">Tarball unavailable.</p>
+    <% end %>
+  </section>
+
+  <section>
+    <h2>Manifest</h2>
+    <pre><%= JSON.pretty_generate(@version.manifest) %></pre>
+  </section>
+</div>

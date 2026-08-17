@@ -49,7 +49,7 @@ module DataPlane
       raise ArgumentError, "refusing to overwrite frozen tarball with different bytes: #{version.tarball_path}"
     end
     FileUtils.mkdir_p(path.dirname)
-    path.open("wb") { |f| f.write(bytes) }
+    atomic_write(version.tarball_path, bytes)
     path
   end
 

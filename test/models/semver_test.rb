@@ -40,4 +40,13 @@ class SemverTest < ActiveSupport::TestCase
     assert Semver.parse("1.0.0-1").sort_key < Semver.parse("1.0.0-alpha").sort_key
     assert Semver.parse("1.0.0-alpha").sort_key < Semver.parse("1.0.0-alpha.1").sort_key
   end
+
+  test "sort_key handles hyphenated identifiers and matches Ruby comparison order" do
+    versions = %w[1.0.0-1 1.0.0-alpha 1.0.0-alpha.1 1.0.0-alpha.2 1.0.0-alpha.10
+                  1.0.0-alpha-beta 1.0.0-alphabet 1.0.0-rc.1 1.0.0]
+    by_semver = versions.sort_by { |v| Semver.parse(v) }
+    by_key = versions.sort_by { |v| Semver.parse(v).sort_key }
+    assert_equal by_semver, by_key
+    assert Semver.parse("1.0.0-alpha.1").sort_key < Semver.parse("1.0.0-alpha-beta").sort_key
+  end
 end

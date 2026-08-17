@@ -26,7 +26,15 @@ module Authentication
     end
 
     def find_session_by_cookie
-      Session.find_by(id: cookies.signed[:session_id]) if cookies.signed[:session_id]
+      return nil unless cookies.signed[:session_id]
+      session = Session.includes(:user).find_by(id: cookies.signed[:session_id])
+      # Suspension kills live sessions, not just future sign-ins — a suspended
+      # admin or publisher must lose their powers immediately.
+      if session && session.user.suspended_at.present?
+        session.destroy
+        return nil
+      end
+      session
     end
 
     def request_authentication

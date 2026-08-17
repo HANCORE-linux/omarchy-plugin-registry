@@ -22,10 +22,12 @@ to object storage behind a CDN. Installs never touch Rails.
 2. **Jobs**: `bin/jobs` (Solid Queue) — runs the review pipeline, hold-window
    releases, and index regeneration. Required.
 3. **Data plane**: `storage/data_plane/` is the CDN origin. Either serve the
-   Rails routes (`/index`, `/dl`, `/revocations.json`, …) behind the CDN, or
-   sync the directory to object storage (`aws s3 sync --delete` on a
-   post-regeneration hook) and point the CDN there. Keep TTLs short (~60 s) on
-   index files and long on `/dl/` (immutable).
+   Rails routes (`/index`, `/dl`, `/revocations.json`, `*.sig`, …) behind the
+   CDN, or sync the directory to object storage and point the CDN there.
+   Sync index files with `--delete`; sync `/dl/` WITHOUT `--delete` (tarballs
+   are immutable, and `registry:regenerate` re-freezes any missing ones from
+   the database, so the directory is always rebuildable). Keep TTLs short
+   (~60 s) on index files and long on `/dl/`.
 4. **Domains**: `plugins.omarchy.org` → app/CDN; `omarchyplugins.com` → 301.
 
 ## Seeding day

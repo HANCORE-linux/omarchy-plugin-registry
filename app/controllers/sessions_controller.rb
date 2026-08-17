@@ -41,7 +41,9 @@ class SessionsController < ApplicationController
     email = params[:email_address].to_s.strip.downcase
     user = User.find_by(email_address: email)
 
-    if user&.redeem_login_code(params[:code])
+    if user&.suspended_at&.present?
+      redirect_to new_session_path, alert: "This account is suspended. Contact registry@omarchy.org."
+    elsif user&.redeem_login_code(params[:code])
       start_new_session_for user
       redirect_to user.onboarded? ? after_authentication_url : onboarding_path
     else

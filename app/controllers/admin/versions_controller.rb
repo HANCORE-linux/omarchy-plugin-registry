@@ -2,6 +2,30 @@ module Admin
   class VersionsController < BaseController
     before_action :set_version
 
+    # The inspection view behind every approval: exact bytes, full findings,
+    # capability delta, file listing, and a diff of files vs the previous release.
+    def show
+      @plugin = @version.plugin
+      @tarball = Registry::TarballInspector.inspect_bytes(@version.tarball.download) if @version.tarball.attached?
+      previous = @plugin.versions.where(state: [ :published, :yanked ]).where.not(id: @version.id)
+        .order(version_sort_key: :desc).first
+      if previous&.tarball&.attached?
+        @previous = previous
+        previous_tarball = Registry::TarballInspector.inspect_bytes(previous.tarball.download)
+        @added_files = (@tarball&.files || []) - previous_tarball.files
+        @removed_files = previous_tarball.files - (@tarball&.files || [])
+        @changed_files = (@tarball&.files || []).select do |f|
+          previous_tarball.contents.key?(f) && previous_tarball.contents[f] != @tarball.contents[f]
+        end
+      end
+    end
+
+    def download_tarball
+      return head :not_found unless @version.tarball.attached?
+      send_data @version.tarball.download, filename: @version.tarball_filename,
+        type: "application/gzip", disposition: "attachment"
+    end
+
     # Approve out of quarantine/hold — releases through the same path as the
     # automated pipeline so frozen bytes and audit stay consistent.
     def approve

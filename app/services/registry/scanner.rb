@@ -52,10 +52,22 @@ module Registry
     def scan
       @tarball.contents.each do |path, content|
         if scannable?(path, content)
-          text = content.dup.force_encoding(Encoding::UTF_8)
-          text = text.scrub unless text.valid_encoding?
-          scan_file(path, text.delete_prefix("\uFEFF"))
-        elsif !genuine_asset?(path, content)
+          if text_like?(content)
+            text = content.dup.force_encoding(Encoding::UTF_8)
+            text = text.scrub unless text.valid_encoding?
+            scan_file(path, text.delete_prefix("\uFEFF"))
+          else
+            # Binary bytes hiding behind a code extension: pattern rules can't
+            # see into it, so a human must.
+            findings << Finding.new("binary-in-text-extension", :flag, path,
+              "content is binary despite a #{File.extname(path)} extension")
+          end
+        elsif genuine_asset?(path, content)
+          # Polyglots: a valid asset header with script content appended still
+          # executes if invoked. Run the pattern rules over the bytes (entropy
+          # excepted \u2014 compressed image data is always high-entropy).
+          scan_file(path, content.dup.force_encoding(Encoding::UTF_8).scrub, entropy: false, strict: false)
+        else
           # Unscannable non-asset content ships anyway \u2014 never unreviewed.
           findings << Finding.new("binary-payload", :flag, path,
             "file is not a scannable type or a recognizable asset (#{File.extname(path).presence || 'no extension'}); a human must look")
@@ -88,6 +100,15 @@ module Registry
       magics.any? { |magic| head.start_with?(magic) }
     end
 
+    # Valid UTF-8 with a high printable ratio — what a real source file looks like.
+    def text_like?(content)
+      sample = content.byteslice(0, 8.kilobytes).to_s.dup.force_encoding(Encoding::UTF_8)
+      return false unless sample.valid_encoding?
+      return true if sample.empty?
+      printable = sample.count("\t\n\r -~") + sample.chars.count { |c| c.ord > 127 }
+      printable.fdiv(sample.length) > 0.9
+    end
+
     def scannable?(path, content)
       ext = File.extname(path).downcase
       return true if TEXT_EXTENSIONS.include?(ext)
@@ -96,8 +117,10 @@ module Registry
       false
     end
 
-    def scan_file(path, text)
-      check path, text, "invisible-unicode", :fail, INVISIBLE_UNICODE,
+    # strict: false is the asset-polyglot pass — binary data can innocently
+    # decode to control codepoints, so nothing auto-rejects there, it only flags.
+    def scan_file(path, text, entropy: true, strict: true)
+      check path, text, "invisible-unicode", strict ? :fail : :flag, INVISIBLE_UNICODE,
         "invisible or bidirectional Unicode characters (code hidden from review)"
       check path, text, "curl-pipe-shell", :flag, /\b(curl|wget)\b[^|\n;]*\|\s*(sudo\s+)?(ba|z|da)?sh\b/,
         "pipes a remote download straight into a shell"
@@ -113,7 +136,8 @@ module Registry
         "touches credential or key storage"
       check path, text, "shell-history-tamper", :flag, /HISTFILE=|history\s+-c\b|shred\b.*bash_history/,
         "tampers with shell history"
-      check_entropy(path, text)
+      check path, text, "embedded-shebang", :flag, /\n#!\s*\/(bin|usr)\//, "script payload embedded past the file header" if !entropy
+      check_entropy(path, text) if entropy
     end
 
     # Long high-entropy blobs are the signature of obfuscated payloads.

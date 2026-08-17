@@ -43,6 +43,10 @@ module Registry
         quarantine!(version, "capability surface grew: #{growth.join(', ')}")
       when ai.flagged?
         quarantine!(version, "ai review flagged: #{ai.reasons.join('; ').first(300)}")
+      when previous.nil? && !AiReview.enabled? && !Rails.application.config.x.skip_first_release_gate
+        # First releases have no capability baseline; without the AI leg of the
+        # pipeline, someone must look before the first bytes go live.
+        quarantine!(version, "first release requires human review while AI review is disabled")
       else
         hold_or_release(version)
       end

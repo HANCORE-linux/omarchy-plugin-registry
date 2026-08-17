@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_17_050001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_17_060001) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -262,6 +262,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_050001) do
     t.string "provider", default: "github", null: false
     t.integer "publisher_id", null: false
     t.string "repository", null: false
+    t.string "repository_id"
+    t.string "repository_owner_id"
     t.datetime "updated_at", null: false
     t.string "workflow", null: false
     t.index ["created_by_id"], name: "index_trusted_publishers_on_created_by_id"

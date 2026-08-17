@@ -33,7 +33,7 @@ class PasskeysTest < ActionDispatch::IntegrationTest
     post session_passkey_options_path
     assert_response :success
     challenge = response.parsed_body["challenge"]
-    assertion = @fake_client.get(challenge: challenge)
+    assertion = @fake_client.get(challenge: challenge, user_verified: true)
     post session_passkey_path, params: { credential: assertion.to_json }
     assert_response :success
 
@@ -47,7 +47,7 @@ class PasskeysTest < ActionDispatch::IntegrationTest
     delete session_path
 
     post session_passkey_options_path
-    forged = @fake_client.get(challenge: Base64.urlsafe_encode64("wrong-challenge"))
+    forged = @fake_client.get(challenge: Base64.urlsafe_encode64("wrong-challenge"), user_verified: true)
     post session_passkey_path, params: { credential: forged.to_json }
     assert_response :unauthorized
   end

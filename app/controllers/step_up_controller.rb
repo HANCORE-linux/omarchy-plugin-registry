@@ -17,11 +17,12 @@ class StepUpController < ApplicationController
     end
   end
 
-  # Passkey path: assertion restricted to the signed-in user's credentials
+  # Passkey path: assertion restricted to the signed-in user's credentials.
+  # UV required — step-up is exactly the moment presence-only must not count.
   def passkey_options
     get_options = WebAuthn::Credential.options_for_get(
       allow: Current.user.passkeys.pluck(:external_id),
-      user_verification: "preferred"
+      user_verification: "required"
     )
     session[:webauthn_step_up_challenge] = get_options.challenge
     render json: get_options
@@ -35,7 +36,8 @@ class StepUpController < ApplicationController
     credential.verify(
       session.delete(:webauthn_step_up_challenge),
       public_key: passkey.public_key,
-      sign_count: passkey.sign_count
+      sign_count: passkey.sign_count,
+      user_verification: true
     )
     passkey.update!(sign_count: credential.sign_count, last_used_at: Time.current)
     mark_second_factor_verified!

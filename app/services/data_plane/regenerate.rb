@@ -12,7 +12,21 @@ module DataPlane
       generator.write_config
       generator.write_all_listing
       generator.write_revocations
-      Plugin.find_each { |p| generator.write_plugin_index(p) }
+      Plugin.find_each do |p|
+        generator.write_plugin_index(p)
+        generator.restore_missing_tarballs(p)
+      end
+    end
+
+    # Full regeneration must be able to rebuild the ENTIRE data plane from the
+    # database — indexes that reference tarballs the directory doesn't hold
+    # would 404 (or worse, a sync --delete would drop survivors).
+    def restore_missing_tarballs(plugin)
+      plugin.versions.where(state: [ :published, :yanked ]).find_each do |version|
+        next if DataPlane.root.join(version.tarball_path).exist?
+        next unless version.tarball.attached?
+        DataPlane.freeze_tarball(version, version.tarball.download)
+      end
     end
 
     def write_config

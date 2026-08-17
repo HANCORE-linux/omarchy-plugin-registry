@@ -13,8 +13,8 @@
         <tbody>
           <% @queue.each do |version| %>
             <tr>
-              <td><%= link_to version.plugin.full_name, plugin_path(version.plugin.publisher.name, version.plugin.name) %></td>
-              <td><%= version.version %></td>
+              <td><%= link_to version.plugin.full_name, admin_version_path(version) %></td>
+              <td><%= link_to version.version, admin_version_path(version) %></td>
               <td><%= state_badge(version.state) %></td>
               <td class="muted"><%= version.review_notes %></td>
               <td class="actions">

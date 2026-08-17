@@ -32,7 +32,10 @@ class Semver
 
   # Zero-padded key so lexicographic order matches semver order in SQL.
   # Prerelease identifiers are encoded so numeric ones order numerically and
-  # sort before alphanumeric ones ("0"-prefix < "1"-prefix), matching the spec.
+  # sort before alphanumeric ones ("0"-prefix < "1"-prefix). The identifier
+  # joiner must sort BELOW every character identifiers may contain — "-" (the
+  # lowest allowed, 0x2D) would collide, so "!" (0x21) joins: this keeps
+  # "alpha.1" < "alpha-beta" and "alpha" < "alpha.1" < "alphabet" all correct.
   def sort_key
     key = format("%010d.%010d.%010d", major, minor, patch)
     return "#{key}~" if prerelease.nil? # "~" sorts releases after any prerelease
@@ -40,7 +43,7 @@ class Semver
     encoded = prerelease.split(".").map do |identifier|
       identifier.match?(/\A\d+\z/) ? format("0%010d", identifier.to_i) : "1#{identifier}"
     end
-    "#{key}-#{encoded.join('.')}"
+    "#{key}-#{encoded.join('!')}"
   end
 
   def to_s

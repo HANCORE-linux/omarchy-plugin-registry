@@ -13,6 +13,8 @@ class Plugin < ApplicationRecord
   validates :name, presence: true, uniqueness: { scope: :publisher_id },
     length: { maximum: NameRules::MAX_LENGTH },
     format: { with: NameRules::NAME_FORMAT, message: "must be lowercase letters, digits, - or _" }
+  validate :name_not_reserved, on: :create
+  validate :name_not_confusable_within_publisher, on: :create
 
   before_validation { self.normalized_name = NameRules.normalize(name) }
 
@@ -49,5 +51,17 @@ class Plugin < ApplicationRecord
 
   def record_view!
     self.class.where(id: id).update_all("views_count = views_count + 1")
+  end
+
+  private
+
+  def name_not_reserved
+    errors.add(:name, "is reserved") if NameRules.reserved?(name)
+  end
+
+  def name_not_confusable_within_publisher
+    return if name.blank? || publisher.nil?
+    clash = publisher.plugins.where(normalized_name: NameRules.normalize(name)).where.not(id: id)
+    errors.add(:name, "is too similar to existing plugin #{clash.first.name}") if clash.exists?
   end
 end

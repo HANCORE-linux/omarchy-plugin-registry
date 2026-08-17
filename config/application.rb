@@ -39,6 +39,10 @@ module OmarchyPluginRegistry
     # {"verdict":..., "reasons":[...]}). Unset = AI review disabled.
     config.x.ai_review_command = ENV["AI_REVIEW_COMMAND"]
 
+    # First releases quarantine for a human when AI review is off; dev/test
+    # opt out so local publishing stays frictionless.
+    config.x.skip_first_release_gate = false
+
     # Static JWKS override for OIDC trusted publishing (tests inject one;
     # production fetches GitHub's and caches it)
     config.x.github_oidc_jwks = nil

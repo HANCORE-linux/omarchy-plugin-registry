@@ -38,6 +38,7 @@ module Registry
       check_entry_points
       check_license
       check_repository
+      check_min_omarchy_version
       errors.empty?
     end
 
@@ -67,6 +68,16 @@ module Registry
       version = manifest["version"].to_s
       return if version.blank?
       errors << "version must be strict semver (got #{version})" unless Semver.valid?(version)
+    end
+
+    # Part of the signed compatibility contract — clients resolve against it,
+    # so malformed values must never reach the index.
+    def check_min_omarchy_version
+      min = manifest["minOmarchyVersion"]
+      return if min.nil?
+      unless min.is_a?(String) && Semver.valid?(min)
+        errors << "minOmarchyVersion must be a strict semver string (got #{min.inspect})"
+      end
     end
 
     def check_kinds

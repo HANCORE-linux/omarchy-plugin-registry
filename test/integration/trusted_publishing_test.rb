@@ -27,6 +27,8 @@ class TrustedPublishingTest < ActionDispatch::IntegrationTest
       aud: "plugins.omarchy.org",
       exp: 5.minutes.from_now.to_i,
       repository: "acme/weather",
+      repository_id: "424242",
+      repository_owner_id: "1701",
       sub: "repo:acme/weather:environment:release",
       workflow_ref: "acme/weather/.github/workflows/publish.yml@refs/tags/v1.0.0",
       job_workflow_ref: "acme/weather/.github/workflows/publish.yml@refs/tags/v1.0.0",
@@ -94,6 +96,19 @@ class TrustedPublishingTest < ActionDispatch::IntegrationTest
     post "/api/v1/trusted/exchange", params: { token: oidc_token(
       workflow_ref: "acme/weather/.github/workflows/other.yml@refs/tags/v1.0.0",
       job_workflow_ref: "acme/weather/.github/workflows/other.yml@refs/tags/v1.0.0") }
+    assert_response :unauthorized
+  end
+
+  test "repository identity is pinned on first use — a recreated repo cannot mint" do
+    post "/api/v1/trusted/exchange", params: { token: oidc_token }
+    assert_response :created
+    assert_equal "424242", @trusted.reload.repository_id
+
+    post "/api/v1/trusted/exchange", params: { token: oidc_token(repository_id: "999999") }
+    assert_response :unauthorized
+    assert_match(/identity changed/, response.parsed_body["error"])
+
+    post "/api/v1/trusted/exchange", params: { token: oidc_token(repository_id: nil) }
     assert_response :unauthorized
   end
 
