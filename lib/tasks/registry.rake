@@ -52,7 +52,9 @@ namespace :registry do
   task reencrypt_secrets: :environment do
     count = 0
     User.where.not(otp_secret: nil).find_each do |user|
-      user.update_columns(otp_secret: User.new(otp_secret: user.otp_secret).attribute_for_database(:otp_secret).to_s)
+      # Rails' official re-encryption path: decrypts (previous keys allowed),
+      # re-encrypts under the current primary
+      user.encrypt
       count += 1
     end
     puts "Re-encrypted #{count} TOTP seeds under the current primary key."

@@ -39,9 +39,12 @@ module DataPlane
     INDEX_TTL = 7.days
 
     # One strictly-increasing generation per regeneration run: clients order
-    # signed files by this integer (timestamps can collide within a second).
+    # signed files by this integer. Anchored to wall-clock milliseconds so a
+    # database restore can't re-issue generations clients already saw, while
+    # the counter guarantees strict increase even within one millisecond.
     def generation
-      @generation ||= RegistryCounter.next!("data_plane_generation")
+      @generation ||= RegistryCounter.next!("data_plane_generation",
+        floor: (Time.current.to_f * 1000).to_i)
     end
 
     def freshness(ttl)

@@ -20,17 +20,18 @@ module Registry
         # followRedirects=false closes the redirect-after-validation gap.
         # (Residual DNS-rebinding TOCTOU is accepted: seeding is an
         # operator-run task over a curated catalog, not attacker-triggered.)
-        run! "git", "-c", "transfer.fsckObjects=true", "-c", "http.followRedirects=false",
-          "clone", "--depth", "1", "--filter=blob:limit=10m", "--quiet", "--", repo_url, clone
+        run_with_disk_quota!(clone,
+          "git", "-c", "transfer.fsckObjects=true", "-c", "http.followRedirects=false",
+          "clone", "--depth", "1", "--filter=blob:limit=10m", "--quiet", "--", repo_url, clone)
         enforce_clone_quota!(clone, repo_url)
         bounded_archive(clone, repo_url)
       end
     end
 
     def self.enforce_clone_quota!(clone, repo_url)
-      bytes = Dir.glob(File.join(clone, "**", "*"), File::FNM_DOTMATCH)
-        .sum { |f| File.file?(f) ? File.size(f) : 0 }
-      raise SnapshotError, "clone of #{repo_url} exceeds the #{MAX_CLONE_BYTES / 1024 / 1024}MB disk quota" if bytes > MAX_CLONE_BYTES
+      if directory_bytes(clone) > MAX_CLONE_BYTES
+        raise SnapshotError, "clone of #{repo_url} exceeds the #{MAX_CLONE_BYTES / 1024 / 1024}MB disk quota"
+      end
     end
 
     def self.validate_url!(repo_url)
@@ -69,21 +70,45 @@ module Registry
       out
     end
 
-    # Timeout enforcement actually KILLS the child — a hung clone must not
-    # outlive its deadline as an orphaned git process.
-    def self.run!(*command)
+    # Timeout AND in-flight disk quota are enforced while the clone runs — the
+    # process is killed the moment either is breached, so a server that
+    # ignores partial-clone filters (or a many-small-blobs repository) cannot
+    # fill the disk before a post-hoc check would notice.
+    def self.run_with_disk_quota!(watched_dir, *command)
       Open3.popen3({ "GIT_TERMINAL_PROMPT" => "0" }, *command) do |stdin, _stdout, stderr, wait_thread|
         stdin.close
         err_reader = Thread.new { stderr.read(64 * 1024).to_s }
-        unless wait_thread.join(CLONE_TIMEOUT)
-          Process.kill("KILL", wait_thread.pid) rescue nil
-          wait_thread.join(5)
-          raise SnapshotError, "clone timed out"
+        deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + CLONE_TIMEOUT
+
+        loop do
+          break if wait_thread.join(2)
+          if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+            kill(wait_thread)
+            raise SnapshotError, "clone timed out"
+          end
+          if directory_bytes(watched_dir) > MAX_CLONE_BYTES
+            kill(wait_thread)
+            raise SnapshotError, "clone exceeded the #{MAX_CLONE_BYTES / 1024 / 1024}MB disk quota mid-transfer"
+          end
         end
+
         unless wait_thread.value.success?
           raise SnapshotError, "#{command.first} failed: #{err_reader.value.strip.first(200)}"
         end
       end
+    end
+
+    def self.kill(wait_thread)
+      Process.kill("KILL", wait_thread.pid) rescue nil
+      wait_thread.join(5)
+    end
+
+    def self.directory_bytes(dir)
+      return 0 unless File.directory?(dir)
+      Dir.glob(File.join(dir, "**", "*"), File::FNM_DOTMATCH)
+        .sum { |f| File.file?(f) ? File.size(f) : 0 }
+    rescue SystemCallError
+      0
     end
   end
 end

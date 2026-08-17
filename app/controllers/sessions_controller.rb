@@ -25,6 +25,13 @@ class SessionsController < ApplicationController
       return render :new, status: :unprocessable_entity
     end
 
+    # Reserved internal identities can never be pre-created through sign-in;
+    # the response is indistinguishable from a normal one (no oracle)
+    if email == Registry::SeedCatalog::SYSTEM_EMAIL
+      session[:pending_email] = email
+      return redirect_to verify_session_path, notice: "Check your email for a sign-in code."
+    end
+
     user = User.find_or_create_by!(email_address: email)
     login_code = user.send_login_code
     expose_login_code_in_dev login_code
