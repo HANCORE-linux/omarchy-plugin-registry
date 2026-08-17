@@ -16,7 +16,15 @@ class ClaimsController < ApplicationController
   def verify
     challenge = Registry::RepoProof.challenge_for(@publisher, Current.user)
     if Registry::RepoProof.verified?(@publisher.seed_source_url, challenge)
+      lost_race = false
       ApplicationRecord.transaction do
+        # One namespace, one first claim: the row lock serializes overlapping
+        # valid proofs and only the first transaction takes ownership
+        @publisher.lock!
+        if @publisher.claimed?
+          lost_race = true
+          raise ActiveRecord::Rollback
+        end
         @publisher.update!(claimed: true)
         Membership.create!(publisher: @publisher, user: Current.user, role: :owner, founding: true)
         # The claimed namespace completes onboarding — never route this user
@@ -24,6 +32,9 @@ class ClaimsController < ApplicationController
         Current.user.update!(name: @publisher.name) if Current.user.name.blank?
         AuditEvent.record!(actor: Current.user, action: "publisher.claim_seeded", subject: @publisher,
           public: true, metadata: { name: @publisher.name, source: @publisher.seed_source_url })
+      end
+      if lost_race
+        return redirect_to publisher_path(@publisher.name), alert: "This namespace was claimed moments ago."
       end
       redirect_to dashboard_path, notice: "#{@publisher.name} is yours. You can delete #{Registry::RepoProof::CLAIM_FILE} from the repo now."
     else

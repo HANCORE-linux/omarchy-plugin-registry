@@ -26,6 +26,24 @@ module DataPlane
       false
     end
 
+    # Verification that stays fail-closed THROUGH a key rotation: the current
+    # key, or — when the operator supplied it — the explicitly named previous
+    # public key. Never an unverified bypass.
+    def verify_any?(content, signature_base64)
+      return true if verify?(content, signature_base64)
+      key = previous_verify_key
+      return false unless key
+      key.verify(Base64.strict_decode64(signature_base64), content)
+    rescue Ed25519::VerifyError, ArgumentError
+      false
+    end
+
+    def previous_verify_key
+      encoded = ENV["REGISTRY_PREVIOUS_SIGNING_PUBKEY"]
+      return nil if encoded.blank?
+      Ed25519::VerifyKey.new(Base64.strict_decode64(encoded))
+    end
+
     def seed
       if (env_seed = ENV["REGISTRY_SIGNING_SEED"]).present?
         Base64.strict_decode64(env_seed)

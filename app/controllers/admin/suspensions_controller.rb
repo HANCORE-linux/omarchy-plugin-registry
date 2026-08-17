@@ -8,7 +8,9 @@ module Admin
       return redirect_to admin_root_path, alert: "You can't suspend yourself." if user == Current.user
 
       ApplicationRecord.transaction do
-        user.update!(suspended_at: Time.current)
+        # A recovery started by the attacker must not keep maturing while the
+        # account sits locked — containment resets the recovery clock too
+        user.update!(suspended_at: Time.current, recovery_requested_at: nil)
         user.sessions.destroy_all
         user.api_tokens.usable.find_each(&:revoke!)
         AuditEvent.record!(actor: Current.user, action: "user.suspend", subject: user,
@@ -19,7 +21,8 @@ module Admin
 
     def unsuspend_user
       user = User.find_by!(email_address: params[:email_address].to_s.strip.downcase)
-      user.update!(suspended_at: nil, sensitive_change_at: Time.current)
+      # Belt-and-braces: nothing pending may survive into the unsuspended state
+      user.update!(suspended_at: nil, recovery_requested_at: nil, sensitive_change_at: Time.current)
       AuditEvent.record!(actor: Current.user, action: "user.unsuspend", subject: user, public: true)
       redirect_to admin_root_path, notice: "#{user.email_address} unsuspended (publish cooldown applies)."
     end

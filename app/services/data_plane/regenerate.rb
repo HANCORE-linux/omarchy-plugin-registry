@@ -134,10 +134,14 @@ module DataPlane
       # silently replace the trust root and strand every pinned client.
       key_path = DataPlane.root.join("signing-key.pub")
       FileUtils.mkdir_p(DataPlane.root)
-      if key_path.exist? && key_path.read != Signer.public_key_base64 &&
-          ENV["REGISTRY_ALLOW_KEY_ROTATION"] != "1"
-        raise "signing key changed since the data plane was written — refusing to replace the trust root " \
-              "(set REGISTRY_ALLOW_KEY_ROTATION=1 only for a deliberate, announced rotation)"
+      if key_path.exist? && key_path.read != Signer.public_key_base64
+        unless ENV["REGISTRY_ALLOW_KEY_ROTATION"] == "1" &&
+            ENV["REGISTRY_PREVIOUS_SIGNING_PUBKEY"].to_s.strip == key_path.read.strip
+          raise "signing key changed since the data plane was written — refusing to replace the trust root. " \
+                "A deliberate rotation requires BOTH REGISTRY_ALLOW_KEY_ROTATION=1 and " \
+                "REGISTRY_PREVIOUS_SIGNING_PUBKEY set to the current on-disk trust root, so every " \
+                "surviving signed file keeps verifying fail-closed through the swap"
+        end
       end
       # Atomic, and only when it actually changed — a recurring rewrite must
       # never risk a truncated trust root
@@ -179,14 +183,14 @@ module DataPlane
       path = DataPlane.root.join(relative)
       signature = DataPlane.root.join("#{relative}.sig")
       return unless path.exist? || signature.exist?
-      # Mid-rotation the old key signed these files; the operator has
-      # explicitly taken responsibility via the announced-rotation flag
-      return if ENV["REGISTRY_ALLOW_KEY_ROTATION"] == "1"
       raise IndexContinuityError, "#{relative} exists without its .sig sibling" unless signature.exist?
       raise IndexContinuityError, "#{relative}.sig exists without its index" unless path.exist?
       content = path.read
-      unless Signer.verify?(content, signature.read)
-        raise IndexContinuityError, "#{relative} signature does not verify"
+      # Continuity holds THROUGH a rotation — old-key files verify via the
+      # explicitly supplied previous public key, never an unverified skip
+      unless Signer.verify_any?(content, signature.read)
+        raise IndexContinuityError, "#{relative} signature does not verify " \
+          "(mid-rotation, supply REGISTRY_PREVIOUS_SIGNING_PUBKEY)"
       end
       rows = plugin.versions.index_by(&:version)
       content.each_line do |line|
@@ -248,7 +252,7 @@ module DataPlane
       signature = DataPlane.root.join("all.json.sig")
       return nil unless path.exist? && signature.exist?
       content = path.read
-      return nil unless Signer.verify?(content, signature.read)
+      return nil unless Signer.verify_any?(content, signature.read)
       JSON.parse(content).fetch("plugins", []).index_by { |e| "#{e['publisher']}.#{e['name']}" }
     rescue JSON::ParserError
       nil
@@ -285,17 +289,12 @@ module DataPlane
       raise CorruptKillListError, "revocations.json exists without its .sig sibling" unless signature.exist?
       raise CorruptKillListError, "revocations.json.sig exists without revocations.json" unless path.exist?
       content = path.read
-      unless Signer.verify?(content, signature.read)
-        # Mid-rotation the kill list is still signed by the OLD key. The
-        # announced-rotation flag means the operator owns this window — skip
-        # the import (run registry:import_revocations first to keep orphans)
-        # rather than dying on every regeneration until the file is re-signed.
-        if ENV["REGISTRY_ALLOW_KEY_ROTATION"] == "1"
-          Rails.logger.warn("[DataPlane] kill list signed by a previous key — rotation flag set, " \
-            "re-learning revocations from the database only")
-          return
-        end
-        raise CorruptKillListError, "revocations.json signature does not verify"
+      # verify_any? keeps this FAIL-CLOSED through a rotation: the old kill
+      # list verifies under REGISTRY_PREVIOUS_SIGNING_PUBKEY and imports
+      # normally (orphans preserved) — there is no unverified bypass.
+      unless Signer.verify_any?(content, signature.read)
+        raise CorruptKillListError, "revocations.json signature does not verify " \
+          "(mid-rotation, supply REGISTRY_PREVIOUS_SIGNING_PUBKEY so the old kill list can be verified)"
       end
       entries = begin
         JSON.parse(content).fetch("revocations", [])

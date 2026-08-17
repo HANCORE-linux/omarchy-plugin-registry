@@ -71,7 +71,7 @@
         <div class="comment">
           <div class="comment__head">
             <strong><%= comment.user.name || "someone" %></strong>
-            <% if comment.from_publisher? %><span class="badge">publisher</span><% end %>
+            <% if @publisher_member_ids.include?(comment.user_id) %><span class="badge">publisher</span><% end %>
             <span class="muted"><%= time_ago_in_words(comment.created_at) %> ago</span>
             <span class="comment__actions">
               <% if authenticated? && comment.user == Current.user %>

@@ -44,8 +44,8 @@ module DataPlane
     signature = root.join("#{relative_path}.sig")
     staged = root.join("#{relative_path}.staged")
     return unless staged.exist? && signature.exist?
-    return if path.exist? && Signer.verify?(path.read, signature.read)
-    File.rename(staged, path) if Signer.verify?(staged.read, signature.read)
+    return if path.exist? && Signer.verify_any?(path.read, signature.read)
+    File.rename(staged, path) if Signer.verify_any?(staged.read, signature.read)
   end
 
   def atomic_write(relative_path, content)
