@@ -47,7 +47,14 @@ module Registry
         text.scan(/\b(?:bar\.run|execDetached|startDetached)\s*\(\s*\[([^\]]*)\]/m) do |m|
           record_command_array(m[0], processes, dynamic_exec_sites)
         end
-        text.scan(/\b(?:bar\.run|execDetached|startDetached)\s*\(\s*["']([^"']+)["']/) { |m| processes << binary_name(m[0]) }
+        # String-form spawns carry their WHOLE command line in the fingerprint
+        # (digest), not just the binary name — editing the arguments of an
+        # unchanged `bash -c '...'` string is growth.
+        text.scan(/\b(?:bar\.run|execDetached|startDetached)\s*\(\s*["']([^"']+)["']/) do |m|
+          processes << binary_name(m[0])
+          processes << "cmd:#{Digest::SHA256.hexdigest(m[0]).first(12)}"
+          m[0].split(/\s+/).each { |w| @referenced_tokens << w }
+        end
 
         # Opaque execution surfaces are recorded per CALL SITE (digest of the
         # matched snippet), never as a saturating boolean — a second dynamic

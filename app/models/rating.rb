@@ -10,9 +10,13 @@ class Rating < ApplicationRecord
   private
 
   def refresh_plugin_totals
-    plugin.update_columns(
-      ratings_count: plugin.ratings.count,
-      ratings_sum: plugin.ratings.sum(:value)
-    )
+    # Recompute under the plugin lock so interleaved raters can't leave the
+    # cached totals inconsistent with the rows
+    plugin.with_lock do
+      plugin.update_columns(
+        ratings_count: plugin.ratings.count,
+        ratings_sum: plugin.ratings.sum(:value)
+      )
+    end
   end
 end

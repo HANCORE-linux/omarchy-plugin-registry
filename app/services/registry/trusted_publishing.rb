@@ -20,6 +20,9 @@ module Registry
       end
       trusted = matches.first
       raise ExchangeError, "publisher #{trusted.publisher.name} is suspended" if trusted.publisher.suspended?
+      unless trusted.created_by.member_of?(trusted.publisher) && trusted.created_by.suspended_at.nil?
+        raise ExchangeError, "the registering account no longer holds this namespace — re-register trusted publishing"
+      end
       pin_repository_identity!(trusted, claims)
 
       token = ApiToken.mint!(

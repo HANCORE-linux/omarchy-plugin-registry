@@ -34,11 +34,13 @@ module Registry
     end
 
     def self.import_entry(entry, snapshotter:)
+      # Publisher names persist lowercased — the same form the comparison uses
+      publisher_name = entry.fetch("publisher").to_s.downcase
       # The claim-proof target must belong to the seeded namespace: the repo
       # owner segment has to match the publisher, or a mismatched catalog row
       # would make one person's namespace claimable through another's repo.
       owner = entry["repository"].to_s[%r{\Ahttps://[^/]+/([^/]+)/}, 1].to_s.downcase
-      unless owner == entry.fetch("publisher").to_s.downcase
+      unless owner == publisher_name
         return { entry:, status: "failed", reason: "repository owner #{owner.inspect} does not match publisher" }
       end
       # Every accepted seed URL must be claimable later — a forge the claim
@@ -47,7 +49,7 @@ module Registry
         return { entry:, status: "failed", reason: "unsupported forge for claim-proof (supported: github.com, codeberg.org, gitlab.com flat owner/repo)" }
       end
 
-      publisher = Publisher.find_or_create_by!(name: entry.fetch("publisher")) do |p|
+      publisher = Publisher.find_or_create_by!(name: publisher_name) do |p|
         p.kind = :personal
         p.claimed = false
         p.seed_source_url = entry["repository"]
