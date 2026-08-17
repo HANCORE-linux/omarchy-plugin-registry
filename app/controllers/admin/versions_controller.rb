@@ -60,6 +60,7 @@ module Admin
       return require_reason! unless params[:reason].present?
       @version.update!(state: :rejected, review_notes: params[:reason])
       @version.plugin.refresh_latest_version!
+      @version.plugin.revert_to_placeholder_if_orphaned_seed!
       audit "version.reject", public: true, metadata: { reason: params[:reason] }
       regenerate_and_redirect "Rejected — version number stays burned."
     end

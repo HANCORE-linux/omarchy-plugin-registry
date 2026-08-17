@@ -93,6 +93,16 @@ class Plugin < ApplicationRecord
   # Production batches view increments through the cache store (Solid Cache —
   # its own database, no contention on the primary) and CleanupJob flushes
   # hourly; elsewhere the write is direct so counts are immediately visible.
+  # SEEDED plugins whose only history is rejection revert to a visible
+  # placeholder (the directory promised the catalog entry exists and is
+  # uninstallable). Shared by the review pipeline and admin rejection.
+  def revert_to_placeholder_if_orphaned_seed!
+    seeded = !publisher.claimed? || versions.joins(:user).exists?(users: { system: true })
+    if seeded && active? && versions.where.not(state: :rejected).none?
+      update!(state: :quarantined)
+    end
+  end
+
   def record_view!
     if Rails.env.production?
       Rails.cache.increment("plugin_views:#{id}", 1, initial: 0, expires_in: 3.hours)

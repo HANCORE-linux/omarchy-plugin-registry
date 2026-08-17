@@ -199,7 +199,11 @@ module Registry
       uri = URI.parse(repository.to_s) rescue nil
       unless uri.is_a?(URI::HTTPS) && repository.to_s.length <= 300
         errors << "repository must be an https:// URL"
+        return
       end
+      # Accidental credentials would persist in the immutable tarball AND
+      # render publicly — refuse at the door
+      errors << "repository URL must not contain credentials" if uri.userinfo.present?
     end
   end
 end

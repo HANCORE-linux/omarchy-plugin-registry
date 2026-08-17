@@ -110,17 +110,9 @@ module Registry
         review_notes: "auto-rejected: #{findings.select { |f| f['severity'] == 'fail' }.map { |f| f['detail'] }.join('; ').first(500)}")
       AuditEvent.record!(action: "version.auto_reject", subject: version, public: true,
         metadata: { plugin: version.plugin.full_name, version: version.version })
-      # SEEDED plugins whose only history is rejection revert to a visible
-      # placeholder (the directory promised the catalog entry exists and is
-      # uninstallable). Ordinary rejected-only submissions stay active but
-      # simply drop out of directory_visible — a failed first attempt is not
-      # a public listing.
-      plugin = version.plugin
-      seeded = !plugin.publisher.claimed? ||
-        plugin.versions.joins(:user).exists?(users: { system: true })
-      if seeded && plugin.active? && plugin.versions.where.not(state: :rejected).none?
-        plugin.update!(state: :quarantined)
-      end
+      # Ordinary rejected-only submissions drop out of directory_visible;
+      # seeded ones revert to a visible placeholder (shared invariant).
+      version.plugin.revert_to_placeholder_if_orphaned_seed!
     end
 
     def quarantine!(version, reason)

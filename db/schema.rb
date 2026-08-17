@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_17_130001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_17_140001) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -252,6 +252,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_130001) do
     t.index ["created_by_id"], name: "index_revocations_on_created_by_id"
     t.index ["plugin_id", "version"], name: "index_revocations_on_plugin_id_and_version", unique: true
     t.index ["plugin_id"], name: "index_revocations_on_plugin_id"
+    t.index ["plugin_id"], name: "index_revocations_whole_plugin_uniqueness", unique: true, where: "version IS NULL"
   end
 
   create_table "sessions", force: :cascade do |t|

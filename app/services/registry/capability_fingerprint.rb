@@ -68,7 +68,9 @@ module Registry
           /\bsetSource\s*\([^\n]{0,160}/,
           /command\s*[:=]\s*(?!\[\s*["'])[a-zA-Z_\[][^\n]{0,160}/,
           /command\s*[:=]\s*\[\s*["'](?:\/[\w\/]*\/)?(?:#{SHELL_INTERPRETERS.join('|')})["']\s*,\s*["']-c["']\s*,\s*(?!["'])[^\n]{0,160}/,
-          /\b(?:bar\.run|execDetached|startDetached)\s*\(\s*(?!["'])(?!\[\s*["'])[^\n]{0,160}/
+          /\b(?:bar\.run|execDetached|startDetached)\s*\(\s*(?!["'])(?!\[\s*["'])[^\n]{0,160}/,
+          /\beval\s*\([^\n]{0,160}/,
+          /new\s+Function\s*\([^\n]{0,160}/
         ].each do |pattern|
           text.scan(pattern) { |m| dynamic_exec_sites << site_digest(m) }
         end

@@ -131,6 +131,21 @@
     <% end %>
   </section>
 
+  <% if @tarball %>
+    <section>
+      <h2>Source<%= " (new + changed files)" if @previous %></h2>
+      <% review_files = @previous ? ((@added_files || []) + (@changed_files || [])) : @tarball.files %>
+      <% review_files.first(25).each do |file| %>
+        <details>
+          <summary><code><%= file %></code></summary>
+          <pre><%= @tarball.contents[file].to_s.byteslice(0, 32.kilobytes).dup.force_encoding(Encoding::UTF_8).scrub %></pre>
+        </details>
+      <% end %>
+      <% if review_files.size > 25 %><p class="muted"><%= review_files.size - 25 %> more files — download the tarball for the rest.</p><% end %>
+      <% if review_files.empty? %><p class="muted">No source changes vs the baseline.</p><% end %>
+    </section>
+  <% end %>
+
   <section>
     <h2>Manifest</h2>
     <pre><%= JSON.pretty_generate(@version.manifest) %></pre>
