@@ -7,7 +7,8 @@
     <% if @publisher.bio.present? %><p class="summary"><%= @publisher.bio %></p><% end %>
     <% unless @publisher.claimed? %>
       <div class="page-head__row"><span class="badge badge--warning">Unclaimed</span>
-        <span class="muted">Seeded from omarchyplugins.com — the author can claim it by proving control of the source repo.</span></div>
+        <span class="muted">Seeded from omarchyplugins.com — the author can claim it by proving control of the source repo.</span>
+        <%= link_to "This is mine →", claim_path(@publisher.name) %></div>
     <% end %>
   </div>
 </div>

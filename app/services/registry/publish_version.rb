@@ -13,12 +13,15 @@ module Registry
 
     attr_reader :version
 
-    def initialize(user:, publisher:, plugin_name:, tarball_bytes:, token: nil)
+    # system_seed skips membership/MFA/claim checks — used ONLY by the seed
+    # importer; seeded versions still run the full review pipeline.
+    def initialize(user:, publisher:, plugin_name:, tarball_bytes:, token: nil, system_seed: false)
       @user = user
       @publisher = publisher
       @plugin_name = plugin_name
       @tarball_bytes = tarball_bytes
       @token = token
+      @system_seed = system_seed
     end
 
     def call
@@ -37,6 +40,7 @@ module Registry
 
     def authorize!
       fail! "publisher is suspended", status: :forbidden if publisher.suspended?
+      return if @system_seed
       fail! "namespace is unclaimed — prove control of the source repo to claim it", status: :forbidden unless publisher.claimed?
       fail! "you are not a member of #{publisher.name}", status: :forbidden unless user.member_of?(publisher)
       fail! "add a passkey or enable two-factor authentication to publish", status: :forbidden unless user.second_factor?

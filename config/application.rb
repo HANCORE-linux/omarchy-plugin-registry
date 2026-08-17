@@ -43,6 +43,9 @@ module OmarchyPluginRegistry
     # production fetches GitHub's and caches it)
     config.x.github_oidc_jwks = nil
 
+    # Injectable raw-file fetcher for seeded-namespace claim proofs (tests stub it)
+    config.x.repo_proof_fetcher = nil
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files

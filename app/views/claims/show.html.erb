@@ -1,0 +1,19 @@
+<% content_for :title, "Claim #{@publisher.name} — Omarchy Plugins" %>
+<div class="form-page" style="max-width: 620px;">
+  <p class="eyebrow">Claim a seeded namespace</p>
+  <h1>Prove it's your repo.</h1>
+  <p><strong><%= @publisher.name %></strong> was seeded from
+    <a href="<%= @publisher.seed_source_url %>"><%= @publisher.seed_source_url %></a>.
+    To claim it, commit a file named <code><%= Registry::RepoProof::CLAIM_FILE %></code> to the
+    default branch containing exactly this token:</p>
+  <div class="token-reveal"><code><%= @publisher.claim_challenge %></code></div>
+  <% if @claim_url %>
+    <p class="muted">We'll check <code><%= @claim_url %></code>.</p>
+    <%= button_to "Verify and claim", verify_claim_path(@publisher.name), class: "button" %>
+  <% else %>
+    <p class="field-errors">We don't recognize that forge for raw-file checks. Email
+      <a href="mailto:registry@omarchy.org">registry@omarchy.org</a> and a human will verify.</p>
+  <% end %>
+  <p class="hint" style="margin-top: 16px;">This proof happens once. After the claim, the
+    namespace belongs to your account — the repo link becomes plain metadata.</p>
+</div>

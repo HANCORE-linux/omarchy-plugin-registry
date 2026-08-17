@@ -9,6 +9,11 @@
   <div class="notice-banner notice-banner--warning">
     <strong>Under review.</strong> This plugin is quarantined while our team investigates. It cannot be installed right now.
   </div>
+<% elsif @latest.nil? && @versions.any? { |v| v.quarantined? || v.held? || v.processing? } %>
+  <div class="notice-banner notice-banner--warning">
+    <strong>Under review.</strong> No version of this plugin has cleared the review pipeline yet.
+    Nothing is installable until one does.
+  </div>
 <% elsif @revoked %>
   <div class="notice-banner notice-banner--danger">
     <strong>Security notice.</strong> One or more versions of this plugin were revoked. Affected installs have been disabled.

@@ -33,6 +33,8 @@ Rails.application.routes.draw do
   resources :comments, only: :destroy
   resources :reports, only: :create
   get "publishers/:name", to: "publishers#show", as: :publisher
+  get "publishers/:name/claim", to: "claims#show", as: :claim
+  post "publishers/:name/claim", to: "claims#verify", as: :verify_claim
   get "governance", to: "pages#governance"
   get "publishing", to: "pages#publishing"
   get "audit", to: "audit_log#index", as: :audit_log
