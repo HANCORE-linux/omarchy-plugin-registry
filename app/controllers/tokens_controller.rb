@@ -1,5 +1,6 @@
 class TokensController < ApplicationController
   before_action :require_recent_second_factor, only: :create
+  before_action :require_no_sensitive_cooldown, only: :create
 
   def create
     publisher = Current.user.publishers.find_by!(name: params[:publisher_name])

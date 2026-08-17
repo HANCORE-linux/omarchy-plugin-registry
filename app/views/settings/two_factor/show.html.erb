@@ -32,7 +32,10 @@
   <section>
     <h2>Authenticator app (TOTP)</h2>
     <% if @user.otp_enabled? %>
-      <p class="lede">Enabled.</p>
+      <p class="lede">Enabled.
+        <%= button_to "Disable TOTP", settings_two_factor_path, method: :delete, class: "button button--ghost button--small",
+              form: { data: { turbo_confirm: "Disable TOTP? Your backup codes stop working; re-enrolling generates a fresh secret." } } %>
+      </p>
       <% if @backup_codes.present? %>
         <h4 style="margin-bottom: 10px;">Backup codes — shown once, save them now</h4>
         <p class="lede">Each works once if you lose your authenticator. They will not be displayed again.</p>

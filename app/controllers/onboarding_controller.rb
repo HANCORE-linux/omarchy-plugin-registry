@@ -27,7 +27,7 @@ class OnboardingController < ApplicationController
     ApplicationRecord.transaction do
       user.update!(name: display_name)
       publisher.save!
-      Membership.create!(publisher:, user:, role: :owner)
+      Membership.create!(publisher:, user:, role: :owner, founding: true)
     end
     AuditEvent.record!(actor: user, action: "publisher.claim", subject: publisher, public: true,
       metadata: { name: publisher.name })

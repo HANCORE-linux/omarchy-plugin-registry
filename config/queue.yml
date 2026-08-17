@@ -1,11 +1,22 @@
+# Containment work (kill-list regeneration, holds/releases, cleanup) runs on
+# its own dedicated worker: a backlog of slow untrusted-review jobs can never
+# delay an admin revocation reaching the signed data plane.
 default: &default
   dispatchers:
     - polling_interval: 1
       batch_size: 500
   workers:
-    - queues: "*"
+    - queues: critical
+      threads: 2
+      processes: 1
+      polling_interval: 0.5
+    - queues: review
       threads: 3
       processes: <%= ENV.fetch("JOB_CONCURRENCY", 1) %>
+      polling_interval: 1
+    - queues: "*"
+      threads: 2
+      processes: 1
       polling_interval: 1
 
 development:

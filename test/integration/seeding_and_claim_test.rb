@@ -50,7 +50,7 @@ class SeedingAndClaimTest < ActionDispatch::IntegrationTest
     publisher = Publisher.find_by!(name: "gracehopper")
     user = User.create!(email_address: "grace@example.com", name: "Grace",
       otp_secret: ROTP::Base32.random, otp_enabled_at: Time.current)
-    Membership.create!(publisher:, user:, role: :owner)
+    Membership.create!(publisher:, user:, role: :owner, founding: true)
 
     error = assert_raises(Registry::PublishVersion::PublishError) do
       Registry::PublishVersion.new(user:, publisher:, plugin_name: "weather",

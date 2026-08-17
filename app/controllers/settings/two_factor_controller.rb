@@ -28,5 +28,22 @@ module Settings
         redirect_to settings_two_factor_path, alert: "That code didn't match — try again."
       end
     end
+
+    # Rotation/removal lifecycle: a compromised seed must be revocable. Gated
+    # by step-up; the same no-zero-factors rule as passkey removal applies.
+    def destroy
+      user = Current.user
+      unless user.otp_enabled?
+        return redirect_to settings_two_factor_path, alert: "TOTP is not enabled."
+      end
+      if !user.passkeys.exists? && (user.admin? || user.memberships.exists?)
+        return redirect_to settings_two_factor_path, alert: "Add a passkey before removing TOTP — you can't drop to zero factors."
+      end
+
+      user.update!(otp_secret: nil, otp_enabled_at: nil, otp_backup_codes: nil,
+        sensitive_change_at: Time.current)
+      AuditEvent.record!(actor: user, action: "totp.disable", subject: user)
+      redirect_to settings_two_factor_path, notice: "TOTP disabled. Re-enroll any time (a fresh secret will be generated); the security cooldown applies."
+    end
   end
 end

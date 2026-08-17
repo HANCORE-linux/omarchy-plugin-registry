@@ -5,7 +5,7 @@ class DeviceFlowTest < ActionDispatch::IntegrationTest
     @user = User.create!(email_address: "dev@example.com", name: "Dev",
       otp_secret: ROTP::Base32.random, otp_enabled_at: Time.current)
     @publisher = Publisher.create!(name: "acme", kind: :org)
-    Membership.create!(publisher: @publisher, user: @user, role: :owner)
+    Membership.create!(publisher: @publisher, user: @user, role: :owner, founding: true)
   end
 
   test "full device flow: code -> approval -> polled token that can publish" do

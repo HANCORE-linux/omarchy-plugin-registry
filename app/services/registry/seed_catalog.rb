@@ -7,18 +7,22 @@ module Registry
   # Entry shape: { "publisher" => "ryanrhughes", "name" => "weather",
   #   "summary" => "...", "repository" => "https://github.com/..." }
   class SeedCatalog
-    SYSTEM_EMAIL = "registry@omarchy.org".freeze
+    # A reserved internal address, never published as a contact — the public
+    # contact registry@omarchy.org must not double as the privileged principal.
+    SYSTEM_EMAIL = "seed-system@plugins.omarchy.org".freeze
 
     # The system identity is an explicit flag, permanently suspended — it
     # exists only as a provenance marker for seeded versions and can never
-    # sign in. If the email was ever registered interactively, that account is
-    # conscripted: flagged system AND suspended, so it gains nothing.
+    # sign in. If the reserved address was somehow registered interactively,
+    # seeding REFUSES rather than conscripting a real account.
     def self.system_user
-      user = User.find_or_create_by!(email_address: SYSTEM_EMAIL) { |u| u.name = "Omarchy Registry" }
-      unless user.system? && user.suspended_at.present?
-        user.update!(system: true, suspended_at: user.suspended_at || Time.current)
-        user.sessions.destroy_all
-        user.api_tokens.usable.find_each(&:revoke!)
+      user = User.find_or_create_by!(email_address: SYSTEM_EMAIL) do |u|
+        u.name = "Omarchy Registry"
+        u.system = true
+        u.suspended_at = Time.current
+      end
+      unless user.system?
+        raise "#{SYSTEM_EMAIL} exists as a non-system account — resolve manually before seeding"
       end
       user
     end
@@ -36,6 +40,11 @@ module Registry
       owner = entry["repository"].to_s[%r{\Ahttps://[^/]+/([^/]+)/}, 1].to_s.downcase
       unless owner == entry.fetch("publisher").to_s.downcase
         return { entry:, status: "failed", reason: "repository owner #{owner.inspect} does not match publisher" }
+      end
+      # Every accepted seed URL must be claimable later — a forge the claim
+      # flow can't verify would strand the namespace unclaimed forever.
+      if RepoProof.raw_claim_url(entry["repository"]).nil?
+        return { entry:, status: "failed", reason: "unsupported forge for claim-proof (supported: github.com, codeberg.org, gitlab.com flat owner/repo)" }
       end
 
       publisher = Publisher.find_or_create_by!(name: entry.fetch("publisher")) do |p|

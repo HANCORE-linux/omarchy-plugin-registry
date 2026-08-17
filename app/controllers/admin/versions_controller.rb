@@ -72,8 +72,11 @@ module Admin
       regenerate_and_redirect "Quarantined — drops from the index on regen."
     end
 
+    # Yank progresses from live OR from quarantine-after-publish — the
+    # documented investigate-then-withdraw sequence must not require
+    # re-publishing the artifact first.
     def yank
-      return bad_transition! unless @version.published?
+      return bad_transition! unless @version.published? || (@version.quarantined? && @version.published_at.present?)
       return require_reason! unless params[:reason].present?
       @version.yank!(reason: params[:reason], actor: Current.user)
       regenerate_and_redirect "Yanked."

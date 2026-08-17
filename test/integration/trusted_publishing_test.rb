@@ -5,7 +5,7 @@ class TrustedPublishingTest < ActionDispatch::IntegrationTest
     @user = User.create!(email_address: "dev@example.com", name: "Dev",
       otp_secret: ROTP::Base32.random, otp_enabled_at: Time.current)
     @publisher = Publisher.create!(name: "acme", kind: :org)
-    Membership.create!(publisher: @publisher, user: @user, role: :owner)
+    Membership.create!(publisher: @publisher, user: @user, role: :owner, founding: true)
     # Pending publisher: the plugin doesn't exist yet — first CI publish creates it
     @trusted = TrustedPublisher.create!(publisher: @publisher, plugin_name: "weather",
       repository: "acme/weather", repository_id: "424242", repository_owner_id: "1701",

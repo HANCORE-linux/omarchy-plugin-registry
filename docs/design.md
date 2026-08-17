@@ -22,6 +22,13 @@ description: A real package-management solution for Omarchy Quattro plugins — 
 }
 ```
 
+> **Implementation errata (2026-08-17):** the build deviates from this document in
+> two places, both per Ryan's direction. (1) Accounts are fully passwordless —
+> emailed one-time codes (the Cortex/Herald flow) with passkeys (UV required)
+> or TOTP as the mandatory publisher second factor; no email+password exists.
+> (2) Community identity is registry-native, not GitHub OAuth. Where this
+> document says password or GitHub OAuth, read those instead.
+
 ## 1. Where we are today
 
 Quattro's plugin system is deliberately minimal. The complete contract, extracted from the repo:

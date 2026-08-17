@@ -5,7 +5,7 @@ class IndexSigningTest < ActionDispatch::IntegrationTest
     @dev = User.create!(email_address: "dev@example.com", name: "Dev",
       otp_secret: ROTP::Base32.random, otp_enabled_at: Time.current)
     @publisher = Publisher.create!(name: "acme", kind: :org)
-    Membership.create!(publisher: @publisher, user: @dev, role: :owner)
+    Membership.create!(publisher: @publisher, user: @dev, role: :owner, founding: true)
     perform_enqueued_jobs do
       Registry::PublishVersion.new(user: @dev, publisher: @publisher, plugin_name: "weather",
         tarball_bytes: TarballBuilder.build).call

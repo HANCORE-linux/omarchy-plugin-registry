@@ -18,7 +18,7 @@ class ClaimsController < ApplicationController
     if Registry::RepoProof.verified?(@publisher.seed_source_url, challenge)
       ApplicationRecord.transaction do
         @publisher.update!(claimed: true)
-        Membership.create!(publisher: @publisher, user: Current.user, role: :owner)
+        Membership.create!(publisher: @publisher, user: Current.user, role: :owner, founding: true)
         # The claimed namespace completes onboarding — never route this user
         # back through the handle-claiming flow.
         Current.user.update!(name: @publisher.name) if Current.user.name.blank?

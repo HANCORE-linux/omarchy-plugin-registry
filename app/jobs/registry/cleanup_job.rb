@@ -1,7 +1,7 @@
 module Registry
   # Recurring housekeeping: dead device-flow rows and stale login codes.
   class CleanupJob < ApplicationJob
-    queue_as :default
+    queue_as :critical
 
     def perform
       DeviceAuthorization.where(expires_at: ...1.day.ago).delete_all

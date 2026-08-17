@@ -26,6 +26,8 @@
           <input type="text" name="reason" class="select" placeholder="Reason (public)" required>
           <button type="submit" class="button button--ghost">Quarantine</button>
         <% end %>
+      <% end %>
+      <% if @version.published? || (@version.quarantined? && @version.published_at.present?) %>
         <%= form_with url: yank_admin_version_path(@version), class: "form-inline" do %>
           <input type="text" name="reason" class="select" placeholder="Reason (public)" required>
           <button type="submit" class="button button--ghost">Yank</button>

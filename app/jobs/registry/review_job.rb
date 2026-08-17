@@ -3,7 +3,7 @@ module Registry
   # updates never skip it. Deterministic scan -> capability fingerprint ->
   # delta check -> AI review -> hold window -> live.
   class ReviewJob < ApplicationJob
-    queue_as :default
+    queue_as :review
     # One review per plugin at a time: concurrent reviews of back-to-back
     # submissions could both observe the same (or no) capability baseline.
     limits_concurrency to: 1, key: ->(version) { "review_plugin_#{version.plugin_id}" }
@@ -62,6 +62,14 @@ module Registry
           # First releases have no capability baseline; without the AI leg of
           # the pipeline, someone must look before the first bytes go live.
           quarantine!(version, "first release requires human review while AI review is disabled")
+        when (fingerprint["dynamic_exec"].present? || fingerprint["dynamic_network"].present?) &&
+             !AiReview.enabled? && !Rails.application.config.x.skip_first_release_gate
+          # Static analysis cannot see the VALUES flowing into a dynamic call
+          # site — a variable can turn malicious with no textual change at the
+          # site. Plugins containing dynamic execution/network therefore never
+          # ride pure-deterministic auto-release: every version needs judgment
+          # (AI when enabled, a human otherwise). Literal commands avoid this.
+          quarantine!(version, "contains dynamic execution/network call sites — requires judgment review on every version")
         else
           hold_or_release(version)
         end

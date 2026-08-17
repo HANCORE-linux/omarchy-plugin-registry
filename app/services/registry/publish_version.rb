@@ -49,11 +49,9 @@ module Registry
       fail! "you are not a member of #{publisher.name}", status: :forbidden if membership.nil?
       # Roster changes are an account-takeover vector: freshly ADDED members
       # wait out a cooldown before publishing through the namespace. Exemption
-      # is pinned to the membership CREATED WITH the namespace itself (within
-      # a minute) — it can't drift to whoever holds the lowest id after a
-      # founder removal, and later collaborators are never exempt.
-      founding = membership.created_at <= publisher.created_at + 1.minute
-      if membership.created_at > User::PUBLISH_COOLDOWN.ago && !founding
+      # is the explicit founding marker set when the namespace was created —
+      # never inferred, never drifting.
+      if membership.created_at > User::PUBLISH_COOLDOWN.ago && !membership.founding?
         fail! "recently added members wait #{User::PUBLISH_COOLDOWN.inspect} before publishing to #{publisher.name}", status: :forbidden
       end
       fail! "add a passkey or enable two-factor authentication to publish", status: :forbidden unless user.second_factor?

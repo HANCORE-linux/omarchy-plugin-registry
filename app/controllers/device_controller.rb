@@ -1,6 +1,7 @@
 # Browser side of the CLI device flow: enter the code, pick the scope, approve.
 class DeviceController < ApplicationController
   before_action :require_recent_second_factor, only: :approve
+  before_action :require_no_sensitive_cooldown, only: :approve
 
   def show
     @user_code = params[:code]

@@ -2,7 +2,7 @@ module Registry
   # Releases a version once its hold window has passed — unless review or an
   # admin changed its state in the meantime.
   class ReleaseJob < ApplicationJob
-    queue_as :default
+    queue_as :critical
 
     def perform(version)
       return unless version.held?

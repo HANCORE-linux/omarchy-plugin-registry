@@ -6,7 +6,7 @@ class StepUpTest < ActionDispatch::IntegrationTest
     @user = User.create!(email_address: "dev@example.com", name: "Dev",
       otp_secret: @secret, otp_enabled_at: Time.current)
     @publisher = Publisher.create!(name: "acme", kind: :org)
-    Membership.create!(publisher: @publisher, user: @user, role: :owner)
+    Membership.create!(publisher: @publisher, user: @user, role: :owner, founding: true)
   end
 
   test "enrolled but unverified sessions cannot mint tokens until step-up" do
@@ -58,7 +58,7 @@ class StepUpTest < ActionDispatch::IntegrationTest
   test "admin powers are locked behind step-up — unverified and stale sessions bounce" do
     admin = User.create!(email_address: "admin@example.com", name: "Admin", admin: true,
       otp_secret: @secret, otp_enabled_at: Time.current)
-    Membership.create!(publisher: @publisher, user: @user, role: :owner) rescue nil
+    Membership.create!(publisher: @publisher, user: @user, role: :owner, founding: true) rescue nil
     version = nil
     perform_enqueued_jobs do
       version = Registry::PublishVersion.new(user: @user, publisher: @publisher,

@@ -15,6 +15,16 @@ module StepUpAuthentication
     require_recent_second_factor if Current.user.second_factor?
   end
 
+  # The sensitive-change cooldown gates EVERY credential-shaped action, not
+  # just publishes — a just-enrolled factor must not immediately mint tokens,
+  # approve devices, or register CI publishers.
+  def require_no_sensitive_cooldown
+    if Current.user.in_publish_cooldown?
+      redirect_back fallback_location: dashboard_path,
+        alert: "This account had a recent security-sensitive change — credential actions resume after the cooldown."
+    end
+  end
+
   def require_recent_second_factor
     user = Current.user
     unless user.second_factor?

@@ -11,7 +11,7 @@ Rails.application.routes.draw do
 
   resource :dashboard, only: :show, controller: "dashboard"
   namespace :settings do
-    resource :two_factor, only: %i[show update], controller: "two_factor"
+    resource :two_factor, only: %i[show update destroy], controller: "two_factor"
     resources :passkeys, only: %i[create destroy] do
       post :options, on: :collection
     end
