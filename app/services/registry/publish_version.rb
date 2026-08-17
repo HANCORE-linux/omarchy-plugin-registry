@@ -39,7 +39,7 @@ module Registry
       fail! "publisher is suspended", status: :forbidden if publisher.suspended?
       fail! "namespace is unclaimed — prove control of the source repo to claim it", status: :forbidden unless publisher.claimed?
       fail! "you are not a member of #{publisher.name}", status: :forbidden unless user.member_of?(publisher)
-      fail! "enable two-factor authentication to publish", status: :forbidden unless user.otp_enabled?
+      fail! "add a passkey or enable two-factor authentication to publish", status: :forbidden unless user.second_factor?
       fail! "publishing is paused after a recent account change — try again later", status: :forbidden if user.in_publish_cooldown?
       if token && !token.authorizes?(publisher, plugin_name)
         fail! "token is not scoped to #{publisher.name}/#{plugin_name}", status: :forbidden

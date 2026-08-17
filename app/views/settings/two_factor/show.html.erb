@@ -1,31 +1,56 @@
-<% content_for :title, "Two-factor auth — Omarchy Plugins" %>
+<% content_for :title, "Account security — Omarchy Plugins" %>
 <div class="content-page container">
   <p class="eyebrow">Account security</p>
-  <h1>Two-factor authentication</h1>
+  <h1>Second factor</h1>
+  <p class="lede">Required before you can publish — every registry credential incident starts
+    with a phished account. A passkey is the strongest option (unphishable); TOTP works too.</p>
 
-  <% if @user.otp_enabled? %>
-    <p class="lede">Enabled. Publishing is unlocked for your account.</p>
-    <% if @user.otp_backup_codes.present? %>
-      <section>
-        <h2>Backup codes</h2>
+  <section>
+    <h2>Passkeys</h2>
+    <% if @user.passkeys.any? %>
+      <table class="table" style="max-width: 560px;">
+        <thead><tr><th>Name</th><th>Last used</th><th></th></tr></thead>
+        <tbody>
+          <% @user.passkeys.each do |passkey| %>
+            <tr>
+              <td><%= passkey.nickname %></td>
+              <td class="muted"><%= passkey.last_used_at ? "#{time_ago_in_words(passkey.last_used_at)} ago" : "never" %></td>
+              <td class="actions"><%= button_to "Remove", settings_passkey_path(passkey), method: :delete, class: "button button--ghost button--small" %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+    <div data-controller="webauthn"
+         data-webauthn-options-url-value="<%= options_settings_passkeys_path %>"
+         data-webauthn-verify-url-value="<%= settings_passkeys_path %>">
+      <button type="button" class="button" data-action="webauthn#register">Add a passkey</button>
+      <p class="field-errors" data-webauthn-target="error"></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Authenticator app (TOTP)</h2>
+    <% if @user.otp_enabled? %>
+      <p class="lede">Enabled.</p>
+      <% if @user.otp_backup_codes.present? %>
+        <h4 style="margin-bottom: 10px;">Backup codes</h4>
         <p class="lede">Each works once if you lose your authenticator. Store them somewhere safe.</p>
         <ul class="backup-codes">
           <% @user.otp_backup_codes.each do |code| %><li><code><%= code %></code></li><% end %>
         </ul>
-      </section>
+      <% end %>
+    <% else %>
+      <p class="lede">Scan with any TOTP app, then confirm with a code.</p>
+      <div class="qr-box"><%= @qr_svg.html_safe %></div>
+      <p class="muted">Or enter the secret manually: <code><%= @user.otp_secret %></code></p>
+      <%= form_with url: settings_two_factor_path, method: :patch do |form| %>
+        <div class="field" style="max-width: 260px; margin-top: 24px;">
+          <label for="code">Code from your app</label>
+          <input type="text" name="code" id="code" class="code-input" inputmode="numeric" maxlength="6" required>
+        </div>
+        <button type="submit" class="button">Enable</button>
+      <% end %>
     <% end %>
-  <% else %>
-    <p class="lede">Required before you can publish — every registry credential incident starts
-      with a phished account, so publishers here carry a second factor. Scan the code with any
-      TOTP app (passkeys are coming).</p>
-    <div class="qr-box"><%= @qr_svg.html_safe %></div>
-    <p class="muted">Or enter the secret manually: <code><%= @user.otp_secret %></code></p>
-    <%= form_with url: settings_two_factor_path, method: :patch do |form| %>
-      <div class="field" style="max-width: 260px; margin-top: 24px;">
-        <label for="code">Code from your app</label>
-        <input type="text" name="code" id="code" class="code-input" inputmode="numeric" maxlength="6" required>
-      </div>
-      <button type="submit" class="button">Enable</button>
-    <% end %>
-  <% end %>
+  </section>
 </div>

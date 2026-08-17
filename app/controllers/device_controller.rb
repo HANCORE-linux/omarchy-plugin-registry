@@ -11,8 +11,8 @@ class DeviceController < ApplicationController
   def approve
     authorization = DeviceAuthorization.find_by_user_code(params[:code])
     return redirect_to device_path, alert: "That code expired — re-run the command." if authorization.nil?
-    unless Current.user.otp_enabled?
-      return redirect_to settings_two_factor_path, alert: "Enable two-factor authentication before authorizing publishes."
+    unless Current.user.second_factor?
+      return redirect_to settings_two_factor_path, alert: "Add a passkey or enable two-factor authentication before authorizing publishes."
     end
 
     if params[:decision] == "deny"

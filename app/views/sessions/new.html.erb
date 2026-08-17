@@ -11,4 +11,11 @@
     </div>
     <button type="submit" class="button">Email me a code</button>
   <% end %>
+  <div data-controller="webauthn"
+       data-webauthn-options-url-value="<%= session_passkey_options_path %>"
+       data-webauthn-verify-url-value="<%= session_passkey_path %>"
+       style="margin-top: 24px;">
+    <button type="button" class="button button--ghost" data-action="webauthn#authenticate">Sign in with a passkey</button>
+    <p class="field-errors" data-webauthn-target="error"></p>
+  </div>
 </div>

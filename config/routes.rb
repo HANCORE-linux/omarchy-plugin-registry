@@ -12,7 +12,12 @@ Rails.application.routes.draw do
   resource :dashboard, only: :show, controller: "dashboard"
   namespace :settings do
     resource :two_factor, only: %i[show update], controller: "two_factor"
+    resources :passkeys, only: %i[create destroy] do
+      post :options, on: :collection
+    end
   end
+  post "session/passkey/options", to: "passkey_sessions#options"
+  post "session/passkey", to: "passkey_sessions#create"
   resources :tokens, only: %i[create destroy]
   resources :trusted_publishers, only: %i[create destroy]
   resources :orgs, only: %i[new create] do

@@ -6,8 +6,8 @@ class TokensController < ApplicationController
     unless plugin_name.match?(NameRules::NAME_FORMAT)
       return redirect_to dashboard_path, alert: "Plugin name must be lowercase letters, digits, - or _"
     end
-    unless Current.user.otp_enabled?
-      return redirect_to settings_two_factor_path, alert: "Enable two-factor authentication before minting publish tokens."
+    unless Current.user.second_factor?
+      return redirect_to settings_two_factor_path, alert: "Add a passkey or enable two-factor authentication before minting publish tokens."
     end
 
     token = ApiToken.mint!(user: Current.user, publisher:, plugin_name:)

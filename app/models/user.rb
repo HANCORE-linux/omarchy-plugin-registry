@@ -7,6 +7,7 @@ class User < ApplicationRecord
   has_many :memberships, dependent: :destroy
   has_many :publishers, through: :memberships
   has_many :api_tokens, dependent: :destroy
+  has_many :passkeys, dependent: :destroy
 
   normalizes :email_address, with: ->(e) { e.strip.downcase }
 
@@ -36,8 +37,12 @@ class User < ApplicationRecord
 
   def otp_enabled? = otp_enabled_at.present?
 
+  # Publishing requires an unphishable-or-close second factor: a passkey
+  # (preferred) or TOTP.
+  def second_factor? = otp_enabled? || passkeys.exists?
+
   def can_publish?
-    otp_enabled? && suspended_at.nil? && !in_publish_cooldown?
+    second_factor? && suspended_at.nil? && !in_publish_cooldown?
   end
 
   def in_publish_cooldown?
