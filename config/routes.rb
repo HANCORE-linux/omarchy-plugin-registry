@@ -14,6 +14,7 @@ Rails.application.routes.draw do
     resource :two_factor, only: %i[show update], controller: "two_factor"
   end
   resources :tokens, only: %i[create destroy]
+  resources :trusted_publishers, only: %i[create destroy]
   resources :orgs, only: %i[new create] do
     member do
       post :add_member
@@ -54,6 +55,7 @@ Rails.application.routes.draw do
         constraints: { publisher: %r{[^/]+}, plugin: %r{[^/]+} }
       post "device/code", to: "device#code"
       post "device/token", to: "device#token"
+      post "trusted/exchange", to: "trusted#exchange"
     end
   end
 

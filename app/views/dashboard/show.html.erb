@@ -75,6 +75,54 @@
   </section>
 
   <section>
+    <h2>Trusted publishing</h2>
+    <p class="lede">Publish from CI with no stored secret: register a repo + workflow +
+      environment once, and tagging a release publishes via OIDC. GitHub Actions today.</p>
+    <% trusted = TrustedPublisher.where(publisher: @publishers).includes(:publisher) %>
+    <% if trusted.any? %>
+      <table class="table">
+        <thead><tr><th>Scope</th><th>Repository</th><th>Workflow</th><th>Environment</th><th></th></tr></thead>
+        <tbody>
+          <% trusted.each do |tp| %>
+            <tr>
+              <td><%= tp.publisher.name %>/<%= tp.plugin_name %></td>
+              <td><code><%= tp.repository %></code></td>
+              <td><code><%= tp.workflow %></code></td>
+              <td><%= tp.environment %></td>
+              <td class="actions"><%= button_to "Remove", trusted_publisher_path(tp), method: :delete, class: "button button--ghost button--small" %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+    <%= form_with url: trusted_publishers_path, class: "directory__bar", style: "margin-top: 18px; align-items: end;" do |form| %>
+      <div class="field" style="margin: 0;">
+        <label>Namespace</label>
+        <select name="publisher_name" style="font-family: var(--mono); padding: 12px; border: 1px solid var(--hairline); background: var(--surface);">
+          <% @publishers.each do |publisher| %><option value="<%= publisher.name %>"><%= publisher.name %></option><% end %>
+        </select>
+      </div>
+      <div class="field" style="margin: 0;">
+        <label>Plugin</label>
+        <input type="text" name="plugin_name" required pattern="[a-z0-9][a-z0-9_-]*" placeholder="weather">
+      </div>
+      <div class="field" style="margin: 0;">
+        <label>Repository</label>
+        <input type="text" name="repository" required placeholder="you/weather">
+      </div>
+      <div class="field" style="margin: 0;">
+        <label>Workflow</label>
+        <input type="text" name="workflow" required value=".github/workflows/publish.yml">
+      </div>
+      <div class="field" style="margin: 0;">
+        <label>Environment</label>
+        <input type="text" name="environment" value="release">
+      </div>
+      <button type="submit" class="button">Register</button>
+    <% end %>
+  </section>
+
+  <section>
     <h2>Organizations</h2>
     <p class="lede"><%= link_to "Create an org", new_org_path %> to share a namespace with a team.</p>
   </section>

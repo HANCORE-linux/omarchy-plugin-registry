@@ -66,6 +66,17 @@
         </dl>
       </section>
     <% end %>
+    <% if @latest&.provenance.present? %>
+      <section>
+        <h4>Provenance</h4>
+        <dl>
+          <dt>Built from</dt>
+          <dd><a href="https://github.com/<%= @latest.provenance["repository"] %>/commit/<%= @latest.provenance["sha"] %>"><%= @latest.provenance["repository"] %>@<%= @latest.provenance["sha"].to_s.first(7) %></a></dd>
+          <dt>Workflow</dt><dd><code><%= @latest.provenance["workflow"].to_s.split("@").first.to_s.split("/").last %></code></dd>
+          <dt>Via</dt><dd>OIDC trusted publishing</dd>
+        </dl>
+      </section>
+    <% end %>
     <section>
       <h4>Versions</h4>
       <ul class="version-list">

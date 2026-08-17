@@ -39,6 +39,10 @@ module OmarchyPluginRegistry
     # {"verdict":..., "reasons":[...]}). Unset = AI review disabled.
     config.x.ai_review_command = ENV["AI_REVIEW_COMMAND"]
 
+    # Static JWKS override for OIDC trusted publishing (tests inject one;
+    # production fetches GitHub's and caches it)
+    config.x.github_oidc_jwks = nil
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files
