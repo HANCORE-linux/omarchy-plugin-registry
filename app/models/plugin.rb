@@ -20,6 +20,19 @@ class Plugin < ApplicationRecord
 
   scope :listed, -> { where(state: :active) }
 
+  # What the public directory shows: anything installable, anything genuinely
+  # in review (in-flight versions or a seed placeholder) — but not burned names
+  # and not plugins whose only history is terminal rejection.
+  scope :directory_visible, -> {
+    where.not(state: :security_holding).where(
+      "plugins.latest_version IS NOT NULL OR plugins.state = :quarantined OR EXISTS (
+         SELECT 1 FROM plugin_versions pv
+         WHERE pv.plugin_id = plugins.id AND pv.state IN (:in_flight))",
+      quarantined: states[:quarantined],
+      in_flight: [ PluginVersion.states[:processing], PluginVersion.states[:held], PluginVersion.states[:quarantined] ]
+    )
+  }
+
   # The manifest id installed clients use: today's dot-convention made a rule.
   def manifest_id = "#{publisher.name}.#{name}"
 

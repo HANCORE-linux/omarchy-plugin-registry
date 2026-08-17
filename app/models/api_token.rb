@@ -10,6 +10,8 @@ class ApiToken < ApplicationRecord
   belongs_to :publisher
 
   attr_reader :plaintext_token
+  # Machine-minted tokens (OIDC exchange) don't consume the user-managed quota
+  attr_accessor :quota_exempt
 
   MAX_USABLE_PER_USER = 25
 
@@ -21,13 +23,14 @@ class ApiToken < ApplicationRecord
 
   scope :usable, -> { where(revoked_at: nil).where(expires_at: Time.current..) }
 
-  def self.mint!(user:, publisher:, plugin_name:, ttl: DEFAULT_TTL)
+  def self.mint!(user:, publisher:, plugin_name:, ttl: DEFAULT_TTL, quota_exempt: false)
     raw = PREFIX + SecureRandom.base58(30)
     token = create!(
       user:, publisher:, plugin_name:,
       token_digest: digest(raw),
       token_hint: "#{raw.first(8)}…#{raw.last(4)}",
-      expires_at: ttl.from_now
+      expires_at: ttl.from_now,
+      quota_exempt: quota_exempt
     )
     token.instance_variable_set(:@plaintext_token, raw)
     token
@@ -55,6 +58,7 @@ class ApiToken < ApplicationRecord
   end
 
   def usable_quota
+    return if quota_exempt
     if user && user.api_tokens.usable.count >= MAX_USABLE_PER_USER
       errors.add(:base, "too many active tokens — revoke some first")
     end

@@ -36,6 +36,9 @@ module Registry
         # 1. Non-literal command values — `command: argv` or arrays built from
         #    expressions can run anything.
         dynamic_exec ||= text.match?(/command:\s*(?!\[\s*["'])[a-zA-Z_\[]/)
+        # 1b. Literal shell invocation with a NON-literal payload:
+        #     ["bash", "-c", someFunction()] runs anything too.
+        dynamic_exec ||= text.match?(/command:\s*\[\s*["'](?:\/[\w\/]*\/)?(?:#{SHELL_INTERPRETERS.join('|')})["']\s*,\s*["']-c["']\s*,\s*(?!["'])/)
         # 2. Literal shell -c payloads — the binary name "bash" hides the real
         #    program, so the script itself joins the fingerprint by digest.
         text.scan(/command:\s*\[\s*["'](?:\/[\w\/]*\/)?(#{SHELL_INTERPRETERS.join('|')})["']\s*,\s*["']-c["']\s*,\s*["'](.{0,4000}?)["']\s*\]/m) do |interpreter, script|
@@ -61,8 +64,10 @@ module Registry
       {
         "processes" => processes.reject(&:blank?).sort,
         "network" => hosts.sort,
-        "paths" => paths.sort.first(20),
-        "writes" => writes.sort.first(20),
+        # Generous caps — growth comparison runs on what's stored, so the cap
+        # must comfortably exceed any legitimate plugin's surface
+        "paths" => paths.sort.first(200),
+        "writes" => writes.sort.first(200),
         "keybindings" => keybindings,
         "dynamic_exec" => dynamic_exec
       }

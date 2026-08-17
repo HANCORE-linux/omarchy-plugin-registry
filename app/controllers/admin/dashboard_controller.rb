@@ -2,7 +2,9 @@ module Admin
   # The human-escalation queue: quarantined/held versions, plus recent activity.
   class DashboardController < BaseController
     def show
-      @queue = PluginVersion.where(state: [ :quarantined, :held, :processing ])
+      # Held versions are clean and auto-release when the hold expires — only
+      # quarantined (human-needed) and processing (pipeline running) surface.
+      @queue = PluginVersion.where(state: [ :quarantined, :processing ])
         .includes(plugin: :publisher).order(:created_at)
       @recent_versions = PluginVersion.includes(plugin: :publisher).order(created_at: :desc).limit(20)
       @recent_events = AuditEvent.order(created_at: :desc).includes(:user).limit(30)

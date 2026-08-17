@@ -251,7 +251,7 @@ class MomusRemediationsTest < ActionDispatch::IntegrationTest
       otp_secret: ROTP::Base32.random, otp_enabled_at: Time.current)
     sign_in_as admin
     post approve_admin_version_path(version)
-    assert_redirected_to admin_root_path
+    assert_redirected_to admin_version_path(version)
     assert version.reload.processing?
     assert_nil DataPlane.root.join(version.tarball_path).exist? ? true : nil
   end

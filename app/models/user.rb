@@ -24,7 +24,15 @@ class User < ApplicationRecord
   # (email, MFA reset) — the npm post-worm posture.
   PUBLISH_COOLDOWN = 12.hours
 
+  MAX_LOGIN_CODES_PER_HOUR = 5
+
+  # Only ONE code is ever redeemable: issuing a new one consumes the rest, so
+  # distributed requests cannot widen the guessable set. Issuance is capped
+  # per account (on top of the per-IP throttle) against email bombing —
+  # returns nil when throttled and sends nothing.
   def send_login_code
+    return nil if login_codes.where(created_at: 1.hour.ago..).count >= MAX_LOGIN_CODES_PER_HOUR
+    login_codes.active.update_all(consumed_at: Time.current)
     login_codes.create!.tap { |code| LoginCodeMailer.sign_in_code(code).deliver_later }
   end
 

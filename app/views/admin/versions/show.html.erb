@@ -10,8 +10,12 @@
   <section>
     <h2>Actions</h2>
     <div class="form-inline">
-      <% if @version.releasable? %>
+      <% if @version.quarantined? %>
         <%= button_to "Approve and publish", approve_admin_version_path(@version), class: "button" %>
+      <% elsif @version.held? %>
+        <span class="badge badge--warning">Clean — releasing when the hold expires (<%= time_ago_in_words(@version.hold_until) %>)</span>
+      <% end %>
+      <% if @version.quarantined? || @version.processing? %>
         <%= form_with url: reject_admin_version_path(@version), class: "form-inline" do %>
           <input type="text" name="reason" class="select" placeholder="Reason (public)" required>
           <button type="submit" class="button button--ghost">Reject</button>

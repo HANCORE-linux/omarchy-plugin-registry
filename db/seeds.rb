@@ -85,3 +85,4 @@ end
 
 DataPlane::Regenerate.all
 puts "Seeded. Admin: ryan@heyoodle.com (passwordless — request a code in dev, it shows in the flash)."
+puts "Admin TOTP secret (add to your authenticator for step-up): #{admin.otp_secret}"

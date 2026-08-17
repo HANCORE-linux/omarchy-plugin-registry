@@ -25,4 +25,37 @@ namespace :registry do
     DataPlane::Regenerate.all
     puts "Data plane regenerated at #{DataPlane.root}"
   end
+
+  desc <<~DESC
+    Import download counts from CDN log aggregation (the production counting
+    path). Input: JSONL, one {"publisher","name","version","count","date"} per
+    line — produce it from your CDN's logs for GET /dl/... with status 200.
+  DESC
+  task :import_download_counts, [ :path ] => :environment do |_t, args|
+    abort "usage: rails registry:import_download_counts[counts.jsonl]" if args[:path].blank?
+    imported = skipped = 0
+    File.foreach(args[:path]) do |line|
+      entry = JSON.parse(line) rescue next
+      version = PluginVersion.joins(plugin: :publisher).find_by(
+        publishers: { name: entry["publisher"] }, plugins: { name: entry["name"] },
+        version: entry["version"])
+      next skipped += 1 if version.nil? || entry["count"].to_i <= 0
+
+      date = Date.parse(entry["date"]) rescue Date.current
+      DailyDownload.upsert(
+        { plugin_version_id: version.id, date: date, count: entry["count"].to_i },
+        unique_by: [ :plugin_version_id, :date ],
+        on_duplicate: Arel.sql("count = excluded.count"))
+      imported += 1
+    end
+    # Refresh the cached rollups from the ledger
+    PluginVersion.find_each do |version|
+      version.update_columns(downloads_count: version.daily_downloads.sum(:count))
+    end
+    Plugin.find_each do |plugin|
+      plugin.update_columns(downloads_count: plugin.versions.sum(:downloads_count))
+    end
+    DataPlane::Regenerate.all
+    puts "Imported #{imported} rows (#{skipped} skipped); rollups refreshed."
+  end
 end

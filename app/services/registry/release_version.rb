@@ -4,6 +4,9 @@ module Registry
   class ReleaseVersion
     def self.call(version, actor: nil)
       raise ArgumentError, "cannot release a #{version.state} version" unless version.releasable?
+      if Revocation.exists?(plugin: version.plugin, version: version.version)
+        raise ArgumentError, "version is on the kill list and can never be released"
+      end
       raise ArgumentError, "cannot release into a #{version.plugin.state} plugin" unless version.plugin.active?
       # Suspension or membership loss between submit and release must stop the
       # release — the hold window exists precisely for this.

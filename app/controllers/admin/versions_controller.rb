@@ -28,9 +28,11 @@ module Admin
         type: "application/gzip", disposition: "attachment"
     end
 
-    # Approve out of quarantine/hold — releases through the same path as the
-    # automated pipeline so frozen bytes and audit stay consistent.
+    # Approve out of QUARANTINE only — held versions are clean and waiting out
+    # the publish-delay window, which an admin click must not bypass; they
+    # release themselves when the hold expires.
     def approve
+      return bad_transition! unless @version.quarantined?
       Registry::ReleaseVersion.call(@version, actor: Current.user)
       audit "version.approve"
       regenerate_and_redirect "Approved and published."
@@ -71,7 +73,13 @@ module Admin
       return require_reason! unless params[:reason].present?
       reason = params[:reason]
       ApplicationRecord.transaction do
-        @version.yank!(reason:, actor: Current.user) if @version.published?
+        if @version.published?
+          @version.yank!(reason:, actor: Current.user)
+        else
+          # Revocation is terminal from any state: a revoked version must
+          # never be approvable back into the index
+          @version.update!(state: :yanked, yanked_at: Time.current, yank_reason: reason)
+        end
         Revocation.find_or_create_by!(plugin: @version.plugin, version: @version.version) do |r|
           r.reason = reason
           r.created_by = Current.user

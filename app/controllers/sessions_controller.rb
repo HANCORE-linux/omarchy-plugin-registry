@@ -26,9 +26,11 @@ class SessionsController < ApplicationController
     end
 
     user = User.find_or_create_by!(email_address: email)
-    expose_login_code_in_dev user.send_login_code
+    login_code = user.send_login_code
+    expose_login_code_in_dev login_code
     session[:pending_email] = email
 
+    # Same response whether or not issuance was throttled — no oracle
     redirect_to verify_session_path, notice: "Check your email for a sign-in code."
   end
 

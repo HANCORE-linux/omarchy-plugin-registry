@@ -21,7 +21,8 @@ module Registry
         user: trusted.created_by,
         publisher: trusted.publisher,
         plugin_name: trusted.plugin_name,
-        ttl: TOKEN_TTL
+        ttl: TOKEN_TTL,
+        quota_exempt: true
       )
       token.update!(provenance: {
         "provider" => "github",

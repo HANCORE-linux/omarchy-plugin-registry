@@ -128,6 +128,7 @@ module Registry
     # tokens must alternate id, operator, id, and WITH must join a license to
     # an exception exactly once — no chained WITH.
     def valid_spdx_expression?(expression)
+      return false unless expression.count("(") == expression.count(")")
       tokens = expression.tr("()", " ").split(/\s+/)
       return false if tokens.empty? || tokens.length.even?
 
