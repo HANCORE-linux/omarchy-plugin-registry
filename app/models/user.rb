@@ -5,7 +5,10 @@ class User < ApplicationRecord
   has_many :sessions, dependent: :destroy
   has_many :login_codes, dependent: :destroy
   has_many :memberships, dependent: :destroy
-  has_many :publishers, through: :memberships
+  # `publishers` means accepted affiliations only — pending invitations show
+  # up nowhere except the invitation list
+  has_many :accepted_memberships, -> { accepted }, class_name: "Membership"
+  has_many :publishers, through: :accepted_memberships
   has_many :api_tokens, dependent: :destroy
   has_many :passkeys, dependent: :destroy
   has_many :comments, dependent: :destroy

@@ -63,7 +63,8 @@ module Registry
       # never reach a version row for clients to choke on
       %w[id name version license minOmarchyVersion repository author].each do |field|
         value = manifest[field]
-        errors << "manifest #{field} must be a string" if value.present? && !value.is_a?(String)
+        # nil-check, not present? — `false` and other non-strings must fail
+        errors << "manifest #{field} must be a string" if !value.nil? && !value.is_a?(String)
       end
       name = manifest["name"]
       if name.is_a?(String) && (name.length > 80 || name.match?(/[[:cntrl:]]/))

@@ -27,7 +27,14 @@ module DataPlane
       plugin.versions.where(state: [ :published, :yanked ]).find_each do |version|
         next if DataPlane.root.join(version.tarball_path).exist?
         next unless version.tarball.attached?
-        DataPlane.freeze_tarball(version, version.tarball.download)
+        bytes = version.tarball.download
+        # A stored blob that no longer matches the signed checksum must never
+        # be served — skip loudly, don't freeze corruption
+        unless Digest::SHA256.hexdigest(bytes) == version.sha256
+          Rails.logger.error("[DataPlane] checksum mismatch restoring #{version.tarball_path} — skipped")
+          next
+        end
+        DataPlane.freeze_tarball(version, bytes)
       end
     end
 

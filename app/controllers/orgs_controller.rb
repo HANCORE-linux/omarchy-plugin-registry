@@ -62,8 +62,10 @@ class OrgsController < ApplicationController
     return head :forbidden unless Current.user.owner_of?(publisher)
 
     membership = publisher.memberships.find(params[:membership_id])
-    if membership.role_owner? && publisher.memberships.owner.count == 1
-      return redirect_to dashboard_path, alert: "An org needs at least one owner."
+    # Only ACCEPTED owners count — a pending invitation is a maybe, and the
+    # invitee declining must never leave the namespace ownerless
+    if membership.role_owner? && !membership.pending? && publisher.memberships.owner.accepted.count == 1
+      return redirect_to dashboard_path, alert: "An org needs at least one accepted owner."
     end
 
     ApplicationRecord.transaction do
