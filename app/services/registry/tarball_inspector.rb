@@ -59,7 +59,14 @@ module Registry
         when entry.directory?
           next
         when %w[g x].include?(entry.header.typeflag)
-          # PAX metadata headers — git archive always emits a global one
+          # PAX metadata headers — git archive always emits a global comment.
+          # But the served bytes keep these records, and a PAX-aware extractor
+          # would APPLY overrides: any path/linkpath rewrite must be rejected,
+          # or validated names and extracted names diverge.
+          pax = entry.read.to_s
+          if pax.match?(/\d+ (path|linkpath|size)=/)
+            raise InvalidTarball, "PAX override of path/linkpath/size is not allowed"
+          end
           next
         when entry.symlink? || entry.header.typeflag == "1"
           raise InvalidTarball, "symlinks and hardlinks are not allowed (#{path})"

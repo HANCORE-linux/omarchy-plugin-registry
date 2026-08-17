@@ -8,8 +8,12 @@ module Admin
       ApplicationRecord.transaction do
         @plugin.update!(state: :security_holding, latest_version: nil)
         @plugin.versions.published.find_each { |v| v.yank!(reason:, actor: Current.user) }
-        # In-flight versions must not resurface via a scheduled ReleaseJob
-        @plugin.versions.where(state: [ :processing, :held, :quarantined ])
+        # In-flight versions must not resurface via a scheduled ReleaseJob.
+        # Anything that ever shipped stays in the signed index as yanked
+        # (security notice preserved); never-published work is rejected.
+        @plugin.versions.where(state: [ :processing, :held, :quarantined ]).where.not(published_at: nil)
+          .update_all(state: PluginVersion.states[:yanked], yanked_at: Time.current, yank_reason: reason)
+        @plugin.versions.where(state: [ :processing, :held, :quarantined ], published_at: nil)
           .update_all(state: PluginVersion.states[:rejected], review_notes: "plugin security-held: #{reason}")
         Revocation.find_or_create_by!(plugin: @plugin, version: nil) do |r|
           r.reason = reason

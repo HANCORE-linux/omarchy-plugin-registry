@@ -29,21 +29,33 @@ module Admin
     end
 
     # Approve out of QUARANTINE only — held versions are clean and waiting out
-    # the publish-delay window, which an admin click must not bypass; they
-    # release themselves when the hold expires.
+    # the publish-delay window, which an admin click must not bypass. Approval
+    # re-enters that same hold window: even human-approved bytes get the
+    # worm-brake delay before going live.
     def approve
       return bad_transition! unless @version.quarantined?
-      Registry::ReleaseVersion.call(@version, actor: Current.user)
-      audit "version.approve"
-      regenerate_and_redirect "Approved and published."
+      hold = Rails.application.config.x.publish_hold
+      if hold.to_i.positive?
+        @version.update!(state: :held, hold_until: hold.from_now)
+        Registry::ReleaseJob.set(wait_until: @version.hold_until).perform_later(@version)
+        audit "version.approve"
+        redirect_to admin_root_path, notice: "Approved — releases when the hold window expires."
+      else
+        Registry::ReleaseVersion.call(@version, actor: Current.user)
+        audit "version.approve"
+        regenerate_and_redirect "Approved and published."
+      end
     rescue ArgumentError => e
       redirect_to admin_root_path, alert: e.message
     end
 
     # Legal admin transitions only: rejected/yanked are terminal for these
-    # actions, and quarantine applies to live versions.
+    # actions, and quarantine applies to live versions. A version that ever
+    # shipped can only be yanked/revoked — rejection would erase it from the
+    # signed index as if it never existed, hiding the security notice.
     def reject
       return bad_transition! unless @version.releasable? || @version.processing?
+      return bad_transition! if @version.published_at.present?
       return require_reason! unless params[:reason].present?
       @version.update!(state: :rejected, review_notes: params[:reason])
       @version.plugin.refresh_latest_version!

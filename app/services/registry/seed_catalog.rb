@@ -20,6 +20,14 @@ module Registry
     end
 
     def self.import_entry(entry, snapshotter:)
+      # The claim-proof target must belong to the seeded namespace: the repo
+      # owner segment has to match the publisher, or a mismatched catalog row
+      # would make one person's namespace claimable through another's repo.
+      owner = entry["repository"].to_s[%r{\Ahttps://[^/]+/([^/]+)/}, 1].to_s.downcase
+      unless owner == entry.fetch("publisher").to_s.downcase
+        return { entry:, status: "failed", reason: "repository owner #{owner.inspect} does not match publisher" }
+      end
+
       publisher = Publisher.find_or_create_by!(name: entry.fetch("publisher")) do |p|
         p.kind = :personal
         p.claimed = false

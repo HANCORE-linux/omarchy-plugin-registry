@@ -136,7 +136,7 @@ module Registry
     def scan_file(path, text, entropy: true, strict: true)
       check path, text, "invisible-unicode", strict ? :fail : :flag, INVISIBLE_UNICODE,
         "invisible or bidirectional Unicode characters (code hidden from review)"
-      check path, text, "curl-pipe-shell", :flag, /\b(curl|wget)\b[^|\n;]*\|\s*(sudo\s+)?(ba|z|da)?sh\b/,
+      check path, text, "curl-pipe-shell", :flag, %r{\b(curl|wget)\b[^|\n;]*\|\s*(sudo\s+)?(?:/[\w/]*/)?(ba|z|da)?sh\b},
         "pipes a remote download straight into a shell"
       check path, text, "base64-decode-exec", :flag, /base64\s+(-d|--decode)[^\n]*\|\s*(sudo\s+)?\w*sh\b|eval.{0,40}base64|atob\s*\([^)]*\).{0,40}(eval|Function)/m,
         "decodes base64 and executes it"

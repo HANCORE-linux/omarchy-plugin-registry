@@ -9,6 +9,8 @@ class PluginsController < ApplicationController
     @revoked = @plugin.revocations.any?
     @comments = @plugin.comments.visible.includes(:user).order(created_at: :desc).limit(50)
     @my_rating = authenticated? ? @plugin.ratings.find_by(user: Current.user) : nil
-    @plugin.record_view!
+    # Origin-side view counting mirrors download counting: on in dev/small
+    # deployments, off in production where analytics come from the edge.
+    @plugin.record_view! if Rails.application.config.x.count_origin_downloads
   end
 end
