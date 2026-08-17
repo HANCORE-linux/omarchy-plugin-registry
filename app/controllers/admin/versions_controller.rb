@@ -14,8 +14,10 @@ module Admin
         previous_tarball = Registry::TarballInspector.inspect_bytes(previous.tarball.download)
         @added_files = (@tarball&.files || []) - previous_tarball.files
         @removed_files = previous_tarball.files - (@tarball&.files || [])
+        # Full-content digests, never the truncated scan window — same-prefix
+        # files with different tails must show as changed
         @changed_files = (@tarball&.files || []).select do |f|
-          previous_tarball.contents.key?(f) && previous_tarball.contents[f] != @tarball.contents[f]
+          previous_tarball.digests.key?(f) && previous_tarball.digests[f] != @tarball.digests[f]
         end
       end
     end
@@ -63,9 +65,11 @@ module Admin
       return require_reason! unless params[:reason].present?
       reason = params[:reason]
       ApplicationRecord.transaction do
-        @version.yank!(reason:, actor: Current.user) unless @version.yanked?
-        Revocation.create!(plugin: @version.plugin, version: @version.version,
-          reason:, created_by: Current.user)
+        @version.yank!(reason:, actor: Current.user) if @version.published?
+        Revocation.find_or_create_by!(plugin: @version.plugin, version: @version.version) do |r|
+          r.reason = reason
+          r.created_by = Current.user
+        end
         audit "version.revoke", public: true, metadata: { reason: }
       end
       regenerate_and_redirect "Revoked — kill list updated, installed copies will disable."

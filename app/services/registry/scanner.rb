@@ -141,6 +141,9 @@ module Registry
         "touches credential or key storage"
       check path, text, "shell-history-tamper", :flag, /HISTFILE=|history\s+-c\b|shred\b.*bash_history/,
         "tampers with shell history"
+      check path, text, "dotfile-write", :flag,
+        %r{(?:>>?|\btee\s+(?:-a\s+)?)\s*["']?(?:\$HOME|~)/\.(?!config/omarchy)[\w.]|\b(?:cp|mv|install)\b[^\n]*\s(?:\$HOME|~)/\.(?!config/omarchy)[\w.]},
+        "writes to home dotfiles outside the plugin's own config"
       check path, text, "embedded-shebang", :flag, /\n#!\s*\/(bin|usr)\//, "script payload embedded past the file header" if !entropy
       check_entropy(path, text) if entropy
     end

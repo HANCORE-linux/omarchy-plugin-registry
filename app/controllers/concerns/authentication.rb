@@ -28,12 +28,16 @@ module Authentication
     def find_session_by_cookie
       return nil unless cookies.signed[:session_id]
       session = Session.includes(:user).find_by(id: cookies.signed[:session_id])
+      return nil if session.nil?
       # Suspension kills live sessions, not just future sign-ins — a suspended
-      # admin or publisher must lose their powers immediately.
-      if session && session.user.suspended_at.present?
+      # admin or publisher must lose their powers immediately. Expired sessions
+      # (absolute or idle lifetime) die on first sight.
+      if session.user.suspended_at.present? || session.expired?
         session.destroy
         return nil
       end
+      # Refresh the idle clock at most hourly to keep writes cheap
+      session.touch if session.updated_at < 1.hour.ago
       session
     end
 
@@ -51,7 +55,8 @@ module Authentication
     def start_new_session_for(user)
       user.sessions.create!(user_agent: request.user_agent, ip_address: request.remote_ip).tap do |session|
         Current.session = session
-        cookies.signed.permanent[:session_id] = { value: session.id, httponly: true, same_site: :lax }
+        cookies.signed[:session_id] = { value: session.id, httponly: true, same_site: :lax,
+                                        expires: Session::ABSOLUTE_LIFETIME.from_now }
       end
     end
 

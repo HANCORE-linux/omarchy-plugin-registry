@@ -73,6 +73,10 @@ Rails.application.routes.draw do
         post :hide
       end
     end
+    post "suspensions/user", to: "suspensions#suspend_user", as: :suspend_user
+    post "suspensions/user/lift", to: "suspensions#unsuspend_user", as: :unsuspend_user
+    post "suspensions/publisher", to: "suspensions#suspend_publisher", as: :suspend_publisher
+    post "suspensions/publisher/lift", to: "suspensions#unsuspend_publisher", as: :unsuspend_publisher
   end
 
   get "up" => "rails/health#show", as: :rails_health_check

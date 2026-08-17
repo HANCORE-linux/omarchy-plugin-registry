@@ -18,21 +18,11 @@ module Registry
     ALLOWED_KINDS = KIND_ENTRY_RULES.keys.freeze
     ID_FORMAT = /\A[A-Za-z0-9][A-Za-z0-9._-]*\z/
 
-    # Real SPDX identifiers only — token-shaped inventions must not become
-    # trusted registry metadata. (The common set; extend as publishers need.)
-    SPDX_LICENSE_IDS = %w[
-      0BSD AGPL-3.0-only AGPL-3.0-or-later Apache-2.0 Artistic-2.0 BSD-2-Clause
-      BSD-3-Clause BSD-3-Clause-Clear BlueOak-1.0.0 BSL-1.0 CC-BY-4.0 CC-BY-SA-4.0
-      CC0-1.0 CDDL-1.0 EPL-1.0 EPL-2.0 EUPL-1.2 GPL-2.0-only GPL-2.0-or-later
-      GPL-3.0-only GPL-3.0-or-later ISC LGPL-2.1-only LGPL-2.1-or-later
-      LGPL-3.0-only LGPL-3.0-or-later MIT MIT-0 MPL-2.0 MulanPSL-2.0 NCSA
-      OFL-1.1 OSL-3.0 PostgreSQL Unlicense UPL-1.0 WTFPL Zlib
-    ].to_set.freeze
-    SPDX_EXCEPTION_IDS = %w[
-      Classpath-exception-2.0 GCC-exception-3.1 GCC-exception-2.0 LLVM-exception
-      Linux-syscall-note OpenJDK-assembly-exception-1.0 GPL-3.0-linking-exception
-      Autoconf-exception-3.0 Bison-exception-2.2 Font-exception-2.0
-    ].to_set.freeze
+    # The complete SPDX license list, vendored from spdx.org (config/spdx.json,
+    # list version recorded inside) — real identifiers only, all of them.
+    SPDX_DATA = JSON.parse(Rails.root.join("config/spdx.json").read).freeze
+    SPDX_LICENSE_IDS = SPDX_DATA["licenses"].to_set.freeze
+    SPDX_EXCEPTION_IDS = SPDX_DATA["exceptions"].to_set.freeze
 
     attr_reader :errors
 

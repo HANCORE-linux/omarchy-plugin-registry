@@ -26,6 +26,10 @@
           <input type="text" name="reason" class="select" placeholder="Reason (public)" required>
           <button type="submit" class="button button--ghost">Yank</button>
         <% end %>
+      <% end %>
+      <%# The kill-bit escalates from ANY post-review state — a version already
+          yanked or quarantined may still be installed on machines out there %>
+      <% if (@version.published? || @version.yanked? || @version.quarantined?) && !Revocation.exists?(plugin: @plugin, version: @version.version) %>
         <%= form_with url: revoke_admin_version_path(@version), class: "form-inline",
               data: { turbo_confirm: "Kill-bit this version? Installed copies will be disabled." } do %>
           <input type="text" name="reason" class="select" placeholder="Reason (public)" required>

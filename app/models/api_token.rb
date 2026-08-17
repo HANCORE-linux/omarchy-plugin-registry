@@ -11,9 +11,13 @@ class ApiToken < ApplicationRecord
 
   attr_reader :plaintext_token
 
-  validates :plugin_name, presence: true, format: { with: NameRules::NAME_FORMAT }
+  MAX_USABLE_PER_USER = 25
+
+  validates :plugin_name, presence: true, format: { with: NameRules::NAME_FORMAT },
+    length: { maximum: NameRules::MAX_LENGTH }
   validates :expires_at, presence: true
   validate :ttl_within_bounds, on: :create
+  validate :usable_quota, on: :create
 
   scope :usable, -> { where(revoked_at: nil).where(expires_at: Time.current..) }
 
@@ -48,5 +52,11 @@ class ApiToken < ApplicationRecord
 
   def ttl_within_bounds
     errors.add(:expires_at, "exceeds maximum lifetime") if expires_at && expires_at > MAX_TTL.from_now
+  end
+
+  def usable_quota
+    if user && user.api_tokens.usable.count >= MAX_USABLE_PER_USER
+      errors.add(:base, "too many active tokens — revoke some first")
+    end
   end
 end

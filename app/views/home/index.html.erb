@@ -33,9 +33,13 @@
           <h3><span class="ns"><%= plugin.publisher.name %>/</span><%= plugin.name %></h3>
           <p><%= plugin.summary %></p>
           <div class="plugin-card__meta">
-            <span><span class="diamond">◆</span> v<%= plugin.latest_version %></span>
-            <span><%= compact_number(plugin.downloads_count) %> downloads</span>
-            <% if plugin.kinds.any? %><span><%= plugin.kinds.first %></span><% end %>
+            <% if plugin.latest_version %>
+              <span><span class="diamond">◆</span> v<%= plugin.latest_version %></span>
+              <span><%= compact_number(plugin.downloads_count) %> downloads</span>
+              <% if plugin.kinds.any? %><span><%= plugin.kinds.first %></span><% end %>
+            <% else %>
+              <span class="badge badge--warning">Under review</span>
+            <% end %>
           </div>
         <% end %>
       <% end %>

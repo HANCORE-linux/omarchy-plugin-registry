@@ -12,7 +12,10 @@ class HomeController < ApplicationController
     @query = params[:q].to_s.strip
     @sort = SORTS.key?(params[:sort]) ? params[:sort] : "downloads"
 
-    scope = Plugin.listed.where.not(latest_version: nil).includes(:publisher)
+    # Plugins without a published version (seeded failures, first submissions
+    # in review) stay VISIBLE with an under-review badge — only burned names
+    # leave the directory.
+    scope = Plugin.where.not(state: :security_holding).includes(:publisher)
     if @query.present?
       like = "%#{ActiveRecord::Base.sanitize_sql_like(@query.downcase)}%"
       scope = scope.where("plugins.name LIKE :q OR plugins.summary LIKE :q OR plugins.normalized_name LIKE :q", q: like)

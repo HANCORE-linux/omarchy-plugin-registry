@@ -9,15 +9,25 @@ module Registry
     class SnapshotError < StandardError; end
 
     CLONE_TIMEOUT = 180 # seconds
+    MAX_CLONE_BYTES = 100 * 1024 * 1024
 
     def self.tarball_for(repo_url)
       validate_url!(repo_url)
       Dir.mktmpdir("registry-seed") do |dir|
         clone = File.join(dir, "repo")
-        run! "git", "-c", "transfer.fsckObjects=true", "clone", "--depth", "1", "--quiet",
-          "--", repo_url, clone
+        # blob:limit keeps oversized current blobs out of the transfer where the
+        # server supports partial clone; the on-disk quota is the backstop.
+        run! "git", "-c", "transfer.fsckObjects=true", "clone", "--depth", "1",
+          "--filter=blob:limit=10m", "--quiet", "--", repo_url, clone
+        enforce_clone_quota!(clone, repo_url)
         bounded_archive(clone, repo_url)
       end
+    end
+
+    def self.enforce_clone_quota!(clone, repo_url)
+      bytes = Dir.glob(File.join(clone, "**", "*"), File::FNM_DOTMATCH)
+        .sum { |f| File.file?(f) ? File.size(f) : 0 }
+      raise SnapshotError, "clone of #{repo_url} exceeds the #{MAX_CLONE_BYTES / 1024 / 1024}MB disk quota" if bytes > MAX_CLONE_BYTES
     end
 
     def self.validate_url!(repo_url)

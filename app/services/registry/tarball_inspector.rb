@@ -18,7 +18,7 @@ module Registry
     # their first MAX_SCAN_BYTES (the scanner flags oversized/binary blobs anyway).
     MAX_SCAN_BYTES = 512.kilobytes
 
-    attr_reader :manifest, :readme, :files, :contents, :truncated, :sha256, :size_bytes
+    attr_reader :manifest, :readme, :files, :contents, :digests, :truncated, :sha256, :size_bytes
 
     def self.inspect_bytes(bytes)
       new(bytes).tap(&:inspect!)
@@ -36,6 +36,7 @@ module Registry
       @sha256 = Digest::SHA256.hexdigest(@bytes)
       @files = []
       @contents = {}
+      @digests = {} # full-content SHA-256 per file — diffing must never rely on the truncated scan window
       @truncated = []
       manifest_json = nil
       readme_content = nil
@@ -67,6 +68,7 @@ module Registry
 
         @files << path
         content = entry.read.to_s
+        @digests[path] = Digest::SHA256.hexdigest(content)
         @truncated << path if content.bytesize > MAX_SCAN_BYTES
         @contents[path] = content.byteslice(0, MAX_SCAN_BYTES)
         manifest_json = content if path == MANIFEST_NAME

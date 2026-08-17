@@ -62,10 +62,21 @@ module Registry
 
       Net::HTTP.start(uri.host, uri.port, use_ssl: true,
         open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT) do |http|
-        response = http.request_get(uri.request_uri)
-        case response
-        when Net::HTTPSuccess then response.body.to_s.byteslice(0, MAX_BODY_BYTES)
-        when Net::HTTPRedirection then http_get(response["location"], limit - 1)
+        http.request_get(uri.request_uri) do |response|
+          case response
+          when Net::HTTPSuccess
+            # Stream with a hard cap — never buffer an unbounded body
+            body = +""
+            response.read_body do |chunk|
+              body << chunk
+              return body.byteslice(0, MAX_BODY_BYTES) if body.bytesize >= MAX_BODY_BYTES
+            end
+            return body
+          when Net::HTTPRedirection
+            return http_get(response["location"], limit - 1)
+          else
+            return nil
+          end
         end
       end
     rescue Timeout::Error, SystemCallError, OpenSSL::SSL::SSLError, SocketError

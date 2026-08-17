@@ -108,6 +108,34 @@
   </section>
 
   <section>
+    <h2>Containment</h2>
+    <p class="lede">Suspension kills live sessions and revokes scoped tokens immediately;
+      lifting a user suspension applies the publish cooldown.</p>
+    <div class="form-inline">
+      <%= form_with url: admin_suspend_user_path, class: "form-inline" do %>
+        <div class="field"><label>User email</label><input type="email" name="email_address" required></div>
+        <div class="field"><label>Reason</label><input type="text" name="reason" class="select" required></div>
+        <button type="submit" class="button button--danger button--small">Suspend user</button>
+      <% end %>
+      <%= form_with url: admin_unsuspend_user_path, class: "form-inline" do %>
+        <div class="field"><label>User email</label><input type="email" name="email_address" required></div>
+        <button type="submit" class="button button--ghost button--small">Lift</button>
+      <% end %>
+    </div>
+    <div class="form-inline">
+      <%= form_with url: admin_suspend_publisher_path, class: "form-inline" do %>
+        <div class="field"><label>Publisher</label><input type="text" name="name" required></div>
+        <div class="field"><label>Reason</label><input type="text" name="reason" class="select" required></div>
+        <button type="submit" class="button button--danger button--small">Suspend publisher</button>
+      <% end %>
+      <%= form_with url: admin_unsuspend_publisher_path, class: "form-inline" do %>
+        <div class="field"><label>Publisher</label><input type="text" name="name" required></div>
+        <button type="submit" class="button button--ghost button--small">Lift</button>
+      <% end %>
+    </div>
+  </section>
+
+  <section>
     <h2>Recent events</h2>
     <ul class="audit-list">
       <% @recent_events.each do |event| %>

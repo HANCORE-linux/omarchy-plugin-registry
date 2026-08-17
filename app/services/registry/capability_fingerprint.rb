@@ -18,6 +18,7 @@ module Registry
       processes = Set.new
       hosts = Set.new
       paths = Set.new
+      writes = Set.new
       keybindings = false
       dynamic_exec = false
 
@@ -51,6 +52,9 @@ module Registry
 
         text.scan(%r{https?://([a-z0-9.-]+\.[a-z]{2,}|\d{1,3}(?:\.\d{1,3}){3})}i) { |m| hosts << m[0].downcase }
         text.scan(%r{["'](/(?:etc|usr|var|opt|home)[^"'\s]*)["']}) { |m| paths << m[0] }
+        # Filesystem WRITES are their own dimension: redirections/tee/cp into
+        # $HOME are exactly the capability an update must not gain silently.
+        text.scan(%r{(?:>>?|\btee\s+(?:-a\s+)?)\s*["']?((?:\$HOME|~)/[^\s"';|&)]+)}) { |m| writes << m[0] }
         keybindings ||= text.match?(/\bShortcut\b|keybinding|GlobalShortcut/i)
       end
 
@@ -58,6 +62,7 @@ module Registry
         "processes" => processes.reject(&:blank?).sort,
         "network" => hosts.sort,
         "paths" => paths.sort.first(20),
+        "writes" => writes.sort.first(20),
         "keybindings" => keybindings,
         "dynamic_exec" => dynamic_exec
       }
@@ -68,7 +73,7 @@ module Registry
     def self.growth(previous, current)
       return [] if previous.blank?
       additions = []
-      %w[processes network paths].each do |dimension|
+      %w[processes network paths writes].each do |dimension|
         added = Array(current[dimension]) - Array(previous[dimension])
         additions.concat(added.map { |item| "+#{dimension.singularize}: #{item}" })
       end

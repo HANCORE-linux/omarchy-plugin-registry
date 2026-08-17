@@ -4,6 +4,9 @@
 # useless to anyone but the account that displayed them.
 class ClaimsController < ApplicationController
   before_action :set_publisher
+  # Each verify triggers an outbound fetch — keep it un-spammable
+  rate_limit to: 10, within: 1.hour, only: :verify,
+    with: -> { redirect_to claim_path(params[:name]), alert: "Too many attempts — try again in a bit." }
 
   def show
     @challenge = Registry::RepoProof.challenge_for(@publisher, Current.user)

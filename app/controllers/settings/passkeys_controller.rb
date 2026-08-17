@@ -13,7 +13,9 @@ module Settings
       creation_options = WebAuthn::Credential.options_for_create(
         user: { id: user.webauthn_id, name: user.email_address, display_name: user.name.to_s },
         exclude: user.passkeys.pluck(:external_id),
-        authenticator_selection: { resident_key: "preferred", user_verification: "required" }
+        # resident_key required: username-less sign-in supplies no credential
+        # allowlist, so non-discoverable credentials could never sign in
+        authenticator_selection: { resident_key: "required", user_verification: "required" }
       )
       session[:webauthn_challenge] = creation_options.challenge
       render json: creation_options
