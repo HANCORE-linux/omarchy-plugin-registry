@@ -1,0 +1,41 @@
+module Api
+  module V1
+    class DeviceController < BaseController
+      # POST /api/v1/device/code — CLI starts the flow
+      def code
+        authorization = DeviceAuthorization.start!
+        render json: {
+          device_code: authorization.plaintext_device_code,
+          user_code: authorization.user_code,
+          verification_uri: "#{DataPlane.base_url}/device",
+          expires_in: DeviceAuthorization::EXPIRATION.to_i,
+          interval: DeviceAuthorization::POLL_INTERVAL
+        }, status: :created
+      end
+
+      # POST /api/v1/device/token — CLI polls until approved
+      def token
+        authorization = DeviceAuthorization.find_by_device_code(params[:device_code])
+        case
+        when authorization.nil?
+          render json: { error: "expired_token" }, status: :bad_request
+        when authorization.pending?
+          render json: { error: "authorization_pending", interval: DeviceAuthorization::POLL_INTERVAL }, status: :accepted
+        when authorization.denied?
+          render json: { error: "access_denied" }, status: :forbidden
+        when authorization.claimed?
+          render json: { error: "expired_token" }, status: :bad_request
+        else
+          api_token = ApiToken.usable.where(user: authorization.user, publisher: authorization.publisher,
+            plugin_name: authorization.plugin_name).order(created_at: :desc).first
+          render json: {
+            token: authorization.claim!,
+            token_type: "bearer",
+            scope: "#{authorization.publisher.name}/#{authorization.plugin_name}",
+            expires_at: api_token&.expires_at&.utc&.iso8601
+          }
+        end
+      end
+    end
+  end
+end

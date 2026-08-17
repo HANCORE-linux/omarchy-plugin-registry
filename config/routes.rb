@@ -52,8 +52,14 @@ Rails.application.routes.draw do
     namespace :v1 do
       post "plugins/:publisher/:plugin/versions", to: "versions#create",
         constraints: { publisher: %r{[^/]+}, plugin: %r{[^/]+} }
+      post "device/code", to: "device#code"
+      post "device/token", to: "device#token"
     end
   end
+
+  # Browser side of the CLI device flow
+  get "device", to: "device#show"
+  post "device/approve", to: "device#approve", as: :approve_device
 
   # --- Static data plane (CDN origin) ---
   get "config.json", to: "data_plane#config"

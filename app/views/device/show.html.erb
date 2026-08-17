@@ -1,0 +1,38 @@
+<% content_for :title, "Device sign-in — Omarchy Plugins" %>
+<div class="form-page">
+  <p class="eyebrow">CLI sign-in</p>
+  <% if @authorization %>
+    <h1>Approve this terminal?</h1>
+    <p>A device holding code <strong class="code-chip"><%= @authorization.user_code %></strong> wants a
+      publish token. Only approve if you just ran <code>omarchy plugin publish</code> yourself.</p>
+    <%= form_with url: approve_device_path do |form| %>
+      <input type="hidden" name="code" value="<%= @authorization.user_code %>">
+      <div class="field">
+        <label for="publisher_name">Namespace</label>
+        <select name="publisher_name" id="publisher_name" style="width: 100%; font-family: var(--mono); padding: 12px; border: 1px solid var(--hairline); background: var(--surface);">
+          <% Current.user.publishers.each do |publisher| %>
+            <option value="<%= publisher.name %>"><%= publisher.name %></option>
+          <% end %>
+        </select>
+      </div>
+      <div class="field">
+        <label for="plugin_name">Plugin</label>
+        <input type="text" name="plugin_name" id="plugin_name" required pattern="[a-z0-9][a-z0-9_-]*" placeholder="weather">
+        <p class="hint">The token is push-only and scoped to exactly this plugin.</p>
+      </div>
+      <button type="submit" class="button">Approve</button>
+      <button type="submit" name="decision" value="deny" class="button button--ghost">Deny</button>
+    <% end %>
+  <% else %>
+    <h1>Enter the code from your terminal.</h1>
+    <p><code>omarchy plugin publish</code> shows an 8-character code. Type it here to connect
+      that terminal to your account.</p>
+    <%= form_with url: device_path, method: :get do |form| %>
+      <div class="field">
+        <label for="code">Code</label>
+        <input type="text" name="code" id="code" class="code-input" maxlength="9" placeholder="XXXX-XXXX" required autofocus autocomplete="off">
+      </div>
+      <button type="submit" class="button">Continue</button>
+    <% end %>
+  <% end %>
+</div>
