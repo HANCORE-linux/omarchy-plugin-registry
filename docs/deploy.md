@@ -32,6 +32,17 @@ to object storage behind a CDN. Installs never touch Rails.
    (~60 s) on index files and long on `/dl/`.
 4. **Domains**: `plugins.omarchy.org` → app/CDN; `omarchyplugins.com` → 301.
 
+## First boot
+
+```sh
+bin/rails db:prepare
+bin/rails registry:grant_admin[you@omarchy.org]   # admin bootstrap — required before any takedown control works
+```
+
+The new admin signs in (email code), enrolls a passkey or TOTP, and `/admin`
+unlocks. Every containment control requires an admin with a verified second
+factor.
+
 ## Seeding day
 
 ```sh

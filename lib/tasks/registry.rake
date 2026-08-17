@@ -1,4 +1,14 @@
 namespace :registry do
+  desc "Grant admin to an account (the supported bootstrap for a fresh deployment)"
+  task :grant_admin, [ :email ] => :environment do |_t, args|
+    abort "usage: rails registry:grant_admin[you@example.com]" if args[:email].blank?
+    user = User.find_or_create_by!(email_address: args[:email].strip.downcase)
+    user.update!(admin: true)
+    AuditEvent.record!(action: "user.grant_admin", subject: user, public: true,
+      metadata: { email: user.email_address })
+    puts "#{user.email_address} is an admin. They must sign in and enroll a second factor before admin actions work."
+  end
+
   desc "Seed plugins from a catalog JSON file (array of {publisher, name, summary, repository})"
   task :seed_catalog, [ :path ] => :environment do |_t, args|
     abort "usage: rails registry:seed_catalog[path/to/catalog.json]" if args[:path].blank?

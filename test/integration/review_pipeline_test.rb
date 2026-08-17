@@ -28,7 +28,8 @@ class ReviewPipelineTest < ActionDispatch::IntegrationTest
       QML
     })
     assert version.published?
-    assert_equal %w[curl jq], version.capability_fingerprint["processes"]
+    assert_includes version.capability_fingerprint["processes"], "curl"
+    assert_includes version.capability_fingerprint["processes"], "jq"
     assert_equal [ "api.weather.com" ], version.capability_fingerprint["network"]
   end
 

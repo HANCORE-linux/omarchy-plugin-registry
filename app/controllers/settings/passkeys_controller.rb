@@ -44,7 +44,17 @@ module Settings
     end
 
     def destroy
-      Current.user.passkeys.find(params[:id]).destroy!
+      passkey = Current.user.passkeys.find(params[:id])
+      # Admins and publisher members may never drop to zero factors — an
+      # email-only takeover could otherwise remove-then-re-enroll its own
+      # factor and inherit the account's powers.
+      would_have_factor = Current.user.otp_enabled? || Current.user.passkeys.where.not(id: passkey.id).exists?
+      if !would_have_factor && (Current.user.admin? || Current.user.memberships.exists?)
+        return redirect_to settings_two_factor_path,
+          alert: "Add a replacement factor before removing your last one."
+      end
+
+      passkey.destroy!
       # Losing a second factor is a sensitive change — publish cooldown applies
       Current.user.update!(sensitive_change_at: Time.current)
       redirect_to settings_two_factor_path, notice: "Passkey removed."

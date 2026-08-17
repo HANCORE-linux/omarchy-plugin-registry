@@ -12,13 +12,16 @@ module Registry
         return override.call(repository)
       end
 
-      response = Net::HTTP.get_response(URI("https://api.github.com/repos/#{repository}"),
-        { "Accept" => "application/vnd.github+json", "User-Agent" => "plugins.omarchy.org" })
+      uri = URI("https://api.github.com/repos/#{repository}")
+      response = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 5, read_timeout: 5) do |http|
+        request = Net::HTTP::Get.new(uri, { "Accept" => "application/vnd.github+json", "User-Agent" => "plugins.omarchy.org" })
+        http.request(request)
+      end
       raise LookupError, "GitHub returned #{response.code} for #{repository}" unless response.is_a?(Net::HTTPSuccess)
 
       data = JSON.parse(response.body)
       { repository_id: data.fetch("id").to_s, repository_owner_id: data.fetch("owner").fetch("id").to_s }
-    rescue JSON::ParserError, KeyError, SocketError, Timeout::Error => e
+    rescue JSON::ParserError, KeyError, SocketError, SystemCallError, Timeout::Error, OpenSSL::SSL::SSLError => e
       raise LookupError, "could not resolve #{repository}: #{e.message}"
     end
   end

@@ -70,20 +70,19 @@ class ProductionReleaseSequenceTest < ActionDispatch::IntegrationTest
     assert v1.reload.published?
 
     # The identical-capability update skips the human but NOT the hold
-    travel_to 20.minutes.from_now do
-      perform_enqueued_jobs do
-        post "/api/v1/plugins/acme/weather/versions",
-          params: TarballBuilder.build(manifest: TarballBuilder.manifest(version: "1.1.0")),
-          headers: { "Authorization" => "Bearer #{@token.plaintext_token}", "Content-Type" => "application/gzip" }
-      end
-      v2 = PluginVersion.find_by(version: "1.1.0")
-      assert v2.held?
-      assert v2.hold_until.future?
-
-      travel 16.minutes do
-        perform_enqueued_jobs { Registry::ReleaseJob.perform_later(v2) }
-      end
-      assert v2.reload.published?
+    # (non-block time travel; travel_back runs automatically in teardown)
+    travel_to 20.minutes.from_now
+    perform_enqueued_jobs do
+      post "/api/v1/plugins/acme/weather/versions",
+        params: TarballBuilder.build(manifest: TarballBuilder.manifest(version: "1.1.0")),
+        headers: { "Authorization" => "Bearer #{@token.plaintext_token}", "Content-Type" => "application/gzip" }
     end
+    v2 = PluginVersion.find_by(version: "1.1.0")
+    assert v2.held?
+    assert v2.hold_until.future?
+
+    travel 16.minutes
+    perform_enqueued_jobs { Registry::ReleaseJob.perform_later(v2) }
+    assert v2.reload.published?
   end
 end

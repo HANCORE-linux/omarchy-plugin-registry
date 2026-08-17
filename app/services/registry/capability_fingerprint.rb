@@ -29,10 +29,20 @@ module Registry
         text = content.dup.force_encoding(Encoding::UTF_8)
         text = text.scrub unless text.valid_encoding?
 
-        # QML/Quickshell process spawns: Process { command: ["curl", ...] },
-        # bar.run("cmd ..."), execDetached(["cmd", ...])
-        text.scan(/command:\s*\[\s*["']([^"']+)["']/) { |m| processes << binary_name(m[0]) }
-        text.scan(/\b(?:bar\.run|execDetached|startDetached)\s*\(\s*\[?\s*["']([^"']+)["']/) { |m| processes << binary_name(m[0]) }
+        # QML/Quickshell process spawns. Every literal command array joins the
+        # fingerprint as a whole (argv digest) — swapping ["env","date"] for
+        # ["env","sh","-c",…], or any other argv change, is growth. Individual
+        # binaries are also recorded, looking through wrapper commands.
+        text.scan(/command:\s*\[([^\]]*)\]/m) do |m|
+          elements = m[0].scan(/["']([^"']*)["']/).flatten
+          next if elements.empty?
+          record_argv(elements, processes)
+        end
+        text.scan(/\b(?:bar\.run|execDetached|startDetached)\s*\(\s*\[([^\]]*)\]/m) do |m|
+          elements = m[0].scan(/["']([^"']*)["']/).flatten
+          record_argv(elements, processes) if elements.any?
+        end
+        text.scan(/\b(?:bar\.run|execDetached|startDetached)\s*\(\s*["']([^"']+)["']/) { |m| processes << binary_name(m[0]) }
 
         # Opaque execution surfaces (fingerprinted so CHANGES count as growth):
         # 1. Non-literal command values — `command: argv` or arrays built from
@@ -85,6 +95,20 @@ module Registry
         "keybindings" => keybindings,
         "dynamic_exec" => dynamic_exec
       }
+    end
+
+    # Wrappers whose real payload is the next argv element
+    EXEC_WRAPPERS = %w[env nice nohup timeout stdbuf setsid sudo doas xargs].freeze
+
+    # Record a literal argv: the leading binary (looking through wrappers),
+    # every element, and a digest of the whole argv so ANY change — flags,
+    # URLs, appended commands — alters the stored fingerprint.
+    def record_argv(elements, processes)
+      index = 0
+      index += 1 while index < elements.length - 1 && EXEC_WRAPPERS.include?(binary_name(elements[index]))
+      processes << binary_name(elements[index])
+      processes << binary_name(elements[0]) # the wrapper itself, if any
+      processes << "argv:#{Digest::SHA256.hexdigest(elements.join("\x00")).first(12)}"
     end
 
     # Storage stays bounded WITHOUT opening a bypass: past the cap, a digest
