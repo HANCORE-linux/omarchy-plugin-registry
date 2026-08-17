@@ -67,7 +67,7 @@ module Registry
 
     def self.run_command(command, stdin_data)
       require "open3"
-      Open3.popen2(ADAPTER_ENV.call, command, unsetenv_others: true, pgroup: true) do |stdin, stdout, wait_thread|
+      Open3.popen3(ADAPTER_ENV.call, command, unsetenv_others: true, pgroup: true) do |stdin, stdout, stderr, wait_thread|
         writer = Thread.new do
           stdin.write(stdin_data)
         rescue Errno::EPIPE
@@ -76,6 +76,14 @@ module Registry
           stdin.close rescue nil
         end
         reader = Thread.new { stdout.read(MAX_OUTPUT_BYTES + 1) }
+        # Drain-and-discard stderr: it processes unpublished plugin source and
+        # must reach neither the app logs nor unbounded memory; draining also
+        # keeps a chatty adapter from deadlocking on a full pipe.
+        drainer = Thread.new do
+          nil while stderr.read(65536)
+        rescue IOError
+          nil
+        end
 
         unless wait_thread.join(TIMEOUT_SECONDS)
           # Negative pid = the whole process group — shell-spawned descendants
@@ -85,6 +93,7 @@ module Registry
           raise "reviewer timed out after #{TIMEOUT_SECONDS}s"
         end
         writer.join(1)
+        drainer.join(1)
         output = reader.value.to_s
         raise "reviewer output exceeds #{MAX_OUTPUT_BYTES} bytes" if output.bytesize > MAX_OUTPUT_BYTES
         raise "reviewer exited #{wait_thread.value.exitstatus}" unless wait_thread.value.success?

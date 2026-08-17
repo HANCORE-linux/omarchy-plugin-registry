@@ -7,6 +7,12 @@ module DataPlane
     # would sign a fresh (empty) kill list over it.
     class CorruptKillListError < StandardError; end
 
+    # Raised when the surviving signed plugin index lists a version the
+    # database doesn't know — the database was restored from a pre-publish
+    # backup, and signing a higher-generation index without that version
+    # would make clients accept the silent drop.
+    class IndexContinuityError < StandardError; end
+
     # A per-plugin trigger still rebuilds everything (cheap at this scale) —
     # writing the one index first and then rewriting it under a second
     # generation would just churn two generations for one publish.
@@ -102,6 +108,8 @@ module DataPlane
     # versions stay listed (with the flag) for reproducibility. The first line
     # is a meta record carrying the freshness horizon.
     def write_plugin_index(plugin)
+      relative = "index/#{plugin.publisher.name}/#{plugin.name}.json"
+      verify_index_continuity!(plugin, relative)
       lines = [ JSON.generate({ "meta" => true }.merge(freshness(INDEX_TTL))) ]
       plugin.versions.where(state: [ :published, :yanked ]).order(:version_sort_key).each do |v|
         # ANY version whose bytes are unrecoverable must not be promised by a
@@ -114,12 +122,53 @@ module DataPlane
         end
         lines << JSON.generate(version_entry(v))
       end
-      DataPlane.write("index/#{plugin.publisher.name}/#{plugin.name}.json", lines.join("\n") + "\n")
+      DataPlane.write(relative, lines.join("\n") + "\n")
+    end
+
+    # The index is append-only: a version once promised by a signed index may
+    # change state but its ROW never leaves the database. If the surviving
+    # signed index lists versions the database doesn't know, the database
+    # predates them (restored from an old backup) — fail closed for operator
+    # recovery instead of signing a higher-generation index that drops them.
+    def verify_index_continuity!(plugin, relative)
+      path = DataPlane.root.join(relative)
+      signature = DataPlane.root.join("#{relative}.sig")
+      return unless path.exist? || signature.exist?
+      # Mid-rotation the old key signed these files; the operator has
+      # explicitly taken responsibility via the announced-rotation flag
+      return if ENV["REGISTRY_ALLOW_KEY_ROTATION"] == "1"
+      raise IndexContinuityError, "#{relative} exists without its .sig sibling" unless signature.exist?
+      raise IndexContinuityError, "#{relative}.sig exists without its index" unless path.exist?
+      content = path.read
+      unless Signer.verify?(content, signature.read)
+        raise IndexContinuityError, "#{relative} signature does not verify"
+      end
+      known = plugin.versions.pluck(:version).to_set
+      content.each_line do |line|
+        entry = begin
+          JSON.parse(line)
+        rescue JSON::ParserError => e
+          raise IndexContinuityError, "#{relative} is signed but malformed: #{e.message}"
+        end
+        next if entry["meta"]
+        unless known.include?(entry["vers"])
+          raise IndexContinuityError,
+            "signed index for #{plugin.full_name} lists #{entry["vers"]} but the database doesn't know it — " \
+            "restore a database that includes it (or deliberately remove the index pair) before regenerating"
+        end
+      end
     end
 
     def write_all_listing
       plugins = Plugin.listed.includes(:publisher).filter_map do |plugin|
         next unless plugin.latest_version
+        # The directory must not advertise a latest whose bytes the plugin
+        # index just declined to promise
+        latest = plugin.versions.find_by(version: plugin.latest_version)
+        if latest && !DataPlane.root.join(latest.tarball_path).exist?
+          Rails.logger.error("[DataPlane] #{plugin.full_name} latest #{latest.version} unrecoverable — omitted from all.json")
+          next
+        end
         {
           "publisher" => plugin.publisher.name,
           "name" => plugin.name,
@@ -164,6 +213,15 @@ module DataPlane
       raise CorruptKillListError, "revocations.json.sig exists without revocations.json" unless path.exist?
       content = path.read
       unless Signer.verify?(content, signature.read)
+        # Mid-rotation the kill list is still signed by the OLD key. The
+        # announced-rotation flag means the operator owns this window — skip
+        # the import (run registry:import_revocations first to keep orphans)
+        # rather than dying on every regeneration until the file is re-signed.
+        if ENV["REGISTRY_ALLOW_KEY_ROTATION"] == "1"
+          Rails.logger.warn("[DataPlane] kill list signed by a previous key — rotation flag set, " \
+            "re-learning revocations from the database only")
+          return
+        end
         raise CorruptKillListError, "revocations.json signature does not verify"
       end
       entries = begin

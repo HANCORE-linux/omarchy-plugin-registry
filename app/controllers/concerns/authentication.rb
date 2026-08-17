@@ -44,12 +44,16 @@ module Authentication
     def request_authentication
       # Only GET destinations can be returned to — replaying a POST as a GET
       # after sign-in would 404/405
-      session[:return_to_after_authenticating] = (request.get? || request.head?) ? request.url : nil
+      # Relative path only — a stored absolute URL would bake in whatever Host
+      # header the request arrived with
+      session[:return_to_after_authenticating] = (request.get? || request.head?) ? request.fullpath : nil
       redirect_to new_session_path
     end
 
     def after_authentication_url
-      session.delete(:return_to_after_authenticating) || root_url
+      stored = session.delete(:return_to_after_authenticating).to_s
+      # Same-origin relative paths only ("//host" is protocol-relative — reject)
+      (stored.start_with?("/") && !stored.start_with?("//")) ? stored : root_url
     end
 
     def start_new_session_for(user)
