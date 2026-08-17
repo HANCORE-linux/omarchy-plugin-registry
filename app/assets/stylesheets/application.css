@@ -339,7 +339,8 @@ pre code { background: none; padding: 0; }
   border-top: 1px solid var(--hairline);
 }
 .site-footer__inner { max-width: var(--container); margin-inline: auto; padding: 48px 24px; display: flex; flex-direction: column; gap: 24px; }
-.site-footer__logo { height: 22px; width: auto; color: var(--pink); filter: drop-shadow(0 0 14px rgba(237, 76, 200, 0.8)) drop-shadow(0 0 26px rgba(237, 76, 200, 0.6)); }
+/* Flat pink — the neon glow appears once per page, on the hero mark only */
+.site-footer__logo { height: 22px; width: auto; color: var(--pink); }
 .site-footer nav { display: flex; gap: 24px; flex-wrap: wrap; }
 .site-footer nav a { font-size: 13px; text-decoration: none; color: var(--text-inverse-soft); }
 .site-footer nav a:hover { color: var(--pink); }

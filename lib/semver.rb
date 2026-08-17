@@ -9,11 +9,13 @@ class Semver
   attr_reader :major, :minor, :patch, :prerelease, :build
 
   # Numeric components are capped at 10 digits so the zero-padded sort key
-  # (%010d) can never be outgrown.
+  # (%010d) can never be outgrown, and the whole string is bounded because it
+  # becomes part of an immutable filename.
   MAX_NUMERIC_DIGITS = 10
+  MAX_LENGTH = 64
 
   def self.valid?(string)
-    return false unless string.is_a?(String) && (match = PATTERN.match(string))
+    return false unless string.is_a?(String) && string.length <= MAX_LENGTH && (match = PATTERN.match(string))
     numeric_components = [ match[1], match[2], match[3], *match[4].to_s.split(".").grep(/\A\d+\z/) ]
     numeric_components.all? { |component| component.length <= MAX_NUMERIC_DIGITS }
   end

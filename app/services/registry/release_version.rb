@@ -11,11 +11,14 @@ module Registry
       # Suspension or membership loss between submit and release must stop the
       # release — the hold window exists precisely for this.
       raise ArgumentError, "publisher is suspended" if version.plugin.publisher.suspended?
-      if (submitter = version.user)
+      if (submitter = version.user) && submitter != Registry::SeedCatalog.system_user
         raise ArgumentError, "submitter is suspended" if submitter.suspended_at.present?
-        unless submitter == Registry::SeedCatalog.system_user || submitter.member_of?(version.plugin.publisher)
+        unless submitter.member_of?(version.plugin.publisher)
           raise ArgumentError, "submitter is no longer a member of #{version.plugin.publisher.name}"
         end
+        # Same bar as publishing: losing the second factor or a fresh sensitive
+        # change pauses releases too, not just new submissions
+        raise ArgumentError, "submitter can no longer publish (second factor or cooldown)" unless submitter.can_publish?
       end
 
       bytes = version.tarball.download

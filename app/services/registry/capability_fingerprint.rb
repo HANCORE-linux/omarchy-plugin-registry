@@ -57,7 +57,7 @@ module Registry
         text.scan(%r{["'](/(?:etc|usr|var|opt|home)[^"'\s]*)["']}) { |m| paths << m[0] }
         # Filesystem WRITES are their own dimension: redirections/tee/cp into
         # $HOME are exactly the capability an update must not gain silently.
-        text.scan(%r{(?:>>?|\btee\s+(?:-a\s+)?)\s*["']?((?:\$HOME|~)/[^\s"';|&)]+)}) { |m| writes << m[0] }
+        text.scan(%r{(?:>>?|\btee\s+(?:-a\s+)?)\s*["']?((?:\$\{?HOME\}?|~)/[^\s"';|&)]+)}) { |m| writes << m[0].delete("{}") }
         keybindings ||= text.match?(/\bShortcut\b|keybinding|GlobalShortcut/i)
       end
 

@@ -57,16 +57,17 @@ module Registry
       fail! e.message
     end
 
-    # A quarantined plugin with no versions is a seed-failure placeholder: once
-    # the namespace is claimed, its owner can publish a corrected version and
-    # the plugin reactivates through the normal pipeline.
+    # A quarantined plugin whose only history is seed failure/rejection is a
+    # placeholder: once the namespace is claimed, its owner can publish a
+    # corrected version and the plugin reactivates — but only AFTER the new
+    # submission passes validation (see create_version!).
     def find_or_build_plugin!
       @plugin = publisher.plugins.find_by(name: plugin_name)
       if plugin.nil?
         @plugin = publisher.plugins.new(name: plugin_name)
         fail! plugin.errors.full_messages.join("; ") unless plugin.valid?
-      elsif plugin.quarantined? && plugin.versions.none?
-        plugin.update!(state: :active)
+      elsif plugin.quarantined? && plugin.versions.where.not(state: :rejected).none?
+        @reactivate_placeholder = true
       elsif !plugin.active?
         fail! "#{plugin.full_name} is #{plugin.state.humanize.downcase} and cannot accept new versions", status: :forbidden
       end
@@ -128,6 +129,7 @@ module Registry
       # rejected update can never deface the live page.
       ApplicationRecord.transaction do
         plugin.save! unless plugin.persisted?
+        plugin.update!(state: :active) if @reactivate_placeholder
         @version = plugin.versions.create!(
           user: user,
           version: tarball.manifest["version"],

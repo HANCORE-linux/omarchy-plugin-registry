@@ -146,12 +146,12 @@ module Registry
         "network call to a raw IP address"
       check path, text, "suspicious-host", :flag, /#{SUSPICIOUS_HOSTS.map { |h| Regexp.escape(h) }.join("|")}/,
         "contacts a paste site, webhook, or dead-drop service"
-      check path, text, "credential-paths", :flag, %r{(\$HOME|~)/\.(ssh|gnupg|aws|config/gh|mozilla)\b|\.ssh/id_},
+      check path, text, "credential-paths", :flag, %r{(\$\{?HOME\}?|~)/\.(ssh|gnupg|aws|config/gh|mozilla)\b|\.ssh/id_},
         "touches credential or key storage"
       check path, text, "shell-history-tamper", :flag, /HISTFILE=|history\s+-c\b|shred\b.*bash_history/,
         "tampers with shell history"
       check path, text, "dotfile-write", :flag,
-        %r{(?:>>?|\btee\s+(?:-a\s+)?)\s*["']?(?:\$HOME|~)/\.(?!config/omarchy)[\w.]|\b(?:cp|mv|install)\b[^\n]*\s(?:\$HOME|~)/\.(?!config/omarchy)[\w.]},
+        %r{(?:>>?|\btee\s+(?:-a\s+)?)\s*["']?(?:\$\{?HOME\}?|~)/\.(?!config/omarchy)[\w.]|\b(?:cp|mv|install)\b[^\n]*\s["']?(?:\$\{?HOME\}?|~)/\.(?!config/omarchy)[\w.]},
         "writes to home dotfiles outside the plugin's own config"
       check path, text, "embedded-shebang", :flag, /\n#!\s*\/(bin|usr)\//, "script payload embedded past the file header" if !entropy
       check_entropy(path, text) if entropy

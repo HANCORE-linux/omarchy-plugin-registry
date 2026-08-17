@@ -31,27 +31,33 @@ module Registry
       # 3. AI review (escalate-only)
       ai = AiReview.review(version:, tarball:, fingerprint:, scan_findings: findings)
 
-      version.update!(
-        capability_fingerprint: fingerprint,
-        scan_results: { "findings" => findings, "capability_growth" => growth,
-                        "ai" => { "verdict" => ai.verdict, "reasons" => ai.reasons } }
-      )
+      # An admin may have rejected or security-held this version while the
+      # scan ran — never overwrite a terminal state with a pipeline outcome.
+      version.with_lock do
+        break unless version.processing?
 
-      case
-      when scanner.verdict == :fail
-        reject!(version, findings)
-      when scanner.verdict == :flag
-        quarantine!(version, "scanner flagged: #{findings.map { |f| f['rule'] }.uniq.join(', ')}")
-      when previous && growth.any?
-        quarantine!(version, "capability surface grew: #{growth.join(', ')}")
-      when ai.flagged?
-        quarantine!(version, "ai review flagged: #{ai.reasons.join('; ').first(300)}")
-      when previous.nil? && !AiReview.enabled? && !Rails.application.config.x.skip_first_release_gate
-        # First releases have no capability baseline; without the AI leg of the
-        # pipeline, someone must look before the first bytes go live.
-        quarantine!(version, "first release requires human review while AI review is disabled")
-      else
-        hold_or_release(version)
+        version.update!(
+          capability_fingerprint: fingerprint,
+          scan_results: { "findings" => findings, "capability_growth" => growth,
+                          "ai" => { "verdict" => ai.verdict, "reasons" => ai.reasons } }
+        )
+
+        case
+        when scanner.verdict == :fail
+          reject!(version, findings)
+        when scanner.verdict == :flag
+          quarantine!(version, "scanner flagged: #{findings.map { |f| f['rule'] }.uniq.join(', ')}")
+        when previous && growth.any?
+          quarantine!(version, "capability surface grew: #{growth.join(', ')}")
+        when ai.flagged?
+          quarantine!(version, "ai review flagged: #{ai.reasons.join('; ').first(300)}")
+        when previous.nil? && !AiReview.enabled? && !Rails.application.config.x.skip_first_release_gate
+          # First releases have no capability baseline; without the AI leg of
+          # the pipeline, someone must look before the first bytes go live.
+          quarantine!(version, "first release requires human review while AI review is disabled")
+        else
+          hold_or_release(version)
+        end
       end
     end
 
@@ -76,6 +82,12 @@ module Registry
         review_notes: "auto-rejected: #{findings.select { |f| f['severity'] == 'fail' }.map { |f| f['detail'] }.join('; ').first(500)}")
       AuditEvent.record!(action: "version.auto_reject", subject: version, public: true,
         metadata: { plugin: version.plugin.full_name, version: version.version })
+      # A seeded plugin whose only history is rejection must stay visible as a
+      # placeholder (claim + corrected upload reactivates it)
+      plugin = version.plugin
+      if !plugin.publisher.claimed? && plugin.versions.where.not(state: :rejected).none?
+        plugin.update!(state: :quarantined)
+      end
     end
 
     def quarantine!(version, reason)

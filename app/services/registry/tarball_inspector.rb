@@ -50,6 +50,11 @@ module Registry
         raise InvalidTarball, "too many entries" if entry_count > MAX_ENTRIES
 
         path = clean_path(entry.full_name)
+        # Every entry's declared size counts against the cap BEFORE any type
+        # skip — a "directory" with a payload still costs decompression work.
+        unpacked += entry.header.size
+        raise InvalidTarball, "unpacked size exceeds limit" if unpacked > MAX_UNPACKED_BYTES
+
         case
         when entry.directory?
           next
@@ -58,9 +63,6 @@ module Registry
         when !entry.file?
           raise InvalidTarball, "unsupported entry type for #{path}"
         end
-
-        unpacked += entry.header.size
-        raise InvalidTarball, "unpacked size exceeds limit" if unpacked > MAX_UNPACKED_BYTES
 
         # Duplicate paths would let reviewed bytes differ from unpacked bytes
         # depending on which entry a consumer picks — never ambiguous.
@@ -90,6 +92,11 @@ module Registry
     def each_tar_entry(&block)
       Zlib::GzipReader.wrap(StringIO.new(@bytes)) do |gz|
         Gem::Package::TarReader.new(gz) { |tar| tar.each(&block) }
+        # Reviewed bytes must equal extracted bytes: a concatenated gzip could
+        # hide extra tar records in a second member that gunzip would extract
+        # but this reader never saw. Drain the first member and refuse leftovers.
+        gz.read
+        raise InvalidTarball, "trailing data after the gzip stream" if gz.unused.present?
       end
     end
 
