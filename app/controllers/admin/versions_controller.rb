@@ -38,11 +38,11 @@ module Admin
       if hold.to_i.positive?
         @version.update!(state: :held, hold_until: hold.from_now)
         Registry::ReleaseJob.set(wait_until: @version.hold_until).perform_later(@version)
-        audit "version.approve"
+        audit "version.approve", public: true
         redirect_to admin_root_path, notice: "Approved — releases when the hold window expires."
       else
         Registry::ReleaseVersion.call(@version, actor: Current.user)
-        audit "version.approve"
+        audit "version.approve", public: true
         regenerate_and_redirect "Approved and published."
       end
     rescue ArgumentError => e
@@ -80,8 +80,12 @@ module Admin
     end
 
     # The kill-bit: yank + revocation entry reaching already-installed copies.
+    # Revocation targets bytes that may be INSTALLED somewhere — versions that
+    # never published have no installed copies and get rejected instead
+    # (yanking them would re-enter the signed index and restore their bytes).
     def revoke
       return bad_transition! unless @version.published? || @version.yanked? || @version.quarantined?
+      return bad_transition! if @version.published_at.nil?
       return require_reason! unless params[:reason].present?
       reason = params[:reason]
       ApplicationRecord.transaction do

@@ -4,6 +4,11 @@ module Api
     # Authorization: Bearer omp_…   Body: the .tar.gz, nothing else.
     # All metadata derives from the manifest inside the tarball.
     class VersionsController < BaseController
+      # Attempt-level throttle: invalid archives burn decompression work
+      # without ever creating rows for the submission quotas to count
+      rate_limit to: 30, within: 15.minutes, only: :create, store: RATE_LIMIT_STORE,
+        with: -> { render json: { error: "slow_down" }, status: :too_many_requests }
+
       before_action :authenticate_api_token!
 
       MAX_BODY_BYTES = Registry::TarballInspector::MAX_TARBALL_BYTES

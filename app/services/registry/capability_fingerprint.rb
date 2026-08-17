@@ -67,13 +67,19 @@ module Registry
       {
         "processes" => processes.reject(&:blank?).sort,
         "network" => hosts.sort,
-        # Generous caps — growth comparison runs on what's stored, so the cap
-        # must comfortably exceed any legitimate plugin's surface
-        "paths" => paths.sort.first(200),
-        "writes" => writes.sort.first(200),
+        "paths" => capped(paths.sort, 200),
+        "writes" => capped(writes.sort, 200),
         "keybindings" => keybindings,
         "dynamic_exec" => dynamic_exec
       }
+    end
+
+    # Storage stays bounded WITHOUT opening a bypass: past the cap, a digest
+    # of the full list joins the fingerprint, so any change in the truncated
+    # tail still changes the stored value and trips the growth hold.
+    def capped(list, cap)
+      return list if list.size <= cap
+      list.first(cap) + [ "overflow:#{Digest::SHA256.hexdigest(list.join("\n")).first(12)} (#{list.size} total)" ]
     end
 
     # An update's fingerprint compared against the last published one.

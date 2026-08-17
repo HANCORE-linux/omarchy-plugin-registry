@@ -1,5 +1,9 @@
 # First sign-in lands here: pick a display name and claim a personal namespace.
 class OnboardingController < ApplicationController
+  # Namespaces are burned forever — throttle claim attempts per client
+  rate_limit to: 5, within: 1.day, only: :create,
+    with: -> { redirect_to onboarding_path, alert: "Too many attempts today." }
+
   def show
     redirect_to dashboard_path if Current.user.onboarded?
   end

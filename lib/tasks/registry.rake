@@ -20,6 +20,17 @@ namespace :registry do
     DataPlane::Regenerate.all
   end
 
+  desc "Import page-view counts from edge analytics (JSONL: {publisher,name,count})"
+  task :import_view_counts, [ :path ] => :environment do |_t, args|
+    abort "usage: rails registry:import_view_counts[views.jsonl]" if args[:path].blank?
+    File.foreach(args[:path]) do |line|
+      entry = JSON.parse(line) rescue next
+      plugin = Plugin.joins(:publisher).find_by(publishers: { name: entry["publisher"] }, name: entry["name"])
+      plugin&.update_columns(views_count: plugin.views_count + entry["count"].to_i)
+    end
+    puts "View counts imported."
+  end
+
   desc "Regenerate the entire static data plane"
   task regenerate: :environment do
     DataPlane::Regenerate.all

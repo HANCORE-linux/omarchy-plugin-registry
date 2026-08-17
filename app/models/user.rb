@@ -84,16 +84,19 @@ class User < ApplicationRecord
   # Returns the plaintext backup codes exactly once, at enrollment; only their
   # digests are persisted.
   def enable_otp!(code)
-    return false unless verify_otp(code)
+    # Enrollment confirms against the PROVISIONAL secret — the only place an
+    # unconfirmed secret may ever satisfy a check
+    return false unless totp_matches?(code)
     codes = Array.new(8) { SecureRandom.alphanumeric(10).downcase }
     update!(otp_enabled_at: Time.current, otp_backup_codes: codes.map { |c| Digest::SHA256.hexdigest(c) })
     codes
   end
 
+  # Step-up/second-factor verification: only a CONFIRMED enrollment counts —
+  # a provisional secret captured pre-confirmation must never satisfy this.
   def verify_otp(code)
-    return false if otp_secret.blank?
-    ROTP::TOTP.new(otp_secret).verify(code.to_s.remove(/\s/), drift_behind: 15).present? ||
-      consume_backup_code(code)
+    return false unless otp_enabled?
+    totp_matches?(code) || consume_backup_code(code)
   end
 
   def owner_of?(publisher)
@@ -105,6 +108,11 @@ class User < ApplicationRecord
   end
 
   private
+
+  def totp_matches?(code)
+    otp_secret.present? &&
+      ROTP::TOTP.new(otp_secret).verify(code.to_s.remove(/\s/), drift_behind: 15).present?
+  end
 
   def consume_backup_code(code)
     digest = Digest::SHA256.hexdigest(code.to_s)

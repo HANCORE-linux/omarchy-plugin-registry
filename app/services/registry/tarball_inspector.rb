@@ -58,14 +58,17 @@ module Registry
         case
         when entry.directory?
           next
-        when %w[g x].include?(entry.header.typeflag)
-          # PAX metadata headers — git archive always emits a global comment.
-          # But the served bytes keep these records, and a PAX-aware extractor
-          # would APPLY overrides: any path/linkpath rewrite must be rejected,
-          # or validated names and extracted names diverge.
+        when entry.header.typeflag == "x"
+          # Per-file PAX headers can rewrite what an extractor produces
+          # (path, linkpath, sparse maps, …) — the served bytes keep them, so
+          # none are allowed. Plugins never legitimately need them.
+          raise InvalidTarball, "per-file PAX extended headers are not allowed"
+        when entry.header.typeflag == "g"
+          # Global PAX header: git archive always emits one comment record.
+          # Allowlist exactly that — every other key could affect extraction.
           pax = entry.read.to_s
-          if pax.match?(/\d+ (path|linkpath|size)=/)
-            raise InvalidTarball, "PAX override of path/linkpath/size is not allowed"
+          unless pax.split("\n").reject(&:empty?).all? { |record| record.match?(/\A\d+ comment=/) }
+            raise InvalidTarball, "global PAX header may only carry a comment"
           end
           next
         when entry.symlink? || entry.header.typeflag == "1"

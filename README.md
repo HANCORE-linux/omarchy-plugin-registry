@@ -29,8 +29,9 @@ bin/dev            # run the app at localhost:3000
 bin/rails test     # run tests
 ```
 
-Ruby 3.4.7 (`.ruby-version`, mise-managed), Rails 8.1, SQLite in development
-(Postgres at deploy), Solid Queue/Cache/Cable, Propshaft + importmap — no Node
+Ruby 3.4.7 (`.ruby-version`, mise-managed), Rails 8.1, SQLite everywhere by
+default (production needs a persistent volume; Postgres is an optional swap —
+see docs/deploy.md), Solid Queue/Cache/Cable, Propshaft + importmap — no Node
 build step.
 
 ## Status
