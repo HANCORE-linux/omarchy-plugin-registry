@@ -18,8 +18,12 @@
               <td><%= state_badge(version.state) %></td>
               <td class="muted"><%= version.review_notes %></td>
               <td class="actions">
-                <%= button_to "Approve", approve_admin_version_path(version), class: "button button--small" %>
-                <%= button_to "Reject", reject_admin_version_path(version), class: "button button--ghost button--small" %>
+                <% if version.releasable? %>
+                  <%= button_to "Approve", approve_admin_version_path(version), class: "button button--small" %>
+                  <%= button_to "Reject", reject_admin_version_path(version), class: "button button--ghost button--small" %>
+                <% else %>
+                  <span class="muted">pipeline running…</span>
+                <% end %>
               </td>
             </tr>
           <% end %>

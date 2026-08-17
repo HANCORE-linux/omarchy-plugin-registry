@@ -18,6 +18,12 @@ Rails.application.routes.draw do
   end
   post "session/passkey/options", to: "passkey_sessions#options"
   post "session/passkey", to: "passkey_sessions#create"
+
+  # Step-up verification for credential-minting actions
+  get "step_up", to: "step_up#show"
+  post "step_up", to: "step_up#create"
+  post "step_up/passkey/options", to: "step_up#passkey_options", as: :step_up_passkey_options
+  post "step_up/passkey", to: "step_up#passkey_verify", as: :step_up_passkey_verify
   resources :tokens, only: %i[create destroy]
   resources :trusted_publishers, only: %i[create destroy]
   resources :orgs, only: %i[new create] do

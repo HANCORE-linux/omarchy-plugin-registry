@@ -20,6 +20,8 @@ class PasskeySessionsController < ApplicationController
     )
     passkey.update!(sign_count: credential.sign_count, last_used_at: Time.current)
     start_new_session_for passkey.user
+    # A passkey sign-in IS a second-factor proof for this session
+    mark_second_factor_verified!
     render json: { redirect: passkey.user.onboarded? ? after_authentication_url : onboarding_path }
   rescue WebAuthn::Error, JSON::ParserError => e
     render json: { error: "Passkey sign-in failed: #{e.message}" }, status: :unauthorized

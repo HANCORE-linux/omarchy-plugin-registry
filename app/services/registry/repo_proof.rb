@@ -17,6 +17,17 @@ module Registry
         ->(m) { "https://gitlab.com/#{m[1]}/#{m[2]}/-/raw/HEAD/#{CLAIM_FILE}" }
     }.freeze
 
+    # Challenge tokens are derived per publisher AND per claiming user — no
+    # stored state, and one user's token is useless to another, so an attacker
+    # who reads the owner's claim page (or the committed file) cannot race the
+    # verify step with their own account.
+    def self.challenge_for(publisher, user)
+      digest = OpenSSL::HMAC.hexdigest("SHA256",
+        Rails.application.key_generator.generate_key("repo_claim_challenges", 32),
+        "#{publisher.id}:#{user.id}")
+      "omarchy-claim-#{digest.first(32)}"
+    end
+
     def self.fetcher
       Rails.application.config.x.repo_proof_fetcher || method(:http_get)
     end

@@ -8,6 +8,8 @@ module Admin
       Registry::ReleaseVersion.call(@version, actor: Current.user)
       audit "version.approve"
       regenerate_and_redirect "Approved and published."
+    rescue ArgumentError => e
+      redirect_to admin_root_path, alert: e.message
     end
 
     def reject

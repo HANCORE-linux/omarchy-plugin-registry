@@ -6,13 +6,25 @@ module Api
     class VersionsController < BaseController
       before_action :authenticate_api_token!
 
+      MAX_BODY_BYTES = Registry::TarballInspector::MAX_TARBALL_BYTES
+
       def create
+        # Cap before buffering: declared length is checked, and the read itself
+        # is bounded so a lying Content-Length can't balloon memory either.
+        if request.content_length.to_i > MAX_BODY_BYTES
+          return render json: { error: "tarball exceeds #{MAX_BODY_BYTES / 1.megabyte}MB limit" }, status: :content_too_large
+        end
+        body = request.body.read(MAX_BODY_BYTES + 1) || ""
+        if body.bytesize > MAX_BODY_BYTES
+          return render json: { error: "tarball exceeds #{MAX_BODY_BYTES / 1.megabyte}MB limit" }, status: :content_too_large
+        end
+
         publisher = Publisher.find_by!(name: params[:publisher])
         version = Registry::PublishVersion.new(
           user: current_token.user,
           publisher: publisher,
           plugin_name: params[:plugin],
-          tarball_bytes: request.body.read,
+          tarball_bytes: body,
           token: current_token
         ).call
 

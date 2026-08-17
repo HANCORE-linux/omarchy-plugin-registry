@@ -18,9 +18,16 @@ class TrustedPublisher < ApplicationRecord
   validates :workflow, presence: true, format: { with: %r{\A\.github/workflows/[\w.-]+\.ya?ml\z} }
   validates :environment, presence: true
 
+  # workflow_ref identifies the caller workflow on direct runs; on reusable-
+  # workflow runs job_workflow_ref points at the called workflow instead. We
+  # pin the registered workflow via workflow_ref, and when job_workflow_ref is
+  # present it must ALSO match — a registered workflow that delegates to an
+  # arbitrary reusable workflow does not get to mint tokens.
   def matches?(claims)
+    expected_prefix = "#{repository}/#{workflow}@"
     claims["repository"] == repository &&
-      claims["job_workflow_ref"].to_s.start_with?("#{repository}/#{workflow}@") &&
+      claims["workflow_ref"].to_s.start_with?(expected_prefix) &&
+      (claims["job_workflow_ref"].blank? || claims["job_workflow_ref"].to_s.start_with?(expected_prefix)) &&
       claims["environment"] == environment &&
       FORBIDDEN_EVENTS.exclude?(claims["event_name"])
   end

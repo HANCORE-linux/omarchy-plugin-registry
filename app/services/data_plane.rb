@@ -19,13 +19,25 @@ module DataPlane
     Rails.application.config.x.registry_base_url
   end
 
-  # Every index file gets a detached Ed25519 signature at <path>.sig.
+  # Every index file gets a detached Ed25519 signature at <path>.sig. Both
+  # files are written atomically (tmp + rename), signature first: a reader can
+  # never see a torn file, and the worst transient pairing (fresh sig with the
+  # old content, or vice versa) FAILS verification — clients retry, never trust
+  # a mismatched pair. Cross-generation drift is prevented by serializing
+  # RegenerateJob (limits_concurrency).
   def write(relative_path, content)
     path = root.join(relative_path)
     FileUtils.mkdir_p(path.dirname)
-    path.open("wb") { |f| f.write(content) }
-    root.join("#{relative_path}.sig").open("wb") { |f| f.write(Signer.sign_base64(content)) }
+    atomic_write("#{relative_path}.sig", Signer.sign_base64(content))
+    atomic_write(relative_path, content)
     path
+  end
+
+  def atomic_write(relative_path, content)
+    path = root.join(relative_path)
+    temp = root.join("#{relative_path}.tmp-#{Process.pid}-#{SecureRandom.hex(4)}")
+    temp.open("wb") { |f| f.write(content) }
+    File.rename(temp, path)
   end
 
   # Tarballs are immutable: same bytes may be re-frozen idempotently (release

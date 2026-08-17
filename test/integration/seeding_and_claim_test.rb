@@ -67,8 +67,9 @@ class SeedingAndClaimTest < ActionDispatch::IntegrationTest
     get claim_path("gracehopper")
     assert_response :success
     publisher = Publisher.find_by!(name: "gracehopper")
-    challenge = publisher.claim_challenge
+    challenge = Registry::RepoProof.challenge_for(publisher, user)
     assert challenge.start_with?("omarchy-claim-")
+    assert_match challenge, response.body
     assert_match "raw.githubusercontent.com/gracehopper/weather", response.body
 
     # Wrong token in the repo -> rejected
@@ -77,13 +78,21 @@ class SeedingAndClaimTest < ActionDispatch::IntegrationTest
     assert_redirected_to claim_path("gracehopper")
     assert_not publisher.reload.claimed?
 
-    # Correct token -> claimed, owner membership, challenge cleared
+    # The owner's committed token is useless to a different account
+    attacker = User.create!(email_address: "mallory@example.com", name: "Mallory")
     Rails.application.config.x.repo_proof_fetcher = ->(_url) { "#{challenge}\n" }
+    sign_in_as attacker
+    post verify_claim_path("gracehopper")
+    assert_redirected_to claim_path("gracehopper")
+    assert_not publisher.reload.claimed?
+
+    # Correct token + the matching account -> claimed, owner membership
+    sign_in_as user
     post verify_claim_path("gracehopper")
     assert_redirected_to dashboard_path
     assert publisher.reload.claimed?
-    assert_nil publisher.claim_challenge
     assert user.owner_of?(publisher)
+    assert_not attacker.owner_of?(publisher)
     assert AuditEvent.exists?(action: "publisher.claim_seeded", public: true)
   ensure
     Rails.application.config.x.repo_proof_fetcher = nil

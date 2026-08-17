@@ -23,8 +23,9 @@ class PluginVersion < ApplicationRecord
 
   def semver = Semver.parse(version)
 
-  # States an admin approval or hold expiry may publish from
-  def releasable? = held? || quarantined? || processing?
+  # States an admin approval or hold expiry may publish from. `processing` is
+  # deliberately excluded: nothing publishes before the review pipeline ran.
+  def releasable? = held? || quarantined?
 
   def yank!(reason:, actor:)
     transaction do

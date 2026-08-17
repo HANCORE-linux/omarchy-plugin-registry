@@ -1,0 +1,27 @@
+<% content_for :title, "Confirm it's you — Omarchy Plugins" %>
+<div class="form-page">
+  <p class="eyebrow">Security check</p>
+  <h1>Confirm it's you.</h1>
+  <p>This action can mint publish credentials, so we double-check the session — signing in
+    isn't enough on its own.</p>
+
+  <% if Current.user.passkeys.any? %>
+    <div data-controller="webauthn"
+         data-webauthn-options-url-value="<%= step_up_passkey_options_path %>"
+         data-webauthn-verify-url-value="<%= step_up_passkey_verify_path %>"
+         style="margin-bottom: 24px;">
+      <button type="button" class="button" data-action="webauthn#authenticate">Use a passkey</button>
+      <p class="field-errors" data-webauthn-target="error"></p>
+    </div>
+  <% end %>
+
+  <% if Current.user.otp_enabled? %>
+    <%= form_with url: step_up_path do |form| %>
+      <div class="field" style="max-width: 260px;">
+        <label for="code">Code from your authenticator</label>
+        <input type="text" name="code" id="code" class="code-input" inputmode="numeric" maxlength="10" required>
+      </div>
+      <button type="submit" class="button <%= "button--ghost" if Current.user.passkeys.any? %>">Verify</button>
+    <% end %>
+  <% end %>
+</div>

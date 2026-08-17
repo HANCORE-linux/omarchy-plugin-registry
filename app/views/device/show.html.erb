@@ -9,7 +9,7 @@
       <input type="hidden" name="code" value="<%= @authorization.user_code %>">
       <div class="field">
         <label for="publisher_name">Namespace</label>
-        <select name="publisher_name" id="publisher_name" style="width: 100%; font-family: var(--mono); padding: 12px; border: 1px solid var(--hairline); background: var(--surface);">
+        <select name="publisher_name" id="publisher_name" class="select" style="width: 100%;">
           <% Current.user.publishers.each do |publisher| %>
             <option value="<%= publisher.name %>"><%= publisher.name %></option>
           <% end %>

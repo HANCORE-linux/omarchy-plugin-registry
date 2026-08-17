@@ -1,6 +1,12 @@
 module Api
   module V1
     class DeviceController < BaseController
+      # Anonymous endpoints: throttle row creation and polling per IP
+      rate_limit to: 10, within: 15.minutes, only: :code, store: RATE_LIMIT_STORE,
+        with: -> { render json: { error: "slow_down" }, status: :too_many_requests }
+      rate_limit to: 120, within: 15.minutes, only: :token, store: RATE_LIMIT_STORE,
+        with: -> { render json: { error: "slow_down" }, status: :too_many_requests }
+
       # POST /api/v1/device/code — CLI starts the flow
       def code
         authorization = DeviceAuthorization.start!

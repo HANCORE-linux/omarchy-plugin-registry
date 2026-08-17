@@ -1,5 +1,7 @@
 module Settings
   class PasskeysController < ApplicationController
+    before_action :require_recent_second_factor, only: :destroy
+
     # POST /settings/passkeys/options — creation options for the browser ceremony
     def options
       user = Current.user
@@ -25,6 +27,7 @@ module Settings
         nickname: params[:nickname].presence || "Passkey"
       )
       AuditEvent.record!(actor: Current.user, action: "passkey.register", subject: Current.user)
+      mark_second_factor_verified!
       render json: { ok: true }
     rescue WebAuthn::Error, JSON::ParserError => e
       render json: { error: "Passkey registration failed: #{e.message}" }, status: :unprocessable_entity

@@ -23,7 +23,16 @@ class User < ApplicationRecord
   end
 
   def redeem_login_code(code)
-    login_codes.active.find_by(code: code.to_s.strip)&.tap(&:consume!)
+    match = login_codes.active.redeemable.find_by(code: code.to_s.strip)
+    if match
+      match.consume!
+      match
+    else
+      # A wrong guess burns an attempt on every active code; codes lock after
+      # LoginCode::MAX_ATTEMPTS so 6 digits can't be brute-forced.
+      login_codes.active.update_all("attempts = attempts + 1")
+      nil
+    end
   rescue ActiveRecord::RecordInvalid
     nil
   end

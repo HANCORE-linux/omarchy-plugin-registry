@@ -51,8 +51,10 @@ module Registry
     # worm-speed propagation dies to a cheap delay.
     def hold_or_release(version)
       hold = Rails.application.config.x.publish_hold
+      # `held` marks "review passed" — the only pipeline state ReleaseVersion
+      # accepts besides an admin-released quarantine.
+      version.update!(state: :held, hold_until: hold.to_i.positive? ? hold.from_now : Time.current)
       if hold.to_i.positive?
-        version.update!(state: :held, hold_until: hold.from_now)
         ReleaseJob.set(wait_until: version.hold_until).perform_later(version)
       else
         ReleaseVersion.call(version)

@@ -31,10 +31,16 @@ class Semver
   end
 
   # Zero-padded key so lexicographic order matches semver order in SQL.
-  # Prerelease ordering is approximated; exact comparison happens in Ruby.
+  # Prerelease identifiers are encoded so numeric ones order numerically and
+  # sort before alphanumeric ones ("0"-prefix < "1"-prefix), matching the spec.
   def sort_key
     key = format("%010d.%010d.%010d", major, minor, patch)
-    prerelease ? "#{key}-#{prerelease}" : "#{key}~" # "~" sorts releases after prereleases
+    return "#{key}~" if prerelease.nil? # "~" sorts releases after any prerelease
+
+    encoded = prerelease.split(".").map do |identifier|
+      identifier.match?(/\A\d+\z/) ? format("0%010d", identifier.to_i) : "1#{identifier}"
+    end
+    "#{key}-#{encoded.join('.')}"
   end
 
   def to_s

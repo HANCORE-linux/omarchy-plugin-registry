@@ -1,17 +1,20 @@
 # Grandfathering seeded namespaces: prove control of the listed source repo,
-# take ownership of the publisher. Repo-proof happens exactly once.
+# take ownership of the publisher. Repo-proof happens exactly once. The
+# challenge token is derived from publisher + claiming user, so tokens are
+# useless to anyone but the account that displayed them.
 class ClaimsController < ApplicationController
   before_action :set_publisher
 
   def show
-    @publisher.update!(claim_challenge: "omarchy-claim-#{SecureRandom.hex(16)}") if @publisher.claim_challenge.blank?
+    @challenge = Registry::RepoProof.challenge_for(@publisher, Current.user)
     @claim_url = Registry::RepoProof.raw_claim_url(@publisher.seed_source_url)
   end
 
   def verify
-    if Registry::RepoProof.verified?(@publisher.seed_source_url, @publisher.claim_challenge)
+    challenge = Registry::RepoProof.challenge_for(@publisher, Current.user)
+    if Registry::RepoProof.verified?(@publisher.seed_source_url, challenge)
       ApplicationRecord.transaction do
-        @publisher.update!(claimed: true, claim_challenge: nil)
+        @publisher.update!(claimed: true)
         Membership.create!(publisher: @publisher, user: Current.user, role: :owner)
         AuditEvent.record!(actor: Current.user, action: "publisher.claim_seeded", subject: @publisher,
           public: true, metadata: { name: @publisher.name, source: @publisher.seed_source_url })

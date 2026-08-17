@@ -84,8 +84,7 @@
         <%= form_with url: plugin_comments_path(@publisher.name, @plugin.name) do %>
           <div class="field">
             <label for="body">Add a comment</label>
-            <textarea name="body" id="body" rows="3" required minlength="3" maxlength="2000"
-              style="width: 100%; font-family: var(--mono); font-size: 14px; padding: 12px; border: 1px solid var(--hairline); background: var(--surface);"></textarea>
+            <textarea name="body" id="body" rows="3" required minlength="3" maxlength="2000"></textarea>
           </div>
           <button type="submit" class="button button--small">Post</button>
         <% end %>

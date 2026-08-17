@@ -3,8 +3,8 @@
   <p class="eyebrow">Dashboard</p>
   <h1>Hey, <%= @user.name&.split(" ")&.first || @user.email_address %>.</h1>
   <p class="lede">
-    <% unless @user.otp_enabled? %>
-      <%= link_to "Enable two-factor auth", settings_two_factor_path %> to unlock publishing.
+    <% unless @user.second_factor? %>
+      <%= link_to "Add a passkey or enable two-factor auth", settings_two_factor_path %> to unlock publishing.
     <% else %>
       Ready to ship. See the <%= link_to "publishing guide", publishing_path %> for the two-minute walkthrough.
     <% end %>
@@ -59,18 +59,18 @@
         </tbody>
       </table>
     <% end %>
-    <%= form_with url: tokens_path, class: "directory__bar", style: "margin-top: 18px;" do |form| %>
-      <div class="field" style="margin: 0;">
+    <%= form_with url: tokens_path, class: "form-inline" do |form| %>
+      <div class="field">
         <label for="publisher_name">Namespace</label>
-        <select name="publisher_name" id="publisher_name" style="font-family: var(--mono); padding: 12px; border: 1px solid var(--hairline); background: var(--surface);">
+        <select name="publisher_name" id="publisher_name" class="select">
           <% @publishers.each do |publisher| %><option value="<%= publisher.name %>"><%= publisher.name %></option><% end %>
         </select>
       </div>
-      <div class="field" style="margin: 0;">
+      <div class="field">
         <label for="plugin_name">Plugin name</label>
         <input type="text" name="plugin_name" id="plugin_name" required pattern="[a-z0-9][a-z0-9_-]*" placeholder="weather">
       </div>
-      <button type="submit" class="button" style="align-self: end;">Mint token</button>
+      <button type="submit" class="button">Mint token</button>
     <% end %>
   </section>
 
@@ -95,26 +95,26 @@
         </tbody>
       </table>
     <% end %>
-    <%= form_with url: trusted_publishers_path, class: "directory__bar", style: "margin-top: 18px; align-items: end;" do |form| %>
-      <div class="field" style="margin: 0;">
+    <%= form_with url: trusted_publishers_path, class: "form-inline" do |form| %>
+      <div class="field">
         <label>Namespace</label>
-        <select name="publisher_name" style="font-family: var(--mono); padding: 12px; border: 1px solid var(--hairline); background: var(--surface);">
+        <select name="publisher_name" class="select">
           <% @publishers.each do |publisher| %><option value="<%= publisher.name %>"><%= publisher.name %></option><% end %>
         </select>
       </div>
-      <div class="field" style="margin: 0;">
+      <div class="field">
         <label>Plugin</label>
         <input type="text" name="plugin_name" required pattern="[a-z0-9][a-z0-9_-]*" placeholder="weather">
       </div>
-      <div class="field" style="margin: 0;">
+      <div class="field">
         <label>Repository</label>
         <input type="text" name="repository" required placeholder="you/weather">
       </div>
-      <div class="field" style="margin: 0;">
+      <div class="field">
         <label>Workflow</label>
         <input type="text" name="workflow" required value=".github/workflows/publish.yml">
       </div>
-      <div class="field" style="margin: 0;">
+      <div class="field">
         <label>Environment</label>
         <input type="text" name="environment" value="release">
       </div>

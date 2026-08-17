@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_17_040001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_17_050001) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -108,6 +108,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_040001) do
   end
 
   create_table "login_codes", force: :cascade do |t|
+    t.integer "attempts", default: 0, null: false
     t.string "code", null: false
     t.datetime "consumed_at"
     t.datetime "created_at", null: false
@@ -191,7 +192,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_040001) do
 
   create_table "publishers", force: :cascade do |t|
     t.text "bio"
-    t.string "claim_challenge"
     t.boolean "claimed", default: true, null: false
     t.datetime "created_at", null: false
     t.string "display_name"
@@ -247,6 +247,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_040001) do
   create_table "sessions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "ip_address"
+    t.datetime "second_factor_verified_at"
     t.datetime "updated_at", null: false
     t.string "user_agent"
     t.integer "user_id", null: false

@@ -28,6 +28,7 @@ module Registry
       check_kinds
       check_entry_points
       check_license
+      check_repository
       errors.empty?
     end
 
@@ -69,6 +70,12 @@ module Registry
     def check_entry_points
       entry_points = manifest["entryPoints"]
       return errors << "entryPoints must be an object" unless entry_points.is_a?(Hash)
+
+      kinds = Array(manifest["kinds"])
+      if kinds.any? && entry_points.keys.sort != kinds.sort
+        errors << "entryPoints keys must exactly match kinds (kinds: #{kinds.sort.join(', ')}; entryPoints: #{entry_points.keys.sort.join(', ')})"
+      end
+
       entry_points.each do |kind, path|
         unless path.is_a?(String) && !path.start_with?("/") && !path.split("/").include?("..")
           errors << "entry point for #{kind} must be a relative path inside the plugin"
@@ -82,6 +89,16 @@ module Registry
       license = manifest["license"].to_s
       return errors << "license is required to publish (SPDX identifier)" if license.blank?
       errors << "license must be an SPDX expression (got #{license})" unless license.match?(SPDX_FORMAT)
+    end
+
+    # Rendered as a link on the plugin page — https only, sane length.
+    def check_repository
+      repository = manifest["repository"]
+      return if repository.blank?
+      uri = URI.parse(repository.to_s) rescue nil
+      unless uri.is_a?(URI::HTTPS) && repository.to_s.length <= 300
+        errors << "repository must be an https:// URL"
+      end
     end
   end
 end

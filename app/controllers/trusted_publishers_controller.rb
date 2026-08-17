@@ -1,4 +1,6 @@
 class TrustedPublishersController < ApplicationController
+  before_action :require_recent_second_factor
+
   def create
     publisher = Current.user.publishers.find_by!(name: params[:publisher_name])
     return redirect_to dashboard_path, alert: "Only namespace owners can register trusted publishers." unless Current.user.owner_of?(publisher)

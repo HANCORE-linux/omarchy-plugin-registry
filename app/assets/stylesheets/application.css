@@ -297,6 +297,14 @@ pre code { background: none; padding: 0; }
 .table td { padding: 10px; border-bottom: 1px solid var(--hairline-soft); vertical-align: middle; }
 .table .actions { display: flex; gap: 8px; justify-content: flex-end; }
 
+.form-inline { display: flex; gap: 16px; align-items: end; flex-wrap: wrap; margin-top: 18px; }
+.form-inline .field { margin: 0; }
+.select, .field select, .field textarea {
+  font-family: var(--mono); font-size: 14px; padding: 12px;
+  border: 1px solid var(--hairline); background: var(--surface); border-radius: 0; outline-color: var(--magenta);
+}
+.field textarea { width: 100%; }
+
 .token-reveal { background: var(--ink); color: var(--paper); padding: 16px 20px; margin-bottom: 24px; overflow-x: auto; }
 .token-reveal code { background: none; color: var(--pink); font-size: 15px; }
 

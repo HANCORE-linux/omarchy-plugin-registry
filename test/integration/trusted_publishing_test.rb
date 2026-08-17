@@ -27,6 +27,7 @@ class TrustedPublishingTest < ActionDispatch::IntegrationTest
       aud: "plugins.omarchy.org",
       exp: 5.minutes.from_now.to_i,
       repository: "acme/weather",
+      workflow_ref: "acme/weather/.github/workflows/publish.yml@refs/tags/v1.0.0",
       job_workflow_ref: "acme/weather/.github/workflows/publish.yml@refs/tags/v1.0.0",
       environment: "release",
       event_name: "release",
@@ -80,7 +81,17 @@ class TrustedPublishingTest < ActionDispatch::IntegrationTest
     assert_response :unauthorized
 
     post "/api/v1/trusted/exchange", params: { token: oidc_token(
+      workflow_ref: "acme/weather/.github/workflows/other.yml@refs/tags/v1.0.0",
       job_workflow_ref: "acme/weather/.github/workflows/other.yml@refs/tags/v1.0.0") }
+    assert_response :unauthorized
+  end
+
+  test "direct workflows without job_workflow_ref still exchange; delegating to a foreign reusable workflow does not" do
+    post "/api/v1/trusted/exchange", params: { token: oidc_token(job_workflow_ref: nil) }
+    assert_response :created
+
+    post "/api/v1/trusted/exchange", params: { token: oidc_token(
+      job_workflow_ref: "evil/reusable/.github/workflows/build.yml@refs/heads/main") }
     assert_response :unauthorized
   end
 end

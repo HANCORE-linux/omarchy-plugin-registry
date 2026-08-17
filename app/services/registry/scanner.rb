@@ -10,7 +10,11 @@ module Registry
       def as_json(*) = { "rule" => rule, "severity" => severity.to_s, "file" => file, "detail" => detail }
     end
 
-    TEXT_EXTENSIONS = %w[.qml .js .mjs .sh .bash .json .md .txt .yml .yaml .toml .conf .css].freeze
+    TEXT_EXTENSIONS = %w[.qml .js .mjs .sh .bash .json .md .txt .yml .yaml .toml .conf .css .svg .xml .html .ini .desktop].freeze
+
+    # Benign asset types allowed through unscanned; anything else unscannable
+    # (executables, libraries, archives, unknown binaries) is flagged.
+    ASSET_EXTENSIONS = %w[.png .jpg .jpeg .gif .webp .ico .ttf .otf .woff .woff2 .mp3 .wav .ogg].freeze
 
     # Invisible/bidi characters used to hide code from review (the GlassWorm
     # trick). A leading BOM is stripped before scanning; any other occurrence
@@ -33,10 +37,21 @@ module Registry
 
     def scan
       @tarball.contents.each do |path, content|
-        next unless scannable?(path, content)
-        text = content.dup.force_encoding(Encoding::UTF_8)
-        text = text.scrub unless text.valid_encoding?
-        scan_file(path, text.delete_prefix("\uFEFF"))
+        if scannable?(path, content)
+          text = content.dup.force_encoding(Encoding::UTF_8)
+          text = text.scrub unless text.valid_encoding?
+          scan_file(path, text.delete_prefix("\uFEFF"))
+        elsif !ASSET_EXTENSIONS.include?(File.extname(path).downcase)
+          # Unscannable non-asset content ships anyway \u2014 never unreviewed.
+          findings << Finding.new("binary-payload", :flag, path,
+            "file type is not scannable (#{File.extname(path).presence || 'no extension'}); a human must look")
+        end
+      end
+      # Reviewed bytes must be ALL the bytes: anything past the per-file scan
+      # cap escaped analysis, so it goes to a human too.
+      @tarball.truncated.each do |path|
+        findings << Finding.new("scan-truncated", :flag, path,
+          "file exceeds the #{Registry::TarballInspector::MAX_SCAN_BYTES / 1.kilobyte}KB scan window \u2014 not fully analyzed")
       end
       scan_metadata
       findings
@@ -50,9 +65,12 @@ module Registry
 
     private
 
+    PLAIN_FILENAMES = %w[readme license licence copying notice authors changelog contributing codeowners].freeze
+
     def scannable?(path, content)
       ext = File.extname(path).downcase
       return true if TEXT_EXTENSIONS.include?(ext)
+      return true if PLAIN_FILENAMES.include?(File.basename(path, ".*").downcase)
       return true if ext.empty? && content.byteslice(0, 256).to_s.start_with?("#!")
       false
     end

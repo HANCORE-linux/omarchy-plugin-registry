@@ -1,4 +1,6 @@
 class OrgsController < ApplicationController
+  before_action :require_recent_second_factor, only: :add_member
+
   def new
     @publisher = Publisher.new(kind: :org)
   end

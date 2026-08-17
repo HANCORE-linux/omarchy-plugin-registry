@@ -12,6 +12,7 @@ module Settings
     def update
       @user = Current.user
       if @user.enable_otp!(params[:code])
+        mark_second_factor_verified!
         redirect_to dashboard_path, notice: "Two-factor authentication enabled. Save your backup codes from this page."
       else
         redirect_to settings_two_factor_path, alert: "That code didn't match — try again."

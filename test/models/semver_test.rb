@@ -33,4 +33,11 @@ class SemverTest < ActiveSupport::TestCase
   test "sort_key puts prereleases before their release" do
     assert Semver.parse("1.0.0-rc.1").sort_key < Semver.parse("1.0.0").sort_key
   end
+
+  test "sort_key orders numeric prerelease identifiers numerically" do
+    assert Semver.parse("1.0.0-alpha.2").sort_key < Semver.parse("1.0.0-alpha.10").sort_key
+    assert Semver.parse("1.0.0-2").sort_key < Semver.parse("1.0.0-10").sort_key
+    assert Semver.parse("1.0.0-1").sort_key < Semver.parse("1.0.0-alpha").sort_key
+    assert Semver.parse("1.0.0-alpha").sort_key < Semver.parse("1.0.0-alpha.1").sort_key
+  end
 end

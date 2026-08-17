@@ -40,6 +40,7 @@ module Registry
 
     def authorize!
       fail! "publisher is suspended", status: :forbidden if publisher.suspended?
+      fail! "account is suspended", status: :forbidden if user.suspended_at.present?
       return if @system_seed
       fail! "namespace is unclaimed — prove control of the source repo to claim it", status: :forbidden unless publisher.claimed?
       fail! "you are not a member of #{publisher.name}", status: :forbidden unless user.member_of?(publisher)
@@ -87,14 +88,11 @@ module Registry
     # judgment-shaped runs in the ReviewJob pipeline. The version lands in
     # `processing` and goes live only after scan + hold.
     def create_version!
+      # Public plugin metadata (summary/kinds/repo/readme) is NOT touched here —
+      # ReleaseVersion applies it when a version actually clears review, so a
+      # rejected update can never deface the live page.
       ApplicationRecord.transaction do
         plugin.save! unless plugin.persisted?
-        plugin.update!(
-          summary: tarball.manifest["description"].presence || plugin.summary,
-          kinds: tarball.manifest["kinds"],
-          repository_url: tarball.manifest["repository"].presence || plugin.repository_url,
-          readme: tarball.readme.presence || plugin.readme
-        )
         @version = plugin.versions.create!(
           version: tarball.manifest["version"],
           manifest: tarball.manifest,
