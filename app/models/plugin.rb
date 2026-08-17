@@ -6,6 +6,9 @@ class Plugin < ApplicationRecord
   belongs_to :publisher
   has_many :versions, class_name: "PluginVersion", dependent: :restrict_with_error
   has_many :revocations, dependent: :restrict_with_error
+  has_many :ratings, dependent: :destroy
+  has_many :comments, dependent: :destroy
+  has_many :reports, as: :reportable, dependent: :destroy
 
   validates :name, presence: true, uniqueness: { scope: :publisher_id },
     length: { maximum: NameRules::MAX_LENGTH },
@@ -37,5 +40,14 @@ class Plugin < ApplicationRecord
 
   def refresh_latest_version!
     update!(latest_version: latest_published_version&.version)
+  end
+
+  def average_rating
+    return nil if ratings_count.zero?
+    (ratings_sum.to_f / ratings_count).round(1)
+  end
+
+  def record_view!
+    self.class.where(id: id).update_all("views_count = views_count + 1")
   end
 end

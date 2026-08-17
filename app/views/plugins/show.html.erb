@@ -22,18 +22,72 @@
     <p class="summary"><%= @plugin.summary %></p>
     <div class="page-head__row">
       <% if @latest %><%= state_badge(:published) %><span class="muted">v<%= @latest.version %> · <%= @latest.license %></span><% end %>
-      <span class="muted"><%= compact_number(@plugin.downloads_count) %> downloads</span>
+      <span class="muted"><%= compact_number(@plugin.downloads_count) %> downloads · <%= compact_number(@plugin.views_count) %> views</span>
+      <% if @plugin.average_rating %>
+        <span class="rating-summary"><span class="diamond">◆</span> <%= @plugin.average_rating %>/5
+          <span class="muted">(<%= @plugin.ratings_count %>)</span></span>
+      <% end %>
     </div>
   </div>
 </div>
 
 <div class="plugin-layout container">
-  <article class="readme">
-    <% if @plugin.readme.present? %>
-      <%= render_markdown @plugin.readme %>
-    <% else %>
-      <p class="muted">No readme provided.</p>
-    <% end %>
+  <article>
+    <div class="readme">
+      <% if @plugin.readme.present? %>
+        <%= render_markdown @plugin.readme %>
+      <% else %>
+        <p class="muted">No readme provided.</p>
+      <% end %>
+    </div>
+
+    <section class="community">
+      <h3>Community</h3>
+
+      <% if authenticated? %>
+        <%= form_with url: plugin_rating_path(@publisher.name, @plugin.name), class: "rate-widget" do %>
+          <span class="eyebrow">Your rating</span>
+          <% (1..5).each do |value| %>
+            <button type="submit" name="value" value="<%= value %>"
+              class="rate-diamond <%= "active" if @my_rating && value <= @my_rating.value %>"
+              aria-label="Rate <%= value %> of 5">◆</button>
+          <% end %>
+        <% end %>
+      <% end %>
+
+      <% @comments.each do |comment| %>
+        <div class="comment">
+          <div class="comment__head">
+            <strong><%= comment.user.name || "someone" %></strong>
+            <% if comment.from_publisher? %><span class="badge">publisher</span><% end %>
+            <span class="muted"><%= time_ago_in_words(comment.created_at) %> ago</span>
+            <span class="comment__actions">
+              <% if authenticated? && (comment.user == Current.user || Current.user.admin?) %>
+                <%= button_to "delete", comment_path(comment), method: :delete, class: "linklike" %>
+              <% end %>
+              <% if authenticated? && comment.user != Current.user %>
+                <%= button_to "report", reports_path(reportable_type: "Comment", reportable_id: comment.id, reason: "inappropriate"), class: "linklike" %>
+              <% end %>
+            </span>
+          </div>
+          <p><%= comment.body %></p>
+        </div>
+      <% end %>
+      <p class="muted" style="margin-top: 12px;"><% if @comments.empty? %>No comments yet.<% end %></p>
+
+      <% if authenticated? %>
+        <%= form_with url: plugin_comments_path(@publisher.name, @plugin.name) do %>
+          <div class="field">
+            <label for="body">Add a comment</label>
+            <textarea name="body" id="body" rows="3" required minlength="3" maxlength="2000"
+              style="width: 100%; font-family: var(--mono); font-size: 14px; padding: 12px; border: 1px solid var(--hairline); background: var(--surface);"></textarea>
+          </div>
+          <button type="submit" class="button button--small">Post</button>
+        <% end %>
+      <% else %>
+        <p class="muted"><%= link_to "Sign in", new_session_path %> to rate or comment.</p>
+      <% end %>
+    </section>
   </article>
 
   <aside class="sidebar">

@@ -3,6 +3,7 @@ class HomeController < ApplicationController
 
   SORTS = {
     "downloads" => { downloads_count: :desc },
+    "rating" => Arel.sql("CASE WHEN ratings_count = 0 THEN 0 ELSE ratings_sum * 1.0 / ratings_count END DESC, ratings_count DESC"),
     "newest" => { created_at: :desc },
     "name" => { name: :asc }
   }.freeze

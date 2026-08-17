@@ -23,6 +23,10 @@ Rails.application.routes.draw do
 
   # Public directory
   get "plugins/:publisher/:name", to: "plugins#show", as: :plugin
+  post "plugins/:publisher/:name/rating", to: "ratings#create", as: :plugin_rating
+  post "plugins/:publisher/:name/comments", to: "comments#create", as: :plugin_comments
+  resources :comments, only: :destroy
+  resources :reports, only: :create
   get "publishers/:name", to: "publishers#show", as: :publisher
   get "governance", to: "pages#governance"
   get "publishing", to: "pages#publishing"
@@ -42,6 +46,11 @@ Rails.application.routes.draw do
     resources :plugins, only: [] do
       member do
         post :security_hold
+      end
+    end
+    resources :reports, only: [] do
+      member do
+        post :resolve
       end
     end
   end

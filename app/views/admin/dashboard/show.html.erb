@@ -60,6 +60,38 @@
   </section>
 
   <section>
+    <h2>Reports (<%= @reports.size %>)</h2>
+    <% if @reports.any? %>
+      <table class="table">
+        <thead><tr><th>What</th><th>Reason</th><th>By</th><th></th></tr></thead>
+        <tbody>
+          <% @reports.each do |report| %>
+            <tr>
+              <td>
+                <% if report.reportable.is_a?(Comment) %>
+                  comment on <%= report.reportable.plugin.full_name %>: “<%= report.reportable.body.truncate(80) %>”
+                <% else %>
+                  <%= report.reportable.try(:full_name) || report.reportable_type %>
+                <% end %>
+              </td>
+              <td><%= report.reason %></td>
+              <td class="muted"><%= report.user.name %></td>
+              <td class="actions">
+                <% if report.reportable.is_a?(Comment) %>
+                  <%= button_to "Hide + resolve", resolve_admin_report_path(report, hide: 1), class: "button button--small" %>
+                <% end %>
+                <%= button_to "Dismiss", resolve_admin_report_path(report), class: "button button--ghost button--small" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <p class="muted">No open reports.</p>
+    <% end %>
+  </section>
+
+  <section>
     <h2>Kill list (<%= @revocations.size %>)</h2>
     <% if @revocations.any? %>
       <table class="table">
