@@ -63,7 +63,9 @@ config switch to disable). On a hit for an installed plugin@version:
   accepted into the review pipeline (live after a short hold), 409 means the
   version number is burned, 422 carries a human-readable validation error.
 - CI: exchange a GitHub Actions OIDC token (`aud: plugins.omarchy.org`) at
-  `POST /api/v1/trusted/exchange {token}` for a 30-minute publish token.
+  `POST /api/v1/trusted/exchange {token}` for a 30-minute publish token. The
+  job must run from a tag ref (`refs/tags/*`) inside the registered pinned
+  environment; the repo's numeric identity is pinned on first exchange.
 - `omarchy plugin new` should scaffold `manifest.json` (with `license`,
   `repository`), a widget, a readme, and the trusted-publishing workflow.
 
