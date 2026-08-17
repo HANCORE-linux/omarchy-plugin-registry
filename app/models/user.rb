@@ -65,6 +65,16 @@ class User < ApplicationRecord
 
   def otp_enabled? = otp_enabled_at.present?
 
+  # Lost-factor recovery: after a 72-hour delay (announced by email, visible
+  # on every sign-in, cancellable by any successful step-up), factor
+  # management reopens without step-up. The window gives the real owner time
+  # to notice and shut a hijack down.
+  RECOVERY_DELAY = 72.hours
+
+  def recovery_pending? = recovery_requested_at.present? && recovery_requested_at > RECOVERY_DELAY.ago
+
+  def recovery_ready? = recovery_requested_at.present? && recovery_requested_at <= RECOVERY_DELAY.ago
+
   # Publishing requires an unphishable-or-close second factor: a passkey
   # (preferred) or TOTP.
   def second_factor? = otp_enabled? || passkeys.exists?
@@ -120,11 +130,15 @@ class User < ApplicationRecord
       ROTP::TOTP.new(otp_secret).verify(code.to_s.remove(/\s/), drift_behind: 15).present?
   end
 
+  # Locked read-modify-write: two concurrent redemptions can't both spend the
+  # same one-time code
   def consume_backup_code(code)
     digest = Digest::SHA256.hexdigest(code.to_s)
-    digests = otp_backup_codes || []
-    return false unless digests.include?(digest)
-    update!(otp_backup_codes: digests - [ digest ])
+    with_lock do
+      digests = reload.otp_backup_codes || []
+      return false unless digests.include?(digest)
+      update!(otp_backup_codes: digests - [ digest ])
+    end
     true
   end
 end

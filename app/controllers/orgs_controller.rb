@@ -1,9 +1,16 @@
 class OrgsController < ApplicationController
   before_action :require_recent_second_factor, only: %i[invite_member remove_member]
   before_action :require_no_sensitive_cooldown, only: :invite_member
-  # Namespaces are first-claim and burned forever — throttle bulk squatting
-  rate_limit to: 5, within: 1.day, only: :create,
-    with: -> { redirect_to dashboard_path, alert: "Org creation is limited to a few per day." }
+  # Namespaces are first-claim and burned forever. The durable control is a
+  # per-ACCOUNT ledger (founding org memberships), not a rotatable IP limit.
+  MAX_ORGS_PER_WEEK = 3
+  before_action only: :create do
+    recent = Current.user.memberships.where(founding: true, created_at: 7.days.ago..)
+      .joins(:publisher).where(publishers: { kind: :org }).count
+    if recent >= MAX_ORGS_PER_WEEK
+      redirect_to dashboard_path, alert: "Org creation is limited to #{MAX_ORGS_PER_WEEK} per week per account."
+    end
+  end
 
   def new
     @publisher = Publisher.new(kind: :org)

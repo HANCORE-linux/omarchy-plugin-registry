@@ -106,6 +106,8 @@
   .badge--warning { background: rgba(239, 179, 90, 0.16); }
   .badge--danger { background: rgba(233, 106, 106, 0.16); }
   pre, .install-cmd, .token-reveal { border: 1px solid var(--hairline-soft); }
+  /* Lifted danger red needs dark text for contrast on destructive controls */
+  .button--danger, button.button--danger { color: #0d0826; }
 }
 
 /* ---------- Reset-ish ---------- */

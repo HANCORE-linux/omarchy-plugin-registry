@@ -24,4 +24,16 @@
       <button type="submit" class="button <%= "button--ghost" if Current.user.passkeys.any? %>">Verify</button>
     <% end %>
   <% end %>
+
+  <div class="u-gap-top">
+    <% if Current.user.recovery_ready? %>
+      <p class="hint">Your recovery window is open — <%= link_to "enroll a replacement factor", settings_two_factor_path %>.</p>
+    <% elsif Current.user.recovery_pending? %>
+      <p class="hint">Recovery in progress: factor management reopens
+        <%= time_ago_in_words(Current.user.recovery_requested_at + User::RECOVERY_DELAY) %> from now.
+        Verifying above cancels it.</p>
+    <% else %>
+      <%= button_to "Lost your factor? Start 72-hour recovery", recovery_path, class: "linklike" %>
+    <% end %>
+  </div>
 </div>

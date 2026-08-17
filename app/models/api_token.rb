@@ -60,7 +60,9 @@ class ApiToken < ApplicationRecord
 
   def usable_quota
     return if quota_exempt
-    if user && user.api_tokens.usable.count >= MAX_USABLE_PER_USER
+    # Machine-minted (OIDC/provenance) tokens neither consume nor count toward
+    # the user-managed quota — a CI burst must not lock a human out
+    if user && user.api_tokens.usable.where(provenance: nil).count >= MAX_USABLE_PER_USER
       errors.add(:base, "too many active tokens — revoke some first")
     end
   end

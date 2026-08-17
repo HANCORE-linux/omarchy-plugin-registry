@@ -22,6 +22,8 @@ Rails.application.routes.draw do
   # Step-up verification for credential-minting actions
   get "step_up", to: "step_up#show"
   post "step_up", to: "step_up#create"
+  post "recovery", to: "recoveries#create", as: :recovery
+  delete "recovery", to: "recoveries#destroy"
   post "step_up/passkey/options", to: "step_up#passkey_options", as: :step_up_passkey_options
   post "step_up/passkey", to: "step_up#passkey_verify", as: :step_up_passkey_verify
   resources :tokens, only: %i[create destroy]

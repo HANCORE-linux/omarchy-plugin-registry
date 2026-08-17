@@ -10,8 +10,11 @@ module StepUpAuthentication
 
   # For second-factor MANAGEMENT (adding/removing factors): open on first
   # enrollment, gated once any factor exists — email compromise must not be
-  # able to add an attacker-controlled factor next to a real one.
+  # able to add an attacker-controlled factor next to a real one. A matured
+  # 72-hour recovery request (User::RECOVERY_DELAY) reopens management for a
+  # publisher who lost their only factor.
   def require_step_up_if_second_factor_enrolled
+    return if Current.user.recovery_ready?
     require_recent_second_factor if Current.user.second_factor?
   end
 

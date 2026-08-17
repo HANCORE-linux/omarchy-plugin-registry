@@ -14,9 +14,11 @@ module DataPlane
       generator.write_config
       generator.write_all_listing
       generator.write_revocations
+      # Artifacts BEFORE indexes: a signed index must never promise a tarball
+      # the data plane can't serve
       Plugin.find_each do |p|
-        generator.write_plugin_index(p)
         generator.restore_missing_tarballs(p)
+        generator.write_plugin_index(p)
       end
     end
 
@@ -89,8 +91,17 @@ module DataPlane
     # is a meta record carrying the freshness horizon.
     def write_plugin_index(plugin)
       lines = [ JSON.generate({ "meta" => true }.merge(freshness(INDEX_TTL))) ]
-      lines += plugin.versions.where(state: [ :published, :yanked ])
-        .order(:version_sort_key).map { |v| JSON.generate(version_entry(v)) }
+      plugin.versions.where(state: [ :published, :yanked ]).order(:version_sort_key).each do |v|
+        # A published version whose bytes are unrecoverable must not be
+        # promised by a freshly signed index — flag it loudly instead.
+        if v.published? && !DataPlane.root.join(v.tarball_path).exist?
+          Rails.logger.error("[DataPlane] #{v.tarball_path} unrecoverable — omitted from signed index")
+          AuditEvent.record!(action: "version.artifact_unrecoverable", subject: v,
+            metadata: { plugin: plugin.full_name, version: v.version })
+          next
+        end
+        lines << JSON.generate(version_entry(v))
+      end
       DataPlane.write("index/#{plugin.publisher.name}/#{plugin.name}.json", lines.join("\n") + "\n")
     end
 

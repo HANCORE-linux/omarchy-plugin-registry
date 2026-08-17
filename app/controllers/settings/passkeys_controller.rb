@@ -38,6 +38,12 @@ module Settings
         mark_second_factor_verified!
         apply_first_factor_cooldown(Current.user)
       end
+      # Recovery-based enrollment closes the recovery window and applies the
+      # full sensitive-change cooldown — a 72-hour hijack can't mint anything
+      # for another cooldown period after it lands
+      if Current.user.recovery_requested_at
+        Current.user.update!(recovery_requested_at: nil, sensitive_change_at: Time.current)
+      end
       render json: { ok: true }
     rescue WebAuthn::Error, JSON::ParserError => e
       render json: { error: "Passkey registration failed: #{e.message}" }, status: :unprocessable_entity

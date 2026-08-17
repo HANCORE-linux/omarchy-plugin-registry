@@ -1,7 +1,9 @@
 # First sign-in lands here: pick a display name and claim a personal namespace.
 class OnboardingController < ApplicationController
-  # Namespaces are burned forever — throttle claim attempts per client
+  # Namespaces are burned forever — throttle claim attempts per ACCOUNT (an
+  # office NAT full of new users must not share one budget)
   rate_limit to: 5, within: 1.day, only: :create,
+    by: -> { Current.user&.id || request.remote_ip },
     with: -> { redirect_to onboarding_path, alert: "Too many attempts today." }
 
   def show
