@@ -23,7 +23,8 @@ class MomusRoundFiftyTest < ActionDispatch::IntegrationTest
     # Rotate: new seed, old public key explicitly supplied
     new_seed = Base64.strict_encode64(Ed25519::SigningKey.generate.seed)
     with_env("REGISTRY_SIGNING_SEED" => new_seed, "REGISTRY_ALLOW_KEY_ROTATION" => "1",
-             "REGISTRY_PREVIOUS_SIGNING_PUBKEY" => old_pubkey) do
+             "REGISTRY_PREVIOUS_SIGNING_PUBKEY" => old_pubkey,
+             "REGISTRY_ROTATION_ACK" => "clients-must-repin") do
       DataPlane::Signer.reset!
       DataPlane::Regenerate.all
     end

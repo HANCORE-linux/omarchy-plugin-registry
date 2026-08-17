@@ -78,6 +78,10 @@ config switch to disable). On a hit for an installed plugin@version:
   `Authorization: Bearer <token>` and the tar.gz as the raw body. 201 means
   accepted into the review pipeline (live after a short hold), 409 means the
   version number is burned, 422 carries a human-readable validation error.
+- Key rotation: the trust root (`signing-key.pub`) is pinned on first use.
+  A rotation is a coordinated re-pin event — after the registry announces
+  one, verify the new key out-of-band and re-pin; until then the client
+  correctly fails closed on new-key signatures.
 - Retention: a submission that never publishes (quarantined, untouched by
   review for 90 days) expires to rejected and its bytes are deleted; its
   version number stays burned forever. Rejected uploads lose their bytes

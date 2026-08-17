@@ -19,6 +19,12 @@ module DataPlane
     # signed index byte-for-byte.
     class ArtifactIntegrityError < StandardError; end
 
+    # Raised when the external witness proves the whole volume (database AND
+    # data plane) was restored from before the last signed kill list — the
+    # wall-clock generation anchor would otherwise happily sign a NEWER empty
+    # kill list and defeat client rollback detection.
+    class StaleRestoreError < StandardError; end
+
     # A per-plugin trigger still rebuilds everything (cheap at this scale) —
     # writing the one index first and then rewriting it under a second
     # generation would just churn two generations for one publish.
@@ -35,6 +41,9 @@ module DataPlane
       FileUtils.mkdir_p(DataPlane.root)
       File.open(DataPlane.root.join(".regenerate.lock"), File::RDWR | File::CREAT, 0o644) do |lock|
         lock.flock(File::LOCK_EX)
+        # The external witness (a file OUTSIDE the app volume) gates
+        # regeneration after a full-volume restore — see check_restore_witness!
+        generator.check_restore_witness!
         # Reconciliation FIRST: revocations recorded on the surviving data
         # plane are re-learned and ENFORCED before anything is signed, so
         # every file written below reflects post-takedown state.
@@ -44,6 +53,7 @@ module DataPlane
         # corrupt artifact failing the preflight below.
         generator.write_config
         generator.write_revocations
+        generator.record_witness!
         # Artifact verification is scoped PER PLUGIN: a corrupt artifact
         # freezes only its own plugin's index (prior signed pair preserved
         # byte-for-byte) while every healthy plugin's takedowns, yanks, and
@@ -87,6 +97,53 @@ module DataPlane
         end
         DataPlane.atomic_write(version.tarball_path, bytes)
       end
+    end
+
+    # A restore of BOTH the database and the data plane is locally
+    # undetectable — every on-volume artifact is consistent, just old. The
+    # witness file (REGISTRY_WITNESS_PATH, on separate storage) records the
+    # last signed kill-list generation; a data plane holding an OLDER
+    # generation than the witness proves a restore, and regeneration refuses
+    # to sign a newer-generation kill list over it until the authoritative
+    # copy is imported (or the operator explicitly acks with
+    # REGISTRY_RESTORE_ACK=1). Unset witness = documented residual risk.
+    def check_restore_witness!
+      witness_path = ENV["REGISTRY_WITNESS_PATH"].presence
+      return unless witness_path
+      return if ENV["REGISTRY_RESTORE_ACK"] == "1"
+      witness = begin
+        JSON.parse(File.read(witness_path))
+      rescue Errno::ENOENT, JSON::ParserError
+        nil
+      end
+      return unless witness
+      disk = DataPlane.root.join("revocations.json")
+      disk_generation = begin
+        disk.exist? ? JSON.parse(disk.read)["generation"].to_i : 0
+      rescue JSON::ParserError
+        0
+      end
+      if witness["generation"].to_i > disk_generation
+        raise StaleRestoreError,
+          "external witness records kill-list generation #{witness['generation']} but the data plane holds " \
+          "#{disk_generation} — the volume was restored from an older backup. Import the latest authoritative " \
+          "revocations.json (bin/rails 'registry:import_revocations[path]') before regenerating, or set " \
+          "REGISTRY_RESTORE_ACK=1 for one run if this older state is deliberately authoritative."
+      end
+    end
+
+    def record_witness!
+      witness_path = ENV["REGISTRY_WITNESS_PATH"].presence
+      return unless witness_path
+      content = DataPlane.root.join("revocations.json").read
+      payload = JSON.generate({
+        "generation" => JSON.parse(content)["generation"],
+        "revocations_sha256" => Digest::SHA256.hexdigest(content),
+        "recorded_at" => Time.current.utc.iso8601
+      })
+      temp = "#{witness_path}.tmp-#{Process.pid}"
+      File.write(temp, payload)
+      File.rename(temp, witness_path)
     end
 
     # A restored database may predate ENTIRE plugin rows. Their surviving
@@ -136,11 +193,13 @@ module DataPlane
       FileUtils.mkdir_p(DataPlane.root)
       if key_path.exist? && key_path.read != Signer.public_key_base64
         unless ENV["REGISTRY_ALLOW_KEY_ROTATION"] == "1" &&
-            ENV["REGISTRY_PREVIOUS_SIGNING_PUBKEY"].to_s.strip == key_path.read.strip
+            ENV["REGISTRY_PREVIOUS_SIGNING_PUBKEY"].to_s.strip == key_path.read.strip &&
+            ENV["REGISTRY_ROTATION_ACK"] == "clients-must-repin"
           raise "signing key changed since the data plane was written — refusing to replace the trust root. " \
-                "A deliberate rotation requires BOTH REGISTRY_ALLOW_KEY_ROTATION=1 and " \
-                "REGISTRY_PREVIOUS_SIGNING_PUBKEY set to the current on-disk trust root, so every " \
-                "surviving signed file keeps verifying fail-closed through the swap"
+                "Rotation is a COORDINATED INCOMPATIBLE EVENT: deployed clients pin one key and fail closed " \
+                "until they re-pin. It requires REGISTRY_ALLOW_KEY_ROTATION=1, " \
+                "REGISTRY_PREVIOUS_SIGNING_PUBKEY set to the current on-disk trust root, AND " \
+                "REGISTRY_ROTATION_ACK=clients-must-repin acknowledging the client-side impact"
         end
       end
       # Atomic, and only when it actually changed — a recurring rewrite must

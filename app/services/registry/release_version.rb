@@ -33,13 +33,26 @@ module Registry
         raise ArgumentError, "submitter can no longer publish (second factor or cooldown)" unless submitter.can_publish?
       end
 
+      # Approval provenance is only honored while the APPROVER's authority
+      # survives the hold window: a suspended or demoted admin's approval
+      # returns the bytes to quarantine instead of publishing on dead
+      # authority.
+      approval_live = version.approved_at.present? &&
+        version.approved_by&.admin? && version.approved_by.suspended_at.nil?
+      if version.held? && version.approved_at.present? && !approval_live
+        version.update!(state: :quarantined, hold_until: nil,
+          review_notes: "#{version.review_notes} [approving admin no longer authorized]".strip)
+        AuditEvent.record!(action: "version.approval_invalidated", subject: version,
+          metadata: { plugin: version.plugin.full_name, version: version.version })
+        return version
+      end
       # The credential that carried the submission must still be alive when a
       # PIPELINE release fires: a token revoked during the hold window (stolen
       # token killed, trusted-publisher registration removed — which revokes
       # its minted tokens) quarantines the version for human review instead of
-      # shipping. An explicit admin approval (approved_at provenance) is a
-      # human override — the bytes were reviewed — and skips only this veto.
-      if version.held? && version.approved_at.nil? && version.api_token&.revoked_at&.present?
+      # shipping. A LIVE admin approval is a human override — the bytes were
+      # reviewed — and skips only this veto.
+      if version.held? && !approval_live && version.api_token&.revoked_at&.present?
         version.update!(state: :quarantined, hold_until: nil,
           review_notes: "#{version.review_notes} [submitting credential revoked during hold]".strip)
         AuditEvent.record!(action: "version.credential_revoked", subject: version,

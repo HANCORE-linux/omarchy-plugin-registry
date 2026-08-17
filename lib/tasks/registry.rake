@@ -48,11 +48,16 @@ namespace :registry do
     content = File.read(args[:path])
     signature_path = "#{args[:path]}.sig"
     abort "#{signature_path} missing — only SIGNED kill lists can be imported" unless File.exist?(signature_path)
-    abort "signature verification failed" unless DataPlane::Signer.verify?(content, File.read(signature_path))
+    abort "signature verification failed" unless DataPlane::Signer.verify_any?(content, File.read(signature_path))
 
     # The SAME generator instance runs the full regeneration so orphan entries
     # (revocations whose plugin the restored DB predates) land in the freshly
     # written kill list even when the on-disk data plane was lost too.
+    # The authoritative pair becomes the on-disk kill list FIRST, so the
+    # regeneration's witness check and reconciliation both see it
+    FileUtils.mkdir_p(DataPlane.root)
+    FileUtils.cp(args[:path], DataPlane.root.join("revocations.json"))
+    FileUtils.cp(signature_path, DataPlane.root.join("revocations.json.sig"))
     generator = DataPlane::Regenerate.new
     generator.import_revocation_entries(JSON.parse(content).fetch("revocations", []))
     DataPlane::Regenerate.all(generator)

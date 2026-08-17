@@ -152,13 +152,20 @@ module Registry
     end
 
     class SpdxExpressionParser
+      # Real SPDX expressions are tiny; these bounds turn pathological input
+      # (64KB of nested parens) into a normal validation failure instead of a
+      # SystemStackError in the worker
+      MAX_TOKENS = 64
+      MAX_DEPTH = 8
+
       def initialize(expression)
         @tokens = expression.to_s.gsub("(", " ( ").gsub(")", " ) ").split(/\s+/).reject(&:empty?)
         @position = 0
+        @depth = 0
       end
 
       def valid?
-        return false if @tokens.empty?
+        return false if @tokens.empty? || @tokens.length > MAX_TOKENS
         parse_expr && @position == @tokens.length
       end
 
@@ -178,9 +185,12 @@ module Registry
 
       def parse_term
         if peek == "("
+          @depth += 1
+          return false if @depth > MAX_DEPTH
           advance
-          return false unless parse_expr
-          return false unless peek == ")"
+          ok = parse_expr && peek == ")"
+          @depth -= 1
+          return false unless ok
           advance
           true
         elsif SPDX_LICENSE_IDS.include?(peek)
