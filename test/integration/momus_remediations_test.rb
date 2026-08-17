@@ -236,7 +236,8 @@ class MomusRemediationsTest < ActionDispatch::IntegrationTest
       sub: "repo:acme/clock:environment:release",
       workflow_ref: "acme/clock/.github/workflows/publish.yml@refs/heads/main",
       environment: "release", event_name: "push", ref: "refs/heads/main", sha: "abc", run_id: "1" }
-    post "/api/v1/trusted/exchange", params: { token: JWT.encode(claims, rsa, "RS256", kid: jwk.kid) }
+    post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "clock",
+      token: JWT.encode(claims, rsa, "RS256", kid: jwk.kid) }
     assert_response :unauthorized
   ensure
     Rails.application.config.x.github_oidc_jwks = nil

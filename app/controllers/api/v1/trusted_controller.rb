@@ -10,7 +10,8 @@ module Api
       # POST /api/v1/trusted/exchange — GitHub Actions OIDC token in,
       # 30-minute scoped publish token out. No stored secrets anywhere.
       def exchange
-        token = Registry::TrustedPublishing.exchange(params.require(:token))
+        token = Registry::TrustedPublishing.exchange(params.require(:token),
+          publisher_name: params.require(:publisher), plugin_name: params.require(:plugin))
         render json: {
           token: token.plaintext_token,
           token_type: "bearer",

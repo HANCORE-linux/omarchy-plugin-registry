@@ -43,7 +43,7 @@ class TrustedPublishingTest < ActionDispatch::IntegrationTest
   end
 
   test "exchanges a valid OIDC token and publishes with provenance" do
-    post "/api/v1/trusted/exchange", params: { token: oidc_token }
+    post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "weather", token: oidc_token }
     assert_response :created
     token = response.parsed_body["token"]
     assert_equal "acme/weather", response.parsed_body["scope"]
@@ -61,13 +61,13 @@ class TrustedPublishingTest < ActionDispatch::IntegrationTest
   end
 
   test "rejects wrong audience, wrong repo, and forbidden events" do
-    post "/api/v1/trusted/exchange", params: { token: oidc_token(aud: "evil") }
+    post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "weather", token: oidc_token(aud: "evil") }
     assert_response :unauthorized
 
-    post "/api/v1/trusted/exchange", params: { token: oidc_token(repository: "evil/weather") }
+    post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "weather", token: oidc_token(repository: "evil/weather") }
     assert_response :unauthorized
 
-    post "/api/v1/trusted/exchange", params: { token: oidc_token(event_name: "pull_request_target") }
+    post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "weather", token: oidc_token(event_name: "pull_request_target") }
     assert_response :unauthorized
     assert_match(/no trusted publisher/, response.parsed_body["error"])
   end
@@ -76,50 +76,50 @@ class TrustedPublishingTest < ActionDispatch::IntegrationTest
     other = OpenSSL::PKey::RSA.new(2048)
     forged = JWT.encode({ iss: "https://token.actions.githubusercontent.com",
       aud: "plugins.omarchy.org", exp: 5.minutes.from_now.to_i }, other, "RS256", kid: @kid)
-    post "/api/v1/trusted/exchange", params: { token: forged }
+    post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "weather", token: forged }
     assert_response :unauthorized
   end
 
   test "rejects wrong environment and wrong workflow" do
     # sub is the binding contract; a job outside the pinned environment has a different sub
-    post "/api/v1/trusted/exchange", params: { token: oidc_token(
+    post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "weather", token: oidc_token(
       sub: "repo:acme/weather:environment:production", environment: "production") }
     assert_response :unauthorized
 
     # a forged top-level environment claim without the matching sub also fails
-    post "/api/v1/trusted/exchange", params: { token: oidc_token(sub: "repo:acme/weather:ref:refs/tags/v1.0.0") }
+    post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "weather", token: oidc_token(sub: "repo:acme/weather:ref:refs/tags/v1.0.0") }
     assert_response :unauthorized
 
     # absent top-level environment claim is fine when sub carries the binding
-    post "/api/v1/trusted/exchange", params: { token: oidc_token(environment: nil) }
+    post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "weather", token: oidc_token(environment: nil) }
     assert_response :created
 
-    post "/api/v1/trusted/exchange", params: { token: oidc_token(
+    post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "weather", token: oidc_token(
       workflow_ref: "acme/weather/.github/workflows/other.yml@refs/tags/v1.0.0",
       job_workflow_ref: "acme/weather/.github/workflows/other.yml@refs/tags/v1.0.0") }
     assert_response :unauthorized
   end
 
   test "repository identity is pinned at registration — a recreated repo cannot mint" do
-    post "/api/v1/trusted/exchange", params: { token: oidc_token(repository_id: "999999") }
+    post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "weather", token: oidc_token(repository_id: "999999") }
     assert_response :unauthorized
     assert_match(/identity changed/, response.parsed_body["error"])
 
-    post "/api/v1/trusted/exchange", params: { token: oidc_token(repository_id: nil) }
+    post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "weather", token: oidc_token(repository_id: nil) }
     assert_response :unauthorized
 
     # Rows without a pinned identity never mint — they must re-register
     @trusted.update!(repository_id: nil, repository_owner_id: nil)
-    post "/api/v1/trusted/exchange", params: { token: oidc_token }
+    post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "weather", token: oidc_token }
     assert_response :unauthorized
     assert_match(/re-register/, response.parsed_body["error"])
   end
 
   test "direct workflows without job_workflow_ref still exchange; delegating to a foreign reusable workflow does not" do
-    post "/api/v1/trusted/exchange", params: { token: oidc_token(job_workflow_ref: nil) }
+    post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "weather", token: oidc_token(job_workflow_ref: nil) }
     assert_response :created
 
-    post "/api/v1/trusted/exchange", params: { token: oidc_token(
+    post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "weather", token: oidc_token(
       job_workflow_ref: "evil/reusable/.github/workflows/build.yml@refs/heads/main") }
     assert_response :unauthorized
   end

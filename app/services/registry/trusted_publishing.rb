@@ -8,13 +8,23 @@ module Registry
     AUDIENCE = "plugins.omarchy.org".freeze
     TOKEN_TTL = 30.minutes
 
-    def self.exchange(oidc_token)
+    def self.exchange(oidc_token, publisher_name:, plugin_name:)
       claims = verify(oidc_token)
       reject_replay!(claims)
 
-      matches = TrustedPublisher.where("LOWER(repository) = ?", claims["repository"].to_s.downcase)
+      # The caller DECLARES its target scope and matching is confined to it —
+      # anyone can register someone else's public repository under their own
+      # namespace, and without the declared scope that squat would make every
+      # victim exchange ambiguous (a repeatable cross-namespace denial).
+      matches = TrustedPublisher
+        .joins(:publisher).where(publishers: { name: publisher_name.to_s.downcase.strip })
+        .where(plugin_name: plugin_name.to_s.downcase.strip)
+        .where("LOWER(repository) = ?", claims["repository"].to_s.downcase)
         .includes(:publisher, :created_by).select { |tp| tp.matches?(claims) }
-      raise ExchangeError, "no trusted publisher registered for #{claims['repository']} / #{claims['job_workflow_ref']}" if matches.empty?
+      if matches.empty?
+        raise ExchangeError, "no trusted publisher registered for #{claims['repository']} / #{claims['job_workflow_ref']} " \
+          "scoped to #{publisher_name}/#{plugin_name}"
+      end
       if matches.size > 1
         raise ExchangeError, "OIDC claims match #{matches.size} registrations — use a distinct environment per plugin so the intended scope is unambiguous"
       end

@@ -38,11 +38,21 @@ class PluginVersion < ApplicationRecord
   # yanked, or quarantined-after-publish). One definition — the human must see
   # the same comparison the machine made.
   def review_baseline
+    # Only LOWER-versioned predecessors: comparing against a higher sibling
+    # that happened to review first would hide capability growth
     plugin.versions.where.not(id: id)
+      .where(version_sort_key: ...version_sort_key)
       .where("state IN (:cleared) OR (state = :quarantined AND published_at IS NOT NULL)",
         cleared: [ self.class.states[:published], self.class.states[:held], self.class.states[:yanked] ],
         quarantined: self.class.states[:quarantined])
       .order(version_sort_key: :desc).first
+  end
+
+  # Review runs in semantic-version order: while a LOWER version is still in
+  # the pipeline, this one waits so its baseline is the true predecessor.
+  def lower_version_in_review?
+    plugin.versions.where.not(id: id).processing
+      .where(version_sort_key: ...version_sort_key).exists?
   end
 
   def yank!(reason:, actor:)

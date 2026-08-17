@@ -22,19 +22,26 @@ module DataPlane
 
     # An externally supplied generator carries pre-imported orphan revocations
     # (registry:import_revocations) into the SAME run that writes the kill list.
+    # A cross-process file lock serializes EVERY caller — the recurring job,
+    # publish-triggered runs, and operator rake tasks — so two runs can never
+    # interleave the deterministic .staged promotion paths.
     def self.all(generator = new)
-      # Reconciliation FIRST: revocations recorded on the surviving data plane
-      # are re-learned and ENFORCED before anything is signed, so every file
-      # written below reflects post-takedown state.
-      generator.reconcile_disk_revocations!
-      generator.write_config
-      generator.write_revocations
-      # Artifacts BEFORE any index that promises them — including all.json
-      Plugin.find_each do |p|
-        generator.restore_missing_tarballs(p)
-        generator.write_plugin_index(p)
+      FileUtils.mkdir_p(DataPlane.root)
+      File.open(DataPlane.root.join(".regenerate.lock"), File::RDWR | File::CREAT, 0o644) do |lock|
+        lock.flock(File::LOCK_EX)
+        # Reconciliation FIRST: revocations recorded on the surviving data
+        # plane are re-learned and ENFORCED before anything is signed, so
+        # every file written below reflects post-takedown state.
+        generator.reconcile_disk_revocations!
+        generator.write_config
+        generator.write_revocations
+        # Artifacts BEFORE any index that promises them — including all.json
+        Plugin.find_each do |p|
+          generator.restore_missing_tarballs(p)
+          generator.write_plugin_index(p)
+        end
+        generator.write_all_listing
       end
-      generator.write_all_listing
     end
 
     # Full regeneration must be able to rebuild the ENTIRE data plane from the

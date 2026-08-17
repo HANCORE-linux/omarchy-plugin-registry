@@ -10,6 +10,12 @@ module Registry
 
     def perform(version)
       return unless version.processing?
+      # Semantic-version order: reviewing 1.2.0 before 1.1.0 finished would
+      # compare both against the wrong predecessor and could hide growth
+      if version.lower_version_in_review?
+        self.class.set(wait: 1.minute).perform_later(version)
+        return
+      end
       plugin = version.plugin
 
       tarball = TarballInspector.inspect_bytes(version.tarball.download)
