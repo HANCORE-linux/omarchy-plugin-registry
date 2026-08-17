@@ -34,5 +34,10 @@ build step.
 
 ## Status
 
-Phase 1 (registry MVP) in progress — see `docs/design.md` §11 for the phased
-rollout plan.
+Phases 1–3 of `docs/design.md` §11 are built: publish pipeline with deterministic
+scanning, capability fingerprints + delta holds, escalate-only AI review hook,
+publish hold window, Ed25519-signed index + kill list, device-flow CLI login,
+OIDC trusted publishing with provenance, passkeys, community
+(ratings/comments/views/reports + moderation), seeding + repo-proof claims, and
+the admin console. Remaining: deploy it (see `docs/deploy.md`), implement the
+client side in Quattro (`docs/client-spec.md`), assign the governance roster.

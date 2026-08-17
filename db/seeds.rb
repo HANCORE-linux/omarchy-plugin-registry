@@ -5,6 +5,10 @@ return if Rails.env.production?
 require "rubygems/package"
 require "zlib"
 
+# A reset DB with a leftover data plane means stale frozen tarballs — wipe it
+# so the seed run regenerates a coherent pair.
+FileUtils.rm_rf(DataPlane.root)
+
 def build_tarball(manifest, files)
   io = StringIO.new
   Zlib::GzipWriter.wrap(io) do |gz|

@@ -16,16 +16,18 @@
       your handle, and enable two-factor auth. Your plugin's id will be
       <code>handle.name</code>, installed as <code>handle/name</code>.</p>
 
-    <h2>3. Mint a token and publish</h2>
+    <h2>3. Publish</h2>
     <pre>$ omarchy plugin publish
+# device flow: approve the 8-char code in your browser, done.
 # or, by hand:
 $ tar czf weather-1.0.0.tar.gz manifest.json Widget.qml README.md
 $ curl -X POST --data-binary @weather-1.0.0.tar.gz \
     -H "Authorization: Bearer omp_…" \
     https://plugins.omarchy.org/api/v1/plugins/you/weather/versions</pre>
     <p>Tokens are push-only, scoped to a single plugin, and expire in 7 days. Every version —
-      first publish or update — runs the same review pipeline. Versions are immutable: once
-      <code>you/weather@1.0.0</code> exists, those bytes are frozen forever.</p>
+      first publish or update — runs the same review pipeline: structural validation, malware
+      scanning, a capability fingerprint, and a short hold before going live. Versions are
+      immutable: once <code>you/weather@1.0.0</code> exists, those bytes are frozen forever.</p>
 
     <h2>The rules</h2>
     <ul>
@@ -36,8 +38,9 @@ $ curl -X POST --data-binary @weather-1.0.0.tar.gz \
     </ul>
 
     <h2>Prefer hands-off?</h2>
-    <p>Wire the scaffolded workflow to trusted publishing (GitHub Actions / GitLab CI, OIDC —
-      coming in Phase 2) and tagging <code>v1.0.0</code> publishes for you with no stored
-      secret at all.</p>
+    <p>Register <span class="term">trusted publishing</span> from your dashboard (repo +
+      workflow + environment, GitHub Actions today) and tagging <code>v1.0.0</code> publishes
+      for you via OIDC with no stored secret at all — your plugin page gets provenance links
+      back to the exact commit and workflow run.</p>
   </div>
 </div>
