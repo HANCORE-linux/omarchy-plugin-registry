@@ -4,7 +4,8 @@ module Api
       # Anonymous endpoints: throttle row creation and polling per IP
       rate_limit to: 10, within: 15.minutes, only: :code, store: RATE_LIMIT_STORE,
         with: -> { render json: { error: "slow_down" }, status: :too_many_requests }
-      rate_limit to: 120, within: 15.minutes, only: :token, store: RATE_LIMIT_STORE,
+      # 15-minute lifetime at a 5s advisory interval needs up to 180 polls
+      rate_limit to: 240, within: 15.minutes, only: :token, store: RATE_LIMIT_STORE,
         with: -> { render json: { error: "slow_down" }, status: :too_many_requests }
 
       # POST /api/v1/device/code — CLI starts the flow

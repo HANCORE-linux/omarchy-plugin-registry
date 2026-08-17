@@ -3,6 +3,10 @@
 class Publisher < ApplicationRecord
   enum :kind, { personal: 0, org: 1 }
 
+  # First-party bootstrap: set to claim a reserved (omarchy*) namespace from
+  # the console/seeds — never exposed through any controller.
+  attr_accessor :allow_reserved
+
   has_many :memberships, dependent: :destroy
   has_many :users, through: :memberships
   has_many :plugins, dependent: :restrict_with_error
@@ -24,7 +28,7 @@ class Publisher < ApplicationRecord
   private
 
   def name_not_reserved
-    errors.add(:name, "is reserved") if NameRules.reserved?(name)
+    errors.add(:name, "is reserved") if NameRules.reserved?(name) && !allow_reserved
   end
 
   def name_not_confusable

@@ -18,8 +18,10 @@ class DataPlaneController < ActionController::API
     served = serve("dl/#{params[:publisher]}/#{params[:plugin]}/#{filename}",
       type: "application/gzip", disposition: "attachment", filename: filename,
       cache_control: "public, max-age=31536000, immutable")
-    # Count only real deliveries of resolvable versions
-    count_download(version) if served
+    # Origin counting is a dev/small-scale convenience; production counts come
+    # from CDN log aggregation (config disables the synchronous DB writes an
+    # anonymous GET could otherwise hammer).
+    count_download(version) if served && Rails.application.config.x.count_origin_downloads
   end
 
   private

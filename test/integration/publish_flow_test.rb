@@ -29,7 +29,7 @@ class PublishFlowTest < ActionDispatch::IntegrationTest
 
     # Data plane artifacts
     index = DataPlane.read("index/acme/weather.json")
-    entry = JSON.parse(index.lines.first)
+    entry = JSON.parse(index.lines.second)
     assert_equal "acme.weather", entry["id"]
     assert_equal body["sha256"], entry["sha256"]
     assert DataPlane.root.join("dl/acme/weather/weather-1.0.0.tar.gz").exist?
@@ -113,7 +113,7 @@ class PublishFlowTest < ActionDispatch::IntegrationTest
       DataPlane::RegenerateJob.perform_later
     end
 
-    entry = JSON.parse(DataPlane.read("index/acme/weather.json").lines.first)
+    entry = JSON.parse(DataPlane.read("index/acme/weather.json").lines.second)
     assert entry["yanked"]
 
     get "/revocations.json"

@@ -106,7 +106,7 @@ class ReviewPipelineTest < ActionDispatch::IntegrationTest
     perform_enqueued_jobs { post approve_admin_version_path(version) }
     assert version.reload.published?
     assert DataPlane.root.join(version.tarball_path).exist?
-    entry = JSON.parse(DataPlane.read("index/acme/weather.json").lines.first)
+    entry = JSON.parse(DataPlane.read("index/acme/weather.json").lines.second)
     assert_equal version.sha256, entry["sha256"]
   end
 end

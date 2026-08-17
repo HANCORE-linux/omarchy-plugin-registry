@@ -123,15 +123,18 @@ module Registry
       errors << "license must be a known SPDX expression (got #{license})" unless valid_spdx_expression?(license)
     end
 
-    # "MIT", "MIT OR Apache-2.0", "GPL-3.0-only WITH GCC-exception-3.1", …
-    # Token sequence must alternate id, operator, id, … with known ids.
+    # "MIT", "(MIT OR Apache-2.0)", "GPL-3.0-only WITH GCC-exception-3.1", …
+    # Parentheses are grouping-only (precedence doesn't affect validity);
+    # tokens must alternate id, operator, id, and WITH must join a license to
+    # an exception exactly once — no chained WITH.
     def valid_spdx_expression?(expression)
-      tokens = expression.split(/\s+/)
+      tokens = expression.tr("()", " ").split(/\s+/)
       return false if tokens.empty? || tokens.length.even?
 
       tokens.each_with_index.all? do |token, index|
         if index.odd?
-          %w[OR AND WITH].include?(token)
+          %w[OR AND WITH].include?(token) &&
+            (token != "WITH" || index < 2 || tokens[index - 2] != "WITH")
         elsif index.positive? && tokens[index - 1] == "WITH"
           SPDX_EXCEPTION_IDS.include?(token)
         else

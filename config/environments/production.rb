@@ -1,6 +1,8 @@
 require "active_support/core_ext/integer/time"
 
 Rails.application.configure do
+  # Download counts come from CDN log aggregation — no per-GET DB writes at origin
+  config.x.count_origin_downloads = false
   # Settings specified here will take precedence over those in config/application.rb.
 
   # Code is not reloaded between requests.

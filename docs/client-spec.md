@@ -17,10 +17,16 @@ kill list especially.
 | Path | Contents |
 |---|---|
 | `GET /config.json` | URL templates: `dl`, `index`, `revocations`, `signing_key`, `api` |
-| `GET /index/<publisher>/<name>.json` | One JSON line per version: `id`, `vers`, `sha256`, `size`, `yanked`, `license`, `minOmarchyVersion`, `kinds`, `caps` |
+| `GET /index/<publisher>/<name>.json` | First line: meta record with `generated_at`/`expires_at`; then one JSON line per version: `id`, `vers`, `sha256`, `size`, `yanked`, `license`, `minOmarchyVersion`, `kinds`, `caps` |
 | `GET /all.json` | Compact directory listing (search/`plugin available`) |
-| `GET /revocations.json` | `{schemaVersion, revocations: [{plugin, version?, reason, revoked_at}]}` — `version` absent = whole plugin |
+| `GET /revocations.json` | `{schemaVersion, revocations: [{plugin, version?, reason, revoked_at}], generated_at, expires_at}` — `version` absent = whole plugin |
 | `GET /dl/<publisher>/<name>/<name>-<version>.tar.gz` | Immutable tarball |
+
+**Freshness (rollback protection)**: every signed file carries
+`generated_at`/`expires_at`. Reject expired files — for `revocations.json`
+(regenerated every 10 minutes, 24h expiry) fail CLOSED: an expired kill list
+means the mirror is stale or rolled back, so treat installs/updates as blocked
+until a fresh one verifies.
 
 ## `omarchy plugin add <publisher>/<name>`
 

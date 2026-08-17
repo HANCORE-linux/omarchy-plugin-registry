@@ -17,8 +17,11 @@ module Registry
         clone = File.join(dir, "repo")
         # blob:limit keeps oversized current blobs out of the transfer where the
         # server supports partial clone; the on-disk quota is the backstop.
-        run! "git", "-c", "transfer.fsckObjects=true", "clone", "--depth", "1",
-          "--filter=blob:limit=10m", "--quiet", "--", repo_url, clone
+        # followRedirects=false closes the redirect-after-validation gap.
+        # (Residual DNS-rebinding TOCTOU is accepted: seeding is an
+        # operator-run task over a curated catalog, not attacker-triggered.)
+        run! "git", "-c", "transfer.fsckObjects=true", "-c", "http.followRedirects=false",
+          "clone", "--depth", "1", "--filter=blob:limit=10m", "--quiet", "--", repo_url, clone
         enforce_clone_quota!(clone, repo_url)
         bounded_archive(clone, repo_url)
       end
@@ -50,7 +53,10 @@ module Registry
     # size cap — an oversized repo can't balloon runner memory first.
     def self.bounded_archive(clone, repo_url)
       out = +""
-      IO.popen([ "git", "-C", clone, "archive", "--format=tar.gz", "HEAD" ], "rb") do |io|
+      # GIT_ALLOW_PROTOCOL=file: archiving must never lazy-fetch filtered blobs
+      # over the network — a filtered-out oversized blob fails the archive
+      # instead of bypassing the transfer limits.
+      IO.popen([ { "GIT_ALLOW_PROTOCOL" => "file" }, "git", "-C", clone, "archive", "--format=tar.gz", "HEAD" ], "rb") do |io|
         while (chunk = io.read(64 * 1024))
           out << chunk
           if out.bytesize > TarballInspector::MAX_TARBALL_BYTES

@@ -67,7 +67,7 @@ module Registry
           # still runs if invoked. Flag embedded executable images outright,
           # then run the pattern rules over the bytes (entropy excepted \u2014
           # compressed image data is always high-entropy).
-          if content.byteslice(0, 64.kilobytes).to_s.b.match?(/\x7fELF|(?<!^)MZ\x90\x00/n)
+          if content.to_s.b.match?(/\x7fELF|(?<!^)MZ\x90\x00/n)
             findings << Finding.new("polyglot-executable", :flag, path,
               "asset contains an embedded executable image")
           end
@@ -98,11 +98,20 @@ module Registry
 
     PLAIN_FILENAMES = %w[readme license licence copying notice authors changelog contributing codeowners].freeze
 
+    # RIFF is a container: the subtype at offset 8 must match the extension,
+    # or any RIFF-prefixed payload would pass as .webp/.wav.
+    RIFF_SUBTYPES = { ".webp" => "WEBP", ".wav" => "WAVE" }.freeze
+
     def genuine_asset?(path, content)
-      magics = ASSET_MAGIC[File.extname(path).downcase]
+      ext = File.extname(path).downcase
+      magics = ASSET_MAGIC[ext]
       return false if magics.nil?
-      head = content.byteslice(0, 8).to_s.b
-      magics.any? { |magic| head.start_with?(magic) }
+      head = content.byteslice(0, 16).to_s.b
+      return false unless magics.any? { |magic| head.start_with?(magic) }
+      if (subtype = RIFF_SUBTYPES[ext])
+        return head.byteslice(8, 4) == subtype
+      end
+      true
     end
 
     # Valid UTF-8 with a high printable ratio — what a real source file looks like.

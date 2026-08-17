@@ -47,7 +47,7 @@ class AdminTakedownTest < ActionDispatch::IntegrationTest
     # Dropped from the directory listing, index entry flagged yanked
     all = JSON.parse(DataPlane.read("all.json"))
     assert_empty all["plugins"]
-    entry = JSON.parse(DataPlane.read("index/acme/weather.json").lines.first)
+    entry = JSON.parse(DataPlane.read("index/acme/weather.json").lines.second)
     assert entry["yanked"]
 
     # And no new versions can be published
@@ -64,7 +64,9 @@ class AdminTakedownTest < ActionDispatch::IntegrationTest
       post quarantine_admin_version_path(@version), params: { reason: "suspicious update" }
     end
     assert @version.reload.quarantined?
-    assert_equal "", DataPlane.read("index/acme/weather.json").strip
+    index_lines = DataPlane.read("index/acme/weather.json").lines
+    assert_equal 1, index_lines.size, "only the meta line should remain"
+    assert JSON.parse(index_lines.first)["meta"]
 
     get plugin_path("acme", "weather")
     assert_response :success

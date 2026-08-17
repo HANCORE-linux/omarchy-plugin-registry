@@ -53,6 +53,9 @@ module OmarchyPluginRegistry
     # Injectable GitHub repo-identity lookup for trusted-publishing registration
     config.x.github_repo_lookup = nil
 
+    # Origin-side download counting (production uses CDN log aggregation instead)
+    config.x.count_origin_downloads = true
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files

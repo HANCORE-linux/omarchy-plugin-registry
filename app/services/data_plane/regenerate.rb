@@ -29,6 +29,17 @@ module DataPlane
       end
     end
 
+    # Freshness horizons: signed files carry generated_at/expires_at so a
+    # stale or rolled-back CDN/object-store copy stops verifying. The kill
+    # list regenerates every 10 minutes and expires fastest — clients fail
+    # CLOSED on an expired revocation list.
+    REVOCATIONS_TTL = 24.hours
+    INDEX_TTL = 7.days
+
+    def freshness(ttl)
+      { "generated_at" => Time.current.utc.iso8601, "expires_at" => ttl.from_now.utc.iso8601 }
+    end
+
     def write_config
       # The public key is served unsigned (trust root — clients pin it);
       # everything else carries a detached .sig made with this key.
@@ -36,20 +47,22 @@ module DataPlane
       FileUtils.mkdir_p(DataPlane.root)
       key_path.write(Signer.public_key_base64)
 
-      DataPlane.write("config.json", JSON.pretty_generate(
+      DataPlane.write("config.json", JSON.pretty_generate({
         "dl" => "#{DataPlane.base_url}/dl/{publisher}/{name}/{name}-{version}.tar.gz",
         "index" => "#{DataPlane.base_url}/index/{publisher}/{name}.json",
         "revocations" => "#{DataPlane.base_url}/revocations.json",
         "signing_key" => "#{DataPlane.base_url}/signing-key.pub",
         "api" => DataPlane.base_url
-      ))
+      }.merge(freshness(INDEX_TTL))))
     end
 
     # One JSON line per version, append-only in spirit: every version ever
     # created appears; only published/yanked are useful to clients, and yanked
-    # versions stay listed (with the flag) for reproducibility.
+    # versions stay listed (with the flag) for reproducibility. The first line
+    # is a meta record carrying the freshness horizon.
     def write_plugin_index(plugin)
-      lines = plugin.versions.where(state: [ :published, :yanked ])
+      lines = [ JSON.generate({ "meta" => true }.merge(freshness(INDEX_TTL))) ]
+      lines += plugin.versions.where(state: [ :published, :yanked ])
         .order(:version_sort_key).map { |v| JSON.generate(version_entry(v)) }
       DataPlane.write("index/#{plugin.publisher.name}/#{plugin.name}.json", lines.join("\n") + "\n")
     end
@@ -67,12 +80,13 @@ module DataPlane
           "downloads" => plugin.downloads_count
         }
       end
-      DataPlane.write("all.json", JSON.generate("plugins" => plugins, "generated_at" => Time.current.utc.iso8601))
+      DataPlane.write("all.json", JSON.generate({ "plugins" => plugins }.merge(freshness(INDEX_TTL))))
     end
 
     def write_revocations
       entries = Revocation.includes(plugin: :publisher).order(:created_at).map(&:as_kill_list_entry)
-      DataPlane.write("revocations.json", JSON.pretty_generate("schemaVersion" => 1, "revocations" => entries))
+      DataPlane.write("revocations.json", JSON.pretty_generate(
+        { "schemaVersion" => 1, "revocations" => entries }.merge(freshness(REVOCATIONS_TTL))))
     end
 
     private

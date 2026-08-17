@@ -38,7 +38,10 @@ module Admin
       redirect_to admin_root_path, alert: e.message
     end
 
+    # Legal admin transitions only: rejected/yanked are terminal for these
+    # actions, and quarantine applies to live versions.
     def reject
+      return bad_transition! unless @version.releasable? || @version.processing?
       return require_reason! unless params[:reason].present?
       @version.update!(state: :rejected, review_notes: params[:reason])
       @version.plugin.refresh_latest_version!
@@ -47,6 +50,7 @@ module Admin
     end
 
     def quarantine
+      return bad_transition! unless @version.published?
       return require_reason! unless params[:reason].present?
       @version.update!(state: :quarantined, review_notes: params[:reason])
       @version.plugin.refresh_latest_version!
@@ -55,6 +59,7 @@ module Admin
     end
 
     def yank
+      return bad_transition! unless @version.published?
       return require_reason! unless params[:reason].present?
       @version.yank!(reason: params[:reason], actor: Current.user)
       regenerate_and_redirect "Yanked."
@@ -62,6 +67,7 @@ module Admin
 
     # The kill-bit: yank + revocation entry reaching already-installed copies.
     def revoke
+      return bad_transition! unless @version.published? || @version.yanked? || @version.quarantined?
       return require_reason! unless params[:reason].present?
       reason = params[:reason]
       ApplicationRecord.transaction do
@@ -88,6 +94,10 @@ module Admin
 
     def require_reason!
       redirect_to admin_version_path(@version), alert: "A public reason is required for takedown actions."
+    end
+
+    def bad_transition!
+      redirect_to admin_version_path(@version), alert: "That action isn't valid from the #{@version.state} state."
     end
 
     def regenerate_and_redirect(notice)

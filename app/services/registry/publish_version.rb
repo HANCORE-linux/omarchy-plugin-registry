@@ -73,13 +73,27 @@ module Registry
       check_submission_limits!
     end
 
-    # Resource brakes: unbounded monotonic submissions would retain 10MB each
-    # and flood the review queue.
+    # Resource brakes: unbounded submissions would retain 10MB each and flood
+    # the review queue. Publisher-wide limits apply to FIRST submissions too —
+    # new plugin names are not an exemption.
     MAX_PENDING_PER_PLUGIN = 5
     MAX_SUBMISSIONS_PER_DAY = 12
+    MAX_PUBLISHER_SUBMISSIONS_PER_DAY = 30
+    MAX_PLUGINS_PER_PUBLISHER = 100
 
     def check_submission_limits!
-      return if @system_seed || !plugin.persisted?
+      return if @system_seed
+
+      publisher_daily = PluginVersion.joins(:plugin)
+        .where(plugins: { publisher_id: publisher.id }, created_at: 24.hours.ago..).count
+      if publisher_daily >= MAX_PUBLISHER_SUBMISSIONS_PER_DAY
+        fail! "publisher-wide publish rate limit reached (#{MAX_PUBLISHER_SUBMISSIONS_PER_DAY}/day)", status: :too_many_requests
+      end
+      if !plugin.persisted? && publisher.plugins.count >= MAX_PLUGINS_PER_PUBLISHER
+        fail! "publisher has reached the #{MAX_PLUGINS_PER_PUBLISHER}-plugin limit", status: :too_many_requests
+      end
+      return unless plugin.persisted?
+
       if plugin.versions.where(state: [ :processing, :held, :quarantined ]).count >= MAX_PENDING_PER_PLUGIN
         fail! "too many versions awaiting review for #{plugin.full_name} — wait for the pipeline or the admin queue", status: :too_many_requests
       end
