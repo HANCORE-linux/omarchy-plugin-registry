@@ -12,13 +12,25 @@
     <div class="form-inline">
       <% if @version.releasable? %>
         <%= button_to "Approve and publish", approve_admin_version_path(@version), class: "button" %>
-        <%= button_to "Reject", reject_admin_version_path(@version), class: "button button--ghost" %>
+        <%= form_with url: reject_admin_version_path(@version), class: "form-inline" do %>
+          <input type="text" name="reason" class="select" placeholder="Reason (public)" required>
+          <button type="submit" class="button button--ghost">Reject</button>
+        <% end %>
       <% end %>
       <% if @version.published? %>
-        <%= button_to "Quarantine", quarantine_admin_version_path(@version), class: "button button--ghost" %>
-        <%= button_to "Yank", yank_admin_version_path(@version), class: "button button--ghost" %>
-        <%= button_to "Revoke (kill-bit)", revoke_admin_version_path(@version), class: "button button--danger",
-              form: { data: { turbo_confirm: "Kill-bit this version? Installed copies will be disabled." } } %>
+        <%= form_with url: quarantine_admin_version_path(@version), class: "form-inline" do %>
+          <input type="text" name="reason" class="select" placeholder="Reason (public)" required>
+          <button type="submit" class="button button--ghost">Quarantine</button>
+        <% end %>
+        <%= form_with url: yank_admin_version_path(@version), class: "form-inline" do %>
+          <input type="text" name="reason" class="select" placeholder="Reason (public)" required>
+          <button type="submit" class="button button--ghost">Yank</button>
+        <% end %>
+        <%= form_with url: revoke_admin_version_path(@version), class: "form-inline",
+              data: { turbo_confirm: "Kill-bit this version? Installed copies will be disabled." } do %>
+          <input type="text" name="reason" class="select" placeholder="Reason (public)" required>
+          <button type="submit" class="button button--danger">Revoke (kill-bit)</button>
+        <% end %>
       <% end %>
       <%= link_to "Download exact tarball", download_tarball_admin_version_path(@version), class: "button button--ghost" %>
     </div>

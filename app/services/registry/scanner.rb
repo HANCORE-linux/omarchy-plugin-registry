@@ -63,9 +63,14 @@ module Registry
               "content is binary despite a #{File.extname(path)} extension")
           end
         elsif genuine_asset?(path, content)
-          # Polyglots: a valid asset header with script content appended still
-          # executes if invoked. Run the pattern rules over the bytes (entropy
-          # excepted \u2014 compressed image data is always high-entropy).
+          # Polyglots: a valid asset header with executable content behind it
+          # still runs if invoked. Flag embedded executable images outright,
+          # then run the pattern rules over the bytes (entropy excepted \u2014
+          # compressed image data is always high-entropy).
+          if content.byteslice(0, 64.kilobytes).to_s.b.match?(/\x7fELF|(?<!^)MZ\x90\x00/n)
+            findings << Finding.new("polyglot-executable", :flag, path,
+              "asset contains an embedded executable image")
+          end
           scan_file(path, content.dup.force_encoding(Encoding::UTF_8).scrub, entropy: false, strict: false)
         else
           # Unscannable non-asset content ships anyway \u2014 never unreviewed.

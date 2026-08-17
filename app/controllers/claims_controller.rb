@@ -16,6 +16,9 @@ class ClaimsController < ApplicationController
       ApplicationRecord.transaction do
         @publisher.update!(claimed: true)
         Membership.create!(publisher: @publisher, user: Current.user, role: :owner)
+        # The claimed namespace completes onboarding — never route this user
+        # back through the handle-claiming flow.
+        Current.user.update!(name: @publisher.name) if Current.user.name.blank?
         AuditEvent.record!(actor: Current.user, action: "publisher.claim_seeded", subject: @publisher,
           public: true, metadata: { name: @publisher.name, source: @publisher.seed_source_url })
       end

@@ -12,11 +12,15 @@
       <label for="name">Display name</label>
       <input type="text" name="name" id="name" required autofocus value="<%= params[:name] %>" placeholder="Ada Lovelace">
     </div>
-    <div class="field">
-      <label for="handle">Handle</label>
-      <input type="text" name="handle" id="handle" required pattern="[a-z0-9][a-z0-9_-]*" value="<%= params[:handle] %>" placeholder="ada">
-      <p class="hint">Lowercase letters, digits, - or _. This is permanent.</p>
-    </div>
+    <% if Current.user.personal_publisher.nil? %>
+      <div class="field">
+        <label for="handle">Handle</label>
+        <input type="text" name="handle" id="handle" required pattern="[a-z0-9][a-z0-9_-]*" value="<%= params[:handle] %>" placeholder="ada">
+        <p class="hint">Lowercase letters, digits, - or _. This is permanent.</p>
+      </div>
+    <% else %>
+      <p class="hint">Your namespace <strong><%= Current.user.personal_publisher.name %></strong> is already set — just add your name.</p>
+    <% end %>
     <button type="submit" class="button">Claim it</button>
   <% end %>
 </div>

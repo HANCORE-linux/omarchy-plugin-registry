@@ -37,6 +37,7 @@ export default class extends Controller {
 
   async fetchOptions() {
     const response = await fetch(this.optionsUrlValue, { method: "POST", headers: this.headers() })
+    this.followNonJsonRedirect(response)
     if (!response.ok) throw new Error("Could not start the passkey ceremony.")
     return response.json()
   }
@@ -47,9 +48,20 @@ export default class extends Controller {
       headers: { ...this.headers(), "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ ...body, nickname: this.nicknameValue || "" })
     })
+    this.followNonJsonRedirect(response)
     const json = await response.json()
     if (!response.ok) throw new Error(json.error || "Passkey verification failed.")
     return json
+  }
+
+  // A redirect to an HTML page (e.g. the step-up gate) means the server wants
+  // the user somewhere else — navigate there instead of choking on non-JSON.
+  followNonJsonRedirect(response) {
+    const isJson = (response.headers.get("Content-Type") || "").includes("json")
+    if (response.redirected && !isJson) {
+      window.location = response.url
+      throw new Error("Redirecting…")
+    }
   }
 
   headers() {

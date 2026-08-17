@@ -34,6 +34,10 @@ class TrustedPublisher < ApplicationRecord
       claims["workflow_ref"].to_s.start_with?(expected_prefix) &&
       (claims["job_workflow_ref"].blank? || claims["job_workflow_ref"].to_s.start_with?(expected_prefix)) &&
       (claims["environment"].blank? || claims["environment"] == environment) &&
+      # Releases publish from tags — a modified workflow on a random branch
+      # (any collaborator can push one) must not mint tokens even if the
+      # environment protection is misconfigured.
+      claims["ref"].to_s.start_with?("refs/tags/") &&
       FORBIDDEN_EVENTS.exclude?(claims["event_name"])
   end
 end

@@ -15,10 +15,12 @@ to object storage behind a CDN. Installs never touch Rails.
 
 ## Pieces
 
-1. **Web**: `bin/thrust bin/rails server` (Dockerfile is ready). SQLite on a
-   persistent volume by default; to move to Postgres, add `gem "pg"`, point
-   `production.primary` at `DATABASE_URL`, and keep the solid_* databases on
-   SQLite or move them too.
+1. **Web**: `bin/thrust bin/rails server` (Dockerfile is ready). SQLite lives
+   under `/rails/storage` — you MUST mount a persistent volume there
+   (`docker run -v registry-storage:/rails/storage …`), or replacing the
+   container loses accounts, ownership, audit, and revocation state. The same
+   mount also persists the data plane. To move to Postgres instead, add
+   `gem "pg"` and point `production.primary` at `DATABASE_URL`.
 2. **Jobs**: `bin/jobs` (Solid Queue) — runs the review pipeline, hold-window
    releases, and index regeneration. Required.
 3. **Data plane**: `storage/data_plane/` is the CDN origin. Either serve the

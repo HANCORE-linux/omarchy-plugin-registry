@@ -181,6 +181,67 @@ class MomusRemediationsTest < ActionDispatch::IntegrationTest
     assert PluginVersion.find_by(version: "1.0.0").published?
   end
 
+  test "dot-segment path variants cannot dodge duplicate detection" do
+    io = StringIO.new
+    Zlib::GzipWriter.wrap(io) do |gz|
+      Gem::Package::TarWriter.new(gz) do |tar|
+        json = TarballBuilder::DEFAULT_MANIFEST.to_json
+        tar.add_file_simple("manifest.json", 0o644, json.bytesize) { |f| f.write(json) }
+        tar.add_file_simple("Widget.qml", 0o644, 5) { |f| f.write("clean") }
+        tar.add_file_simple("././Widget.qml", 0o644, 4) { |f| f.write("evil") }
+      end
+    end
+    publish io.string
+    assert_response :unprocessable_entity
+    assert_match(/duplicate path/, response.parsed_body["error"])
+  end
+
+  test "PNG-headed executables are flagged as polyglots" do
+    perform_enqueued_jobs do
+      publish TarballBuilder.build(files: {
+        "Widget.qml" => "import QtQuick\nItem {}\n",
+        "icon.png" => "\x89PNG\r\n\x1a\n....\x7fELF\x02\x01\x01 payload".b
+      })
+    end
+    version = PluginVersion.last
+    assert version.quarantined?
+    assert_includes version.scan_results["findings"].map { |f| f["rule"] }, "polyglot-executable"
+  end
+
+  test "onboarding cannot be replayed to squat additional handles" do
+    user = User.create!(email_address: "new@example.com")
+    sign_in_as user
+    post onboarding_path, params: { name: "New", handle: "firsthandle" }
+    assert user.reload.onboarded?
+
+    post onboarding_path, params: { name: "New", handle: "secondhandle" }
+    assert_redirected_to dashboard_path
+    assert_nil Publisher.find_by(name: "secondhandle")
+    assert_equal 1, user.publishers.count
+  end
+
+  test "OIDC exchange requires a tag ref" do
+    user = User.create!(email_address: "ci@example.com", name: "CI",
+      otp_secret: ROTP::Base32.random, otp_enabled_at: Time.current)
+    Membership.create!(publisher: @publisher, user:, role: :owner)
+    TrustedPublisher.create!(publisher: @publisher, plugin_name: "clock",
+      repository: "acme/clock", workflow: ".github/workflows/publish.yml",
+      environment: "release", created_by: user)
+
+    rsa = OpenSSL::PKey::RSA.new(2048)
+    jwk = JWT::JWK.new(rsa.public_key)
+    Rails.application.config.x.github_oidc_jwks = { keys: [ jwk.export.merge(alg: "RS256", use: "sig", kid: jwk.kid) ] }
+    claims = { iss: "https://token.actions.githubusercontent.com", aud: "plugins.omarchy.org",
+      exp: 5.minutes.from_now.to_i, repository: "acme/clock", repository_id: "7", repository_owner_id: "8",
+      sub: "repo:acme/clock:environment:release",
+      workflow_ref: "acme/clock/.github/workflows/publish.yml@refs/heads/main",
+      environment: "release", event_name: "push", ref: "refs/heads/main", sha: "abc", run_id: "1" }
+    post "/api/v1/trusted/exchange", params: { token: JWT.encode(claims, rsa, "RS256", kid: jwk.kid) }
+    assert_response :unauthorized
+  ensure
+    Rails.application.config.x.github_oidc_jwks = nil
+  end
+
   test "admin cannot approve a version the pipeline has not reviewed" do
     publish TarballBuilder.build # no jobs performed -> still processing
     version = PluginVersion.last

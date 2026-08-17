@@ -91,14 +91,14 @@ module Registry
       end
     end
 
-    # Entries may be prefixed with a single top-level directory (git archive
-    # style) or not; normalize to root-relative paths and refuse escapes.
+    # Normalize to canonical root-relative paths — "./x", "././x", and "a//b"
+    # must collapse to the same path extraction would produce, or duplicate
+    # detection can be sidestepped. Escapes are refused outright.
     def clean_path(raw)
-      path = raw.sub(%r{\A\./}, "")
-      if path.start_with?("/") || path.split("/").include?("..") || path.include?("\0")
-        raise InvalidTarball, "illegal path in tarball: #{raw}"
-      end
-      path
+      raise InvalidTarball, "illegal path in tarball: #{raw.inspect}" if raw.include?("\0") || raw.start_with?("/")
+      segments = raw.split("/").reject { |segment| segment == "." || segment.empty? }
+      raise InvalidTarball, "illegal path in tarball: #{raw.inspect}" if segments.empty? || segments.include?("..")
+      segments.join("/")
     end
 
     def parse_manifest(json)
