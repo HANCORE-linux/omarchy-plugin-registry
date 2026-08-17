@@ -29,7 +29,7 @@ class PluginVersionTest < ActiveSupport::TestCase
   end
 
   test "yank leaves resolution and refreshes latest" do
-    admin = User.create!(email_address: "a@example.com", password: "password1234", name: "Admin")
+    admin = User.create!(email_address: "a@example.com", name: "Admin")
     build_version("1.0.0")
     v2 = build_version("1.1.0")
     @plugin.refresh_latest_version!

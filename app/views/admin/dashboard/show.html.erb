@@ -1,0 +1,95 @@
+<% content_for :title, "Admin — Omarchy Plugins" %>
+<div class="content-page container">
+  <p class="eyebrow">Admin</p>
+  <h1>Review queue</h1>
+  <p class="lede">Flagged, held, and processing versions land here. Everything you do lands on
+    the public transparency log.</p>
+
+  <section>
+    <h2>Needs attention (<%= @queue.size %>)</h2>
+    <% if @queue.any? %>
+      <table class="table">
+        <thead><tr><th>Plugin</th><th>Version</th><th>State</th><th>Notes</th><th></th></tr></thead>
+        <tbody>
+          <% @queue.each do |version| %>
+            <tr>
+              <td><%= link_to version.plugin.full_name, plugin_path(version.plugin.publisher.name, version.plugin.name) %></td>
+              <td><%= version.version %></td>
+              <td><%= state_badge(version.state) %></td>
+              <td class="muted"><%= version.review_notes %></td>
+              <td class="actions">
+                <%= button_to "Approve", approve_admin_version_path(version), class: "button button--small" %>
+                <%= button_to "Reject", reject_admin_version_path(version), class: "button button--ghost button--small" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <p class="muted">Queue's empty. As designed.</p>
+    <% end %>
+  </section>
+
+  <section>
+    <h2>Recent versions</h2>
+    <table class="table">
+      <thead><tr><th>Plugin</th><th>Version</th><th>State</th><th>Published</th><th></th></tr></thead>
+      <tbody>
+        <% @recent_versions.each do |version| %>
+          <tr>
+            <td><%= version.plugin.full_name %></td>
+            <td><%= version.version %></td>
+            <td><%= state_badge(version.state) %></td>
+            <td class="muted"><%= version.published_at&.strftime("%Y-%m-%d %H:%M") %></td>
+            <td class="actions">
+              <% if version.published? %>
+                <%= button_to "Quarantine", quarantine_admin_version_path(version), class: "button button--ghost button--small" %>
+                <%= button_to "Yank", yank_admin_version_path(version), class: "button button--ghost button--small" %>
+                <%= button_to "Revoke", revoke_admin_version_path(version), class: "button button--danger button--small",
+                      form: { data: { turbo_confirm: "Kill-bit #{version.plugin.full_name}@#{version.version}? Installed copies will be disabled." } } %>
+              <% end %>
+              <% if version.plugin.active? %>
+                <%= button_to "Burn plugin", security_hold_admin_plugin_path(version.plugin), class: "button button--danger button--small",
+                      form: { data: { turbo_confirm: "Security-hold #{version.plugin.full_name}? This burns the name forever and revokes every version." } } %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Kill list (<%= @revocations.size %>)</h2>
+    <% if @revocations.any? %>
+      <table class="table">
+        <thead><tr><th>Plugin</th><th>Version</th><th>Reason</th><th>When</th></tr></thead>
+        <tbody>
+          <% @revocations.each do |revocation| %>
+            <tr>
+              <td><%= revocation.plugin.full_name %></td>
+              <td><%= revocation.version || "all" %></td>
+              <td><%= revocation.reason %></td>
+              <td class="muted"><%= revocation.created_at.strftime("%Y-%m-%d") %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <p class="muted">Empty — exactly how it should be, almost always.</p>
+    <% end %>
+  </section>
+
+  <section>
+    <h2>Recent events</h2>
+    <ul class="audit-list">
+      <% @recent_events.each do |event| %>
+        <li>
+          <time><%= event.created_at.strftime("%m-%d %H:%M") %></time>
+          <span class="action"><%= event.action %></span>
+          <span class="muted"><%= event.user&.name || "system" %> · <%= event.metadata.map { |k, v| "#{k}: #{v}" }.join(" · ") %></span>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+</div>

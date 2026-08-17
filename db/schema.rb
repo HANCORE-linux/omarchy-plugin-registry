@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_17_034006) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_17_034007) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -75,6 +75,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_034006) do
     t.integer "plugin_version_id", null: false
     t.index ["plugin_version_id", "date"], name: "index_daily_downloads_on_plugin_version_id_and_date", unique: true
     t.index ["plugin_version_id"], name: "index_daily_downloads_on_plugin_version_id"
+  end
+
+  create_table "login_codes", force: :cascade do |t|
+    t.string "code", null: false
+    t.datetime "consumed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["user_id", "code"], name: "index_login_codes_on_user_id_and_code"
+    t.index ["user_id"], name: "index_login_codes_on_user_id"
   end
 
   create_table "memberships", force: :cascade do |t|
@@ -175,7 +185,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_034006) do
     t.json "otp_backup_codes"
     t.datetime "otp_enabled_at"
     t.string "otp_secret"
-    t.string "password_digest", null: false
     t.datetime "sensitive_change_at"
     t.datetime "suspended_at"
     t.datetime "updated_at", null: false
@@ -188,6 +197,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_034006) do
   add_foreign_key "api_tokens", "users"
   add_foreign_key "audit_events", "users"
   add_foreign_key "daily_downloads", "plugin_versions"
+  add_foreign_key "login_codes", "users"
   add_foreign_key "memberships", "publishers"
   add_foreign_key "memberships", "users"
   add_foreign_key "plugin_versions", "plugins"

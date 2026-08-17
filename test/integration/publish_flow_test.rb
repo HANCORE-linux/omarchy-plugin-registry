@@ -2,7 +2,7 @@ require "test_helper"
 
 class PublishFlowTest < ActionDispatch::IntegrationTest
   setup do
-    @user = User.create!(email_address: "dev@example.com", password: "password1234",
+    @user = User.create!(email_address: "dev@example.com",
       name: "Dev", otp_secret: ROTP::Base32.random, otp_enabled_at: Time.current)
     @publisher = Publisher.create!(name: "acme", kind: :org)
     Membership.create!(publisher: @publisher, user: @user, role: :owner)

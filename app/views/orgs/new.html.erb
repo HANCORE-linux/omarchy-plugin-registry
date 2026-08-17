@@ -1,0 +1,20 @@
+<% content_for :title, "New org — Omarchy Plugins" %>
+<div class="form-page">
+  <p class="eyebrow">Organizations</p>
+  <h1>Create an org.</h1>
+  <p>An org is a shared namespace with a member roster. You'll be its owner.</p>
+  <% if @publisher.errors.any? %>
+    <div class="field-errors"><% @publisher.errors.full_messages.each do |e| %><p><%= e %></p><% end %></div>
+  <% end %>
+  <%= form_with url: orgs_path do |form| %>
+    <div class="field">
+      <label for="publisher_name">Namespace</label>
+      <input type="text" name="publisher[name]" id="publisher_name" required pattern="[a-z0-9][a-z0-9_-]*" value="<%= @publisher.name %>">
+    </div>
+    <div class="field">
+      <label for="publisher_display_name">Display name</label>
+      <input type="text" name="publisher[display_name]" id="publisher_display_name" value="<%= @publisher.display_name %>">
+    </div>
+    <button type="submit" class="button">Create org</button>
+  <% end %>
+</div>

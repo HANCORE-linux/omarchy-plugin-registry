@@ -1,0 +1,46 @@
+<section class="hero section-dark">
+  <div class="container">
+    <%= render "shared/logo", class: "glow-mark" %>
+    <p class="eyebrow">plugins.omarchy.org</p>
+    <h1>Plugins for people who love computers.</h1>
+    <p>Hosted, scanned, and revocable — every version is immutable, checksummed, and one
+      command away. Discovery belongs on a web page. This is the web page.</p>
+    <div class="hero__install">
+      <span class="prompt">$</span> omarchy plugin add <span class="prompt">publisher/name</span>
+    </div>
+    <div class="hero__stats">
+      <div class="hero__stat"><b><%= @stats[:plugins] %></b><span>plugins</span></div>
+      <div class="hero__stat"><b><%= @stats[:publishers] %></b><span>publishers</span></div>
+      <div class="hero__stat"><b><%= compact_number(@stats[:downloads]) %></b><span>downloads</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="directory container">
+  <%= form_with url: root_path, method: :get, class: "directory__bar" do %>
+    <input type="search" name="q" value="<%= @query %>" placeholder="Search plugins…" aria-label="Search plugins">
+    <div class="directory__sort">
+      <% HomeController::SORTS.each_key do |sort| %>
+        <%= link_to sort, root_path(q: @query.presence, sort: sort), class: ("active" if @sort == sort) %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if @plugins.any? %>
+    <div class="plugin-grid">
+      <% @plugins.each do |plugin| %>
+        <%= link_to plugin_path(plugin.publisher.name, plugin.name), class: "plugin-card" do %>
+          <h3><span class="ns"><%= plugin.publisher.name %>/</span><%= plugin.name %></h3>
+          <p><%= plugin.summary %></p>
+          <div class="plugin-card__meta">
+            <span><span class="diamond">◆</span> v<%= plugin.latest_version %></span>
+            <span><%= compact_number(plugin.downloads_count) %> downloads</span>
+            <% if plugin.kinds.any? %><span><%= plugin.kinds.first %></span><% end %>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  <% else %>
+    <p class="muted"><% if @query.present? %>Nothing matches “<%= @query %>”.<% else %>No plugins published yet — <%= link_to "be the first", publishing_path %>.<% end %></p>
+  <% end %>
+</section>

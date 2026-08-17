@@ -1,0 +1,43 @@
+<% content_for :title, "Publishing — Omarchy Plugins" %>
+<div class="content-page container">
+  <p class="eyebrow">Publishing guide</p>
+  <h1>Ship a plugin in minutes.</h1>
+  <div class="prose">
+    <p class="statement">Push it anywhere — GitHub, Codeberg, your own Forgejo, or nowhere
+      public at all. The registry never requires a forge. Tag, publish, done.</p>
+
+    <h2>1. Scaffold</h2>
+    <pre>$ omarchy plugin new weather</pre>
+    <p>You get a <code>manifest.json</code>, a starter widget, a readme, and an optional CI
+      publish workflow.</p>
+
+    <h2>2. Claim your namespace</h2>
+    <p><%= link_to "Sign in", new_session_path %> (no password — we email you a code), claim
+      your handle, and enable two-factor auth. Your plugin's id will be
+      <code>handle.name</code>, installed as <code>handle/name</code>.</p>
+
+    <h2>3. Mint a token and publish</h2>
+    <pre>$ omarchy plugin publish
+# or, by hand:
+$ tar czf weather-1.0.0.tar.gz manifest.json Widget.qml README.md
+$ curl -X POST --data-binary @weather-1.0.0.tar.gz \
+    -H "Authorization: Bearer omp_…" \
+    https://plugins.omarchy.org/api/v1/plugins/you/weather/versions</pre>
+    <p>Tokens are push-only, scoped to a single plugin, and expire in 7 days. Every version —
+      first publish or update — runs the same review pipeline. Versions are immutable: once
+      <code>you/weather@1.0.0</code> exists, those bytes are frozen forever.</p>
+
+    <h2>The rules</h2>
+    <ul>
+      <li>Strict semver, always increasing. A used version number is burned forever, even if rejected.</li>
+      <li><code>license</code> (SPDX) is required. <code>repository</code> is optional but earns a verified-repo badge.</li>
+      <li>No symlinks, no entry points outside the plugin directory, 10 MB max.</li>
+      <li>Manifest <code>id</code> must equal <code>yourhandle.pluginname</code>.</li>
+    </ul>
+
+    <h2>Prefer hands-off?</h2>
+    <p>Wire the scaffolded workflow to trusted publishing (GitHub Actions / GitLab CI, OIDC —
+      coming in Phase 2) and tagging <code>v1.0.0</code> publishes for you with no stored
+      secret at all.</p>
+  </div>
+</div>

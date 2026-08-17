@@ -1,0 +1,32 @@
+<% content_for :title, "#{@publisher.name} — Omarchy Plugins" %>
+
+<div class="page-head">
+  <div class="container">
+    <p class="eyebrow"><%= @publisher.org? ? "Organization" : "Publisher" %><%= " · verified" if @publisher.verified? %></p>
+    <h1><%= @publisher.display_name.presence || @publisher.name %></h1>
+    <% if @publisher.bio.present? %><p class="summary"><%= @publisher.bio %></p><% end %>
+    <% unless @publisher.claimed? %>
+      <div class="page-head__row"><span class="badge badge--warning">Unclaimed</span>
+        <span class="muted">Seeded from omarchyplugins.com — the author can claim it by proving control of the source repo.</span></div>
+    <% end %>
+  </div>
+</div>
+
+<section class="directory container">
+  <% if @plugins.any? %>
+    <div class="plugin-grid">
+      <% @plugins.each do |plugin| %>
+        <%= link_to plugin_path(@publisher.name, plugin.name), class: "plugin-card" do %>
+          <h3><%= plugin.name %></h3>
+          <p><%= plugin.summary %></p>
+          <div class="plugin-card__meta">
+            <span><span class="diamond">◆</span> v<%= plugin.latest_version %></span>
+            <span><%= compact_number(plugin.downloads_count) %> downloads</span>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  <% else %>
+    <p class="muted">No published plugins yet.</p>
+  <% end %>
+</section>

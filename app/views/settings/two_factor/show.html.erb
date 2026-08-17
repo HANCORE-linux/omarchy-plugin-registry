@@ -1,0 +1,31 @@
+<% content_for :title, "Two-factor auth — Omarchy Plugins" %>
+<div class="content-page container">
+  <p class="eyebrow">Account security</p>
+  <h1>Two-factor authentication</h1>
+
+  <% if @user.otp_enabled? %>
+    <p class="lede">Enabled. Publishing is unlocked for your account.</p>
+    <% if @user.otp_backup_codes.present? %>
+      <section>
+        <h2>Backup codes</h2>
+        <p class="lede">Each works once if you lose your authenticator. Store them somewhere safe.</p>
+        <ul class="backup-codes">
+          <% @user.otp_backup_codes.each do |code| %><li><code><%= code %></code></li><% end %>
+        </ul>
+      </section>
+    <% end %>
+  <% else %>
+    <p class="lede">Required before you can publish — every registry credential incident starts
+      with a phished account, so publishers here carry a second factor. Scan the code with any
+      TOTP app (passkeys are coming).</p>
+    <div class="qr-box"><%= @qr_svg.html_safe %></div>
+    <p class="muted">Or enter the secret manually: <code><%= @user.otp_secret %></code></p>
+    <%= form_with url: settings_two_factor_path, method: :patch do |form| %>
+      <div class="field" style="max-width: 260px; margin-top: 24px;">
+        <label for="code">Code from your app</label>
+        <input type="text" name="code" id="code" class="code-input" inputmode="numeric" maxlength="6" required>
+      </div>
+      <button type="submit" class="button">Enable</button>
+    <% end %>
+  <% end %>
+</div>

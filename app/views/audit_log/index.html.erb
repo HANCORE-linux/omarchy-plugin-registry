@@ -1,0 +1,17 @@
+<% content_for :title, "Transparency log — Omarchy Plugins" %>
+<div class="content-page container">
+  <p class="eyebrow">Transparency</p>
+  <h1>Audit log</h1>
+  <p class="lede">Every publish, yank, takedown, and namespace claim — in public. The index
+    itself is mirrorable; this is the human-readable view.</p>
+  <ul class="audit-list">
+    <% @events.each do |event| %>
+      <li>
+        <time datetime="<%= event.created_at.iso8601 %>"><%= event.created_at.strftime("%Y-%m-%d %H:%M UTC") %></time>
+        <span class="action"><%= event.action %></span>
+        <span><%= event.metadata.map { |k, v| "#{k}: #{v}" }.join(" · ") %></span>
+      </li>
+    <% end %>
+    <% if @events.empty? %><li><span class="muted">Nothing yet.</span></li><% end %>
+  </ul>
+</div>

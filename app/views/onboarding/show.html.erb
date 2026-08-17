@@ -1,0 +1,22 @@
+<% content_for :title, "Welcome — Omarchy Plugins" %>
+<div class="form-page">
+  <p class="eyebrow">One-time setup</p>
+  <h1>Claim your namespace.</h1>
+  <p>Your handle is where your plugins live — installs will read
+    <code>omarchy plugin add <em>handle</em>/name</code>. First come, first served.</p>
+  <% if @handle_errors.present? %>
+    <div class="field-errors"><% @handle_errors.each do |e| %><p><%= e %></p><% end %></div>
+  <% end %>
+  <%= form_with url: onboarding_path do |form| %>
+    <div class="field">
+      <label for="name">Display name</label>
+      <input type="text" name="name" id="name" required autofocus value="<%= params[:name] %>" placeholder="Ada Lovelace">
+    </div>
+    <div class="field">
+      <label for="handle">Handle</label>
+      <input type="text" name="handle" id="handle" required pattern="[a-z0-9][a-z0-9_-]*" value="<%= params[:handle] %>" placeholder="ada">
+      <p class="hint">Lowercase letters, digits, - or _. This is permanent.</p>
+    </div>
+    <button type="submit" class="button">Claim it</button>
+  <% end %>
+</div>

@@ -1,29 +1,61 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title><%= content_for(:title) || "Omarchy Plugin Registry" %></title>
+    <title><%= content_for(:title) || "Omarchy Plugins" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="Omarchy Plugin Registry">
-    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="description" content="The Omarchy plugin registry — hosted, scanned, revocable. Browse, install, and publish plugins for Omarchy.">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
-
     <%= yield :head %>
-
-    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
-    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
-
-    <link rel="icon" href="/icon.png" type="image/png">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/icon.png">
-
-    <%# Includes all stylesheet files in app/assets/stylesheets %>
+    <%= preload_link_tag "JetBrainsMono-Regular.woff2", as: :font, type: "font/woff2", crossorigin: "anonymous" %>
+    <%= preload_link_tag "ClashGrotesk-Medium.woff2", as: :font, type: "font/woff2", crossorigin: "anonymous" %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
   </head>
 
   <body>
-    <%= yield %>
+    <header class="site-header">
+      <%= link_to root_path, class: "site-header__brand" do %>
+        <%= render "shared/logo", class: "site-header__logo" %>
+        <span class="site-header__wordmark">Omarchy <em>Plugins</em></span>
+      <% end %>
+      <nav class="site-header__nav">
+        <%= link_to "Plugins", root_path %>
+        <%= link_to "Publishing", publishing_path %>
+        <%= link_to "Governance", governance_path %>
+        <% if authenticated? %>
+          <% if Current.user&.admin? %><%= link_to "Admin", admin_root_path %><% end %>
+          <%= link_to "Dashboard", dashboard_path, class: "button" %>
+        <% else %>
+          <%= link_to "Sign in", new_session_path, class: "button" %>
+        <% end %>
+      </nav>
+    </header>
+
+    <% if flash[:notice] || flash[:alert] || (Rails.env.development? && flash[:dev_login_code]) %>
+      <div class="flashes">
+        <% if flash[:notice] %><p class="flash flash--notice"><%= flash[:notice] %></p><% end %>
+        <% if flash[:alert] %><p class="flash flash--alert"><%= flash[:alert] %></p><% end %>
+        <% if Rails.env.development? && flash[:dev_login_code] %>
+          <p class="flash flash--notice">DEV — your sign-in code is <code><%= flash[:dev_login_code] %></code></p>
+        <% end %>
+      </div>
+    <% end %>
+
+    <main><%= yield %></main>
+
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <%= render "shared/logo", class: "site-footer__logo" %>
+        <nav>
+          <%= link_to "Governance", governance_path %>
+          <%= link_to "Transparency log", audit_log_path %>
+          <%= link_to "Publishing guide", publishing_path %>
+          <a href="https://omarchy.org">omarchy.org</a>
+        </nav>
+        <p class="site-footer__legal">plugins.omarchy.org · An <a href="https://www.omacon.org">Omacom</a> project · <span class="katakana">オマコム</span></p>
+      </div>
+    </footer>
   </body>
 </html>

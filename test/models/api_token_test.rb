@@ -2,7 +2,7 @@ require "test_helper"
 
 class ApiTokenTest < ActiveSupport::TestCase
   setup do
-    @user = User.create!(email_address: "dev@example.com", password: "password1234", name: "Dev")
+    @user = User.create!(email_address: "dev@example.com", name: "Dev")
     @publisher = Publisher.create!(name: "acme", kind: :org)
   end
 

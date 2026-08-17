@@ -1,0 +1,31 @@
+<% content_for :title, "Governance — Omarchy Plugins" %>
+<div class="content-page container">
+  <p class="eyebrow">Governance</p>
+  <h1>Who can pull the levers.</h1>
+  <div class="prose">
+    <p class="statement">A registry is a promise: what you install is what was reviewed, and if
+      something malicious slips through, someone you can name will take it down. Here's who,
+      and how.</p>
+
+    <h2>Powers and who holds them</h2>
+    <ul>
+      <li><span class="term">Quarantine</span> — freeze a version pending investigation. New installs stop within minutes; bytes are preserved.</li>
+      <li><span class="term">Yank / takedown</span> — remove a version from resolution permanently. The name and version are burned forever.</li>
+      <li><span class="term">Kill-bit</span> — add an entry to <code>revocations.json</code>, disabling already-installed copies on users' machines.</li>
+      <li><span class="term">Publisher revocation</span> — suspend a compromised or malicious account.</li>
+    </ul>
+    <p>The admin roster will be published on this page — names, not titles — along with who
+      holds the index-signing key and how it is stored. <em>(Roster assignment is in progress;
+      this page ships before the registry accepts its first outside publisher.)</em></p>
+
+    <h2>Appeals</h2>
+    <p>If your plugin was taken down and you believe that's wrong, email
+      <a href="mailto:registry@omarchy.org">registry@omarchy.org</a>. Appeals are answered by a
+      human, in public, on the <%= link_to "transparency log", audit_log_path %>.</p>
+
+    <h2>Transparency</h2>
+    <p>The full index is static, signed, and mirrorable by anyone. Every administrative action
+      lands on the <%= link_to "audit log", audit_log_path %>. If we ever remove something, you
+      can see that we did, when, and why.</p>
+  </div>
+</div>

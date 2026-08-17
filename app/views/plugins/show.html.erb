@@ -1,0 +1,82 @@
+<% content_for :title, "#{@plugin.full_name} — Omarchy Plugins" %>
+
+<% if @plugin.security_holding? %>
+  <div class="notice-banner notice-banner--danger">
+    <strong>Security holding.</strong> This plugin was removed for malware and its name is permanently retired.
+    Installed copies have been disabled via the revocation list.
+  </div>
+<% elsif @plugin.quarantined? %>
+  <div class="notice-banner notice-banner--warning">
+    <strong>Under review.</strong> This plugin is quarantined while our team investigates. It cannot be installed right now.
+  </div>
+<% elsif @revoked %>
+  <div class="notice-banner notice-banner--danger">
+    <strong>Security notice.</strong> One or more versions of this plugin were revoked. Affected installs have been disabled.
+  </div>
+<% end %>
+
+<div class="page-head">
+  <div class="container">
+    <p class="eyebrow"><%= @plugin.kinds.join(" · ") %></p>
+    <h1><span class="ns"><%= link_to @publisher.name, publisher_path(@publisher.name) %>/</span><%= @plugin.name %></h1>
+    <p class="summary"><%= @plugin.summary %></p>
+    <div class="page-head__row">
+      <% if @latest %><%= state_badge(:published) %><span class="muted">v<%= @latest.version %> · <%= @latest.license %></span><% end %>
+      <span class="muted"><%= compact_number(@plugin.downloads_count) %> downloads</span>
+    </div>
+  </div>
+</div>
+
+<div class="plugin-layout container">
+  <article class="readme">
+    <% if @plugin.readme.present? %>
+      <%= render_markdown @plugin.readme %>
+    <% else %>
+      <p class="muted">No readme provided.</p>
+    <% end %>
+  </article>
+
+  <aside class="sidebar">
+    <section>
+      <h4>Install</h4>
+      <div class="install-cmd"><span class="prompt">$</span> omarchy plugin add <%= @plugin.full_name %></div>
+    </section>
+    <section>
+      <h4>Details</h4>
+      <dl>
+        <dt>Plugin id</dt><dd><code><%= @plugin.manifest_id %></code></dd>
+        <% if @latest %>
+          <dt>Version</dt><dd><%= @latest.version %></dd>
+          <dt>Published</dt><dd><%= time_ago_in_words(@latest.published_at) %> ago</dd>
+          <dt>Size</dt><dd><%= number_to_human_size(@latest.size_bytes) %></dd>
+          <dt>SHA-256</dt><dd><code><%= @latest.sha256.first(12) %>…</code></dd>
+        <% end %>
+        <% if @plugin.repository_url.present? %>
+          <dt>Source</dt><dd><%= link_to @plugin.repository_url.sub(%r{\Ahttps?://}, ""), @plugin.repository_url %></dd>
+        <% end %>
+      </dl>
+    </section>
+    <% if @latest&.capability_fingerprint.present? %>
+      <section>
+        <h4>Capabilities</h4>
+        <dl>
+          <% @latest.capability_fingerprint.each do |cap, value| %>
+            <dt><%= cap.humanize %></dt><dd><%= Array(value).join(", ") %></dd>
+          <% end %>
+        </dl>
+      </section>
+    <% end %>
+    <section>
+      <h4>Versions</h4>
+      <ul class="version-list">
+        <% @versions.each do |version| %>
+          <li>
+            <span class="v"><%= version.version %></span>
+            <span class="muted"><%= version.created_at.to_date %></span>
+            <%= state_badge(version.state) unless version.published? %>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+  </aside>
+</div>

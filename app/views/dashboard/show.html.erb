@@ -1,0 +1,86 @@
+<% content_for :title, "Dashboard — Omarchy Plugins" %>
+<div class="content-page container">
+  <p class="eyebrow">Dashboard</p>
+  <h1>Hey, <%= @user.name&.split(" ")&.first || @user.email_address %>.</h1>
+  <p class="lede">
+    <% unless @user.otp_enabled? %>
+      <%= link_to "Enable two-factor auth", settings_two_factor_path %> to unlock publishing.
+    <% else %>
+      Ready to ship. See the <%= link_to "publishing guide", publishing_path %> for the two-minute walkthrough.
+    <% end %>
+  </p>
+
+  <% if flash[:minted_token] %>
+    <div class="token-reveal">
+      <p class="eyebrow">Copy this token now — it won't be shown again</p>
+      <code><%= flash[:minted_token] %></code>
+    </div>
+  <% end %>
+
+  <% @publishers.each do |publisher| %>
+    <section>
+      <h2><%= publisher.name %> <% if publisher.org? %><span class="badge">org</span><% end %></h2>
+      <% if publisher.plugins.any? %>
+        <table class="table">
+          <thead><tr><th>Plugin</th><th>Latest</th><th>Downloads</th><th>State</th></tr></thead>
+          <tbody>
+            <% publisher.plugins.each do |plugin| %>
+              <tr>
+                <td><%= link_to plugin.name, plugin_path(publisher.name, plugin.name) %></td>
+                <td><%= plugin.latest_version || "—" %></td>
+                <td><%= compact_number(plugin.downloads_count) %></td>
+                <td><%= state_badge(plugin.state) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <p class="muted">No plugins yet in this namespace.</p>
+      <% end %>
+    </section>
+  <% end %>
+
+  <section>
+    <h2>Publish tokens</h2>
+    <p class="lede">Push-only, scoped to one plugin, and they expire in 7 days — mint a fresh
+      one when you need it.</p>
+    <% if @tokens.any? %>
+      <table class="table">
+        <thead><tr><th>Token</th><th>Scope</th><th>Expires</th><th></th></tr></thead>
+        <tbody>
+          <% @tokens.each do |token| %>
+            <tr>
+              <td><code><%= token.token_hint %></code></td>
+              <td><%= token.publisher.name %>/<%= token.plugin_name %></td>
+              <td><%= time_ago_in_words(token.expires_at) %></td>
+              <td class="actions"><%= button_to "Revoke", token_path(token), method: :delete, class: "button button--ghost button--small" %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+    <%= form_with url: tokens_path, class: "directory__bar", style: "margin-top: 18px;" do |form| %>
+      <div class="field" style="margin: 0;">
+        <label for="publisher_name">Namespace</label>
+        <select name="publisher_name" id="publisher_name" style="font-family: var(--mono); padding: 12px; border: 1px solid var(--hairline); background: var(--surface);">
+          <% @publishers.each do |publisher| %><option value="<%= publisher.name %>"><%= publisher.name %></option><% end %>
+        </select>
+      </div>
+      <div class="field" style="margin: 0;">
+        <label for="plugin_name">Plugin name</label>
+        <input type="text" name="plugin_name" id="plugin_name" required pattern="[a-z0-9][a-z0-9_-]*" placeholder="weather">
+      </div>
+      <button type="submit" class="button" style="align-self: end;">Mint token</button>
+    <% end %>
+  </section>
+
+  <section>
+    <h2>Organizations</h2>
+    <p class="lede"><%= link_to "Create an org", new_org_path %> to share a namespace with a team.</p>
+  </section>
+
+  <section>
+    <h2>Session</h2>
+    <%= button_to "Sign out", session_path, method: :delete, class: "button button--ghost" %>
+  </section>
+</div>

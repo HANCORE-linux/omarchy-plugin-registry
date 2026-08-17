@@ -1,6 +1,9 @@
+# Passwordless, mirroring Cortex/Herald: sign-in is an emailed one-time code
+# (LoginCode); TOTP — and eventually passkeys — is the second factor required
+# to publish. No password ever exists to phish.
 class User < ApplicationRecord
-  has_secure_password
   has_many :sessions, dependent: :destroy
+  has_many :login_codes, dependent: :destroy
   has_many :memberships, dependent: :destroy
   has_many :publishers, through: :memberships
   has_many :api_tokens, dependent: :destroy
@@ -9,11 +12,23 @@ class User < ApplicationRecord
 
   validates :email_address, presence: true, uniqueness: true,
     format: { with: URI::MailTo::EMAIL_REGEXP }
-  validates :name, presence: true
 
   # Publishing is blocked for a cooldown window after sensitive account changes
-  # (email, password, MFA reset) — the npm post-worm posture.
+  # (email, MFA reset) — the npm post-worm posture.
   PUBLISH_COOLDOWN = 12.hours
+
+  def send_login_code
+    login_codes.create!.tap { |code| LoginCodeMailer.sign_in_code(code).deliver_later }
+  end
+
+  def redeem_login_code(code)
+    login_codes.active.find_by(code: code.to_s.strip)&.tap(&:consume!)
+  rescue ActiveRecord::RecordInvalid
+    nil
+  end
+
+  # Name + a claimed personal namespace = onboarded
+  def onboarded? = name.present? && personal_publisher.present?
 
   def personal_publisher
     publishers.merge(Publisher.personal).first
