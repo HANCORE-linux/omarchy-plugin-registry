@@ -15,8 +15,18 @@ class RecoveriesController < ApplicationController
     end
 
     if user.recovery_requested_at.nil?
+      # The owner's warning email is the defense this whole flow rests on —
+      # the 72-hour clock starts only AFTER the notification is handed off.
+      # Synchronous delivery: an SMTP failure aborts the start (retryable),
+      # never a silent maturity without warning.
+      begin
+        RecoveryMailer.recovery_started(user).deliver_now
+      rescue StandardError => e
+        Rails.logger.error("[Recovery] notification failed for user #{user.id}: #{e.class}")
+        return redirect_to step_up_path,
+          alert: "We couldn't send the security notification email, so recovery was NOT started. Try again shortly."
+      end
       user.update!(recovery_requested_at: Time.current)
-      RecoveryMailer.recovery_started(user).deliver_later
       AuditEvent.record!(actor: user, action: "account.recovery_requested", subject: user)
     end
     redirect_to step_up_path,

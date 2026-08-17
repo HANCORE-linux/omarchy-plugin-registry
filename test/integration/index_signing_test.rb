@@ -27,7 +27,7 @@ class IndexSigningTest < ActionDispatch::IntegrationTest
 
     get "/revocations.json"
     content = response.body
-    get "/revocations.json", params: { sig: 1 }
+    get "/revocations.json.sig"
     signature = response.body
 
     verify_key = Ed25519::VerifyKey.new(Base64.strict_decode64(key))

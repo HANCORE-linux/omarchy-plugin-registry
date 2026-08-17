@@ -33,10 +33,11 @@ class DataPlaneController < ActionController::API
 
   private
 
-  # ?sig=1 (or .sig-suffixed routes) serve the detached signature instead
-  def sig_suffix = params[:sig].present? ? ".sig" : ""
+  # Signature bytes are selected by the request PATH alone (.sig routes) —
+  # never by query string, which shared caches may ignore when keying
+  def sig_suffix = request.path.end_with?(".sig") ? ".sig" : ""
 
-  def content_type_for_json = params[:sig].present? ? "text/plain" : "application/json"
+  def content_type_for_json = request.path.end_with?(".sig") ? "text/plain" : "application/json"
 
   # Returns truthy only when the file was actually sent. Indexes are mutable
   # (short cache); immutable tarballs pass their own cache_control. The

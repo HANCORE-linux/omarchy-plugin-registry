@@ -28,18 +28,26 @@ class TrustedPublisher < ApplicationRecord
   # — a registered workflow delegating to an arbitrary reusable workflow does
   # not get to mint tokens.
   def matches?(claims)
-    # GitHub repo names are case-insensitive; user-entered casing must not
-    # break the match against canonical claims
-    expected_prefix = "#{repository.downcase}/#{workflow}@"
     claims["repository"].to_s.downcase == repository.downcase &&
       claims["sub"].to_s.downcase == "repo:#{repository.downcase}:environment:#{environment.downcase}" &&
-      claims["workflow_ref"].to_s.downcase.start_with?(expected_prefix) &&
-      (claims["job_workflow_ref"].blank? || claims["job_workflow_ref"].to_s.downcase.start_with?(expected_prefix)) &&
+      workflow_ref_matches?(claims["workflow_ref"]) &&
+      (claims["job_workflow_ref"].blank? || workflow_ref_matches?(claims["job_workflow_ref"])) &&
       (claims["environment"].blank? || claims["environment"] == environment) &&
       # Releases publish from tags — a modified workflow on a random branch
       # (any collaborator can push one) must not mint tokens even if the
       # environment protection is misconfigured.
       claims["ref"].to_s.start_with?("refs/tags/") &&
       FORBIDDEN_EVENTS.exclude?(claims["event_name"])
+  end
+
+  private
+
+  # GitHub repo owner/name are case-insensitive; the WORKFLOW PATH is a real
+  # file path and case-sensitive — a case-variant workflow is a different
+  # file and must never satisfy the allowlist.
+  def workflow_ref_matches?(ref)
+    owner, name, rest = ref.to_s.split("/", 3)
+    return false if rest.blank?
+    "#{owner}/#{name}".downcase == repository.downcase && rest.start_with?("#{workflow}@")
   end
 end

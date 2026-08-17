@@ -57,7 +57,10 @@ Rails.application.configure do
 
   # Ignore bad email addresses and do not raise email delivery errors.
   # Set this to true and configure the email server for immediate delivery to raise delivery errors.
-  # config.action_mailer.raise_delivery_errors = false
+  # Delivery failures must RAISE: the recovery flow starts its 72-hour clock
+  # only when the warning email hand-off succeeded, which requires seeing the
+  # failure (jobs also retry rather than silently dropping codes).
+  config.action_mailer.raise_delivery_errors = true
 
   # Set host to be used by links generated in mailer templates.
   config.action_mailer.default_url_options = { host: URI(ENV.fetch("REGISTRY_BASE_URL", "https://plugins.omarchy.org")).host }
