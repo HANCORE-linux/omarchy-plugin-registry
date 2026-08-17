@@ -28,6 +28,10 @@ module OmarchyPluginRegistry
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w[assets tasks])
 
+    # Static data plane output (synced to object storage/CDN in production)
+    config.x.data_plane_root = Rails.root.join("storage/data_plane")
+    config.x.registry_base_url = ENV.fetch("REGISTRY_BASE_URL", "https://plugins.omarchy.org")
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files
