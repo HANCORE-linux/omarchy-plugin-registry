@@ -35,13 +35,10 @@ module Registry
         # ["env","sh","-c",…], or any other argv change, is growth. Individual
         # binaries are also recorded, looking through wrapper commands.
         text.scan(/command:\s*\[([^\]]*)\]/m) do |m|
-          elements = m[0].scan(/["']([^"']*)["']/).flatten
-          next if elements.empty?
-          record_argv(elements, processes)
+          record_command_array(m[0], processes, dynamic_exec_sites)
         end
         text.scan(/\b(?:bar\.run|execDetached|startDetached)\s*\(\s*\[([^\]]*)\]/m) do |m|
-          elements = m[0].scan(/["']([^"']*)["']/).flatten
-          record_argv(elements, processes) if elements.any?
+          record_command_array(m[0], processes, dynamic_exec_sites)
         end
         text.scan(/\b(?:bar\.run|execDetached|startDetached)\s*\(\s*["']([^"']+)["']/) { |m| processes << binary_name(m[0]) }
 
@@ -116,6 +113,16 @@ module Registry
 
     # Wrappers whose real payload is the next argv element
     EXEC_WRAPPERS = %w[env nice nohup timeout stdbuf setsid sudo doas xargs].freeze
+
+    # A command array that mixes literal strings with expressions — e.g.
+    # ["env", program, arg] — is dynamic execution: the quoted parts alone
+    # must not stand in for the whole argv.
+    def record_command_array(raw, processes, dynamic_exec_sites)
+      elements = raw.scan(/["']([^"']*)["']/).flatten
+      residue = raw.gsub(/["'][^"']*["']/, "").gsub(/[\s,]/, "")
+      dynamic_exec_sites << site_digest(raw) if residue.present?
+      record_argv(elements, processes) if elements.any?
+    end
 
     # Record a literal argv: the leading binary (looking through wrappers),
     # every element, and a digest of the whole argv so ANY change — flags,

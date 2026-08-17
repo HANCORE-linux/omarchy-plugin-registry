@@ -1,0 +1,22 @@
+{
+ "name": "http_repository",
+ "manifest": {
+  "schemaVersion": 1,
+  "id": "acme.weather",
+  "name": "Weather",
+  "version": "1.0.0",
+  "kinds": [
+   "bar-widget"
+  ],
+  "entryPoints": {
+   "bar-widget": "Widget.qml"
+  },
+  "license": "MIT",
+  "repository": "http://example.com/x"
+ },
+ "files": {
+  "Widget.qml": "x"
+ },
+ "expect": "invalid",
+ "reason": "https"
+}

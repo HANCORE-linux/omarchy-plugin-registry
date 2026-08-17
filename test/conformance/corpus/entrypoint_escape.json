@@ -1,0 +1,21 @@
+{
+ "name": "entrypoint_escape",
+ "manifest": {
+  "schemaVersion": 1,
+  "id": "acme.weather",
+  "name": "Weather",
+  "version": "1.0.0",
+  "kinds": [
+   "bar-widget"
+  ],
+  "entryPoints": {
+   "bar-widget": "../evil.qml"
+  },
+  "license": "MIT"
+ },
+ "files": {
+  "Widget.qml": "x"
+ },
+ "expect": "invalid",
+ "reason": "relative path"
+}

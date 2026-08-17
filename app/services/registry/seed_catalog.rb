@@ -9,13 +9,18 @@ module Registry
   class SeedCatalog
     SYSTEM_EMAIL = "registry@omarchy.org".freeze
 
-    # Permanently suspended: the system identity exists only as a provenance
-    # marker for seeded versions and can never sign in interactively.
+    # The system identity is an explicit flag, permanently suspended — it
+    # exists only as a provenance marker for seeded versions and can never
+    # sign in. If the email was ever registered interactively, that account is
+    # conscripted: flagged system AND suspended, so it gains nothing.
     def self.system_user
-      User.find_or_create_by!(email_address: SYSTEM_EMAIL) do |u|
-        u.name = "Omarchy Registry"
-        u.suspended_at = Time.current
+      user = User.find_or_create_by!(email_address: SYSTEM_EMAIL) { |u| u.name = "Omarchy Registry" }
+      unless user.system? && user.suspended_at.present?
+        user.update!(system: true, suspended_at: user.suspended_at || Time.current)
+        user.sessions.destroy_all
+        user.api_tokens.usable.find_each(&:revoke!)
       end
+      user
     end
 
     def self.import(entries, snapshotter: RepoSnapshot.method(:tarball_for))

@@ -1,0 +1,21 @@
+{
+ "name": "entrypoint_wrong_extension",
+ "manifest": {
+  "schemaVersion": 1,
+  "id": "acme.weather",
+  "name": "Weather",
+  "version": "1.0.0",
+  "kinds": [
+   "bar-widget"
+  ],
+  "entryPoints": {
+   "bar-widget": "run.sh"
+  },
+  "license": "MIT"
+ },
+ "files": {
+  "run.sh": "#!/bin/sh\n"
+ },
+ "expect": "invalid",
+ "reason": "must be .qml"
+}

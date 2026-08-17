@@ -13,11 +13,17 @@ module Registry
       if Revocation.exists?(plugin: version.plugin, version: version.version)
         raise ArgumentError, "version is on the kill list and can never be released"
       end
-      raise ArgumentError, "cannot release into a #{version.plugin.state} plugin" unless version.plugin.active?
+      # A quarantined placeholder (only rejected history besides this version)
+      # reactivates when its correction releases; anything else must be active.
+      placeholder_correction = version.plugin.quarantined? &&
+        version.plugin.versions.where.not(state: :rejected).where.not(id: version.id).none?
+      unless version.plugin.active? || placeholder_correction
+        raise ArgumentError, "cannot release into a #{version.plugin.state} plugin"
+      end
       # Suspension or membership loss between submit and release must stop the
       # release — the hold window exists precisely for this.
       raise ArgumentError, "publisher is suspended" if version.plugin.publisher.suspended?
-      if (submitter = version.user) && submitter != Registry::SeedCatalog.system_user
+      if (submitter = version.user) && !submitter.system?
         raise ArgumentError, "submitter is suspended" if submitter.suspended_at.present?
         unless submitter.member_of?(version.plugin.publisher)
           raise ArgumentError, "submitter is no longer a member of #{version.plugin.publisher.name}"
@@ -31,6 +37,7 @@ module Registry
       raise "tarball checksum mismatch at release" unless Digest::SHA256.hexdigest(bytes) == version.sha256
 
       ApplicationRecord.transaction do
+        version.plugin.update!(state: :active) if placeholder_correction
         version.update!(state: :published, published_at: Time.current, hold_until: nil)
         DataPlane.freeze_tarball(version, bytes)
         # refresh_latest_version! also applies page metadata from whichever

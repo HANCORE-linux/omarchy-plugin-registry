@@ -40,7 +40,11 @@ kill list especially.
    version whose `minOmarchyVersion` is satisfied.
 2. Fetch + verify `revocations.json`; abort if the selection is revoked.
 3. Download the tarball; check SHA-256 against the index entry.
-4. Existing flow unchanged: `omarchy-plugin-validate` on the staged unpack,
+4. Existing flow unchanged: `omarchy-plugin-validate` on the staged unpack
+   (the shared validation contract lives as data in the registry repo at
+   `test/conformance/corpus/*.json` — run the same corpus against
+   `omarchy-plugin-validate` in Quattro CI so the two validators can never
+   silently diverge),
    id-collision check, move to `~/.config/omarchy/plugins/<id>/`, land
    **disabled** (enable stays a separate consent step).
 5. Write an install receipt next to the manifest:

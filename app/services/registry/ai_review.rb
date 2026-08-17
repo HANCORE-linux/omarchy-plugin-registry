@@ -18,7 +18,7 @@ module Registry
 
     def self.enabled? = Rails.application.config.x.ai_review_command.present?
 
-    def self.review(version:, tarball:, fingerprint:, scan_findings:, previous: nil, capability_growth: [], changed_files: [])
+    def self.review(version:, tarball:, fingerprint:, scan_findings:, previous: nil, capability_growth: [], changed_files: [], previous_contents: {})
       return Result.new("pass", [ "ai review disabled" ]) unless enabled?
 
       payload = {
@@ -31,6 +31,7 @@ module Registry
         # reviewer judges the CHANGE, not just the snapshot
         previous: previous && { version: previous.version, fingerprint: previous.capability_fingerprint },
         changed_files: changed_files,
+        previous_contents: previous_contents,
         capability_growth: capability_growth,
         files: tarball.contents.transform_values { |c| c.dup.force_encoding(Encoding::UTF_8).scrub }
       }
@@ -66,7 +67,7 @@ module Registry
 
     def self.run_command(command, stdin_data)
       require "open3"
-      Open3.popen2(ADAPTER_ENV.call, command, unsetenv_others: true) do |stdin, stdout, wait_thread|
+      Open3.popen2(ADAPTER_ENV.call, command, unsetenv_others: true, pgroup: true) do |stdin, stdout, wait_thread|
         writer = Thread.new do
           stdin.write(stdin_data)
         rescue Errno::EPIPE
@@ -77,7 +78,9 @@ module Registry
         reader = Thread.new { stdout.read(MAX_OUTPUT_BYTES + 1) }
 
         unless wait_thread.join(TIMEOUT_SECONDS)
-          Process.kill("KILL", wait_thread.pid) rescue nil
+          # Negative pid = the whole process group — shell-spawned descendants
+          # die with the parent
+          Process.kill("KILL", -wait_thread.pid) rescue Process.kill("KILL", wait_thread.pid) rescue nil
           wait_thread.join(5)
           raise "reviewer timed out after #{TIMEOUT_SECONDS}s"
         end

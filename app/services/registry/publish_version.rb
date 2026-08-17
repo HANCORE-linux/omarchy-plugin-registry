@@ -79,7 +79,10 @@ module Registry
         @plugin = publisher.plugins.new(name: plugin_name)
         fail! plugin.errors.full_messages.join("; ") unless plugin.valid?
       elsif plugin.quarantined? && plugin.versions.where.not(state: :rejected).none?
-        @reactivate_placeholder = true
+        # Placeholder correction: accept the submission but leave the plugin
+        # quarantined — it only reactivates when the correction RELEASES
+        # (ReleaseVersion), so a failed correction changes nothing publicly.
+        nil
       elsif !plugin.active?
         fail! "#{plugin.full_name} is #{plugin.state.humanize.downcase} and cannot accept new versions", status: :forbidden
       end
@@ -148,7 +151,6 @@ module Registry
       # rejected update can never deface the live page.
       ApplicationRecord.transaction do
         plugin.save! unless plugin.persisted?
-        plugin.update!(state: :active) if @reactivate_placeholder
         @version = plugin.versions.create!(
           user: user,
           version: tarball.manifest["version"],

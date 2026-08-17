@@ -1,0 +1,20 @@
+{
+ "name": "license_with_exception",
+ "manifest": {
+  "schemaVersion": 1,
+  "id": "acme.weather",
+  "name": "Weather",
+  "version": "1.0.0",
+  "kinds": [
+   "bar-widget"
+  ],
+  "entryPoints": {
+   "bar-widget": "Widget.qml"
+  },
+  "license": "GPL-3.0-only WITH GCC-exception-3.1"
+ },
+ "files": {
+  "Widget.qml": "x"
+ },
+ "expect": "valid"
+}

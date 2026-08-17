@@ -38,6 +38,7 @@ module Registry
       @contents = {}
       @digests = {} # full-content SHA-256 per file — diffing must never rely on the truncated scan window
       @truncated = []
+      @directories = Set.new
       manifest_json = nil
       readme_content = nil
       unpacked = 0
@@ -57,6 +58,8 @@ module Registry
 
         case
         when entry.directory?
+          # Tracked so an explicit directory entry can't collide with a file
+          @directories << path
           next
         when entry.header.typeflag == "x"
           # Per-file PAX headers can rewrite what an extractor produces
@@ -95,6 +98,7 @@ module Registry
       # become an immutable release.
       file_set = @files.to_set
       @files.each do |candidate|
+        raise InvalidTarball, "path conflict: #{candidate} is both a file and a directory" if @directories.include?(candidate)
         prefix = candidate.rpartition("/").first
         until prefix.empty?
           raise InvalidTarball, "path conflict: #{prefix} is both a file and a directory" if file_set.include?(prefix)

@@ -1,0 +1,22 @@
+{
+ "name": "bad_min_omarchy_version",
+ "manifest": {
+  "schemaVersion": 1,
+  "id": "acme.weather",
+  "name": "Weather",
+  "version": "1.0.0",
+  "kinds": [
+   "bar-widget"
+  ],
+  "entryPoints": {
+   "bar-widget": "Widget.qml"
+  },
+  "license": "MIT",
+  "minOmarchyVersion": "latest"
+ },
+ "files": {
+  "Widget.qml": "x"
+ },
+ "expect": "invalid",
+ "reason": "minOmarchyVersion"
+}

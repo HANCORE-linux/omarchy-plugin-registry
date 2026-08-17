@@ -1,0 +1,20 @@
+{
+ "name": "service_shell_entrypoint",
+ "manifest": {
+  "schemaVersion": 1,
+  "id": "acme.weather",
+  "name": "Weather",
+  "version": "1.0.0",
+  "kinds": [
+   "service"
+  ],
+  "entryPoints": {
+   "service": "daemon.sh"
+  },
+  "license": "MIT"
+ },
+ "files": {
+  "daemon.sh": "#!/bin/sh\n"
+ },
+ "expect": "valid"
+}

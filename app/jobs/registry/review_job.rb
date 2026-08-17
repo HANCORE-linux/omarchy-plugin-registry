@@ -35,7 +35,8 @@ module Registry
       # reviewer judges the change, not just the snapshot
       changed_files = changed_files_since(previous, tarball) if AiReview.enabled?
       ai = AiReview.review(version:, tarball:, fingerprint:, scan_findings: findings,
-        previous: previous, capability_growth: growth, changed_files: changed_files || [])
+        previous: previous, capability_growth: growth, changed_files: changed_files || [],
+        previous_contents: @previous_contents || {})
 
       # An admin may have rejected or security-held this version while the
       # scan ran — never overwrite a terminal state with a pipeline outcome.
@@ -71,10 +72,16 @@ module Registry
 
     def changed_files_since(previous, tarball)
       return [] unless previous&.tarball&.attached?
-      previous_digests = TarballInspector.inspect_bytes(previous.tarball.download).digests
+      previous_inspection = TarballInspector.inspect_bytes(previous.tarball.download)
+      previous_digests = previous_inspection.digests
       added = tarball.files - previous_digests.keys
       changed = tarball.files.select { |f| previous_digests[f] && previous_digests[f] != tarball.digests[f] }
       removed = previous_digests.keys - tarball.files
+      # Bounded previous contents for changed files so the reviewer can diff
+      # actual source, not just names
+      @previous_contents = changed.first(20).index_with do |f|
+        previous_inspection.contents[f].to_s.byteslice(0, 16.kilobytes).dup.force_encoding(Encoding::UTF_8).scrub
+      end
       added.map { |f| "+#{f}" } + changed.map { |f| "~#{f}" } + removed.map { |f| "-#{f}" }
     rescue TarballInspector::InvalidTarball
       []
@@ -105,9 +112,8 @@ module Registry
       # simply drop out of directory_visible — a failed first attempt is not
       # a public listing.
       plugin = version.plugin
-      seed_user = User.find_by(email_address: SeedCatalog::SYSTEM_EMAIL)
       seeded = !plugin.publisher.claimed? ||
-        (seed_user && plugin.versions.exists?(user_id: seed_user.id))
+        plugin.versions.joins(:user).exists?(users: { system: true })
       if seeded && plugin.active? && plugin.versions.where.not(state: :rejected).none?
         plugin.update!(state: :quarantined)
       end
