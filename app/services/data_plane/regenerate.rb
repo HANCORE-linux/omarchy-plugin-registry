@@ -2,6 +2,11 @@ module DataPlane
   # Regenerates the static index. Cheap at Omarchy's scale — the whole index
   # can be rebuilt on every publish (the crates.io degenerate case).
   class Regenerate
+    # Raised when an on-disk kill list exists but can't be trusted — the run
+    # must die before writing anything, or a restored pre-revocation database
+    # would sign a fresh (empty) kill list over it.
+    class CorruptKillListError < StandardError; end
+
     # A per-plugin trigger still rebuilds everything (cheap at this scale) —
     # writing the one index first and then rewriting it under a second
     # generation would just churn two generations for one publish.
@@ -146,14 +151,28 @@ module DataPlane
     def reconcile_disk_revocations!
       @orphan_revocations = []
       path = DataPlane.root.join("revocations.json")
-      return unless path.exist?
-      content = path.read
       signature = DataPlane.root.join("revocations.json.sig")
-      return unless signature.exist? && Signer.verify?(content, signature.read)
+      return unless path.exist? || signature.exist?
 
-      import_revocation_entries(JSON.parse(content).fetch("revocations", []))
-    rescue JSON::ParserError
-      nil
+      # FAIL CLOSED: an existing-but-unverifiable kill list (missing sibling,
+      # bad signature, malformed JSON) must ABORT regeneration. Proceeding
+      # would overwrite the client-visible mismatch with a freshly signed
+      # kill list built from the (possibly pre-revocation) database — reviving
+      # revoked artifacts. An operator must restore or explicitly remove the
+      # pair before regeneration resumes.
+      raise CorruptKillListError, "revocations.json exists without its .sig sibling" unless signature.exist?
+      raise CorruptKillListError, "revocations.json.sig exists without revocations.json" unless path.exist?
+      content = path.read
+      unless Signer.verify?(content, signature.read)
+        raise CorruptKillListError, "revocations.json signature does not verify"
+      end
+      entries = begin
+        JSON.parse(content).fetch("revocations", [])
+      rescue JSON::ParserError => e
+        raise CorruptKillListError, "revocations.json is signed but malformed: #{e.message}"
+      end
+
+      import_revocation_entries(entries)
     end
 
     # Idempotent, enforcement-first: every entry is re-ENFORCED on every run

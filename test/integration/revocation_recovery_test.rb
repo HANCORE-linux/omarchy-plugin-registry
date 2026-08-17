@@ -60,7 +60,7 @@ class RevocationRecoveryTest < ActionDispatch::IntegrationTest
       "an orphan revocation must never be erased from the signed kill list"
   end
 
-  test "a tampered kill list is ignored, not imported" do
+  test "a tampered kill list ABORTS regeneration — nothing imported, nothing overwritten" do
     sign_in_as @admin
     perform_enqueued_jobs { post revoke_admin_version_path(@version), params: { reason: "malware" } }
     Revocation.delete_all
@@ -69,8 +69,48 @@ class RevocationRecoveryTest < ActionDispatch::IntegrationTest
     tampered = JSON.parse(DataPlane.read("revocations.json"))
     tampered["revocations"] = [ { "plugin" => "acme.weather", "version" => "9.9.9", "reason" => "forged" } ]
     DataPlane.root.join("revocations.json").write(JSON.pretty_generate(tampered))
+    on_disk = DataPlane.read("revocations.json")
 
-    perform_enqueued_jobs { DataPlane::RegenerateJob.perform_later }
+    assert_raises(DataPlane::Regenerate::CorruptKillListError) { DataPlane::Regenerate.all }
     assert_equal 0, Revocation.count, "nothing may be imported from an unverifiable kill list"
+    assert_equal on_disk, DataPlane.read("revocations.json"),
+      "a failed run must not re-sign over the client-visible mismatch"
+  end
+
+  test "a kill list missing its signature sibling aborts regeneration" do
+    sign_in_as @admin
+    perform_enqueued_jobs { post revoke_admin_version_path(@version), params: { reason: "malware" } }
+    DataPlane.root.join("revocations.json.sig").delete
+
+    assert_raises(DataPlane::Regenerate::CorruptKillListError) { DataPlane::Regenerate.all }
+  end
+
+  test "an orphaned signature without its kill list aborts regeneration" do
+    sign_in_as @admin
+    perform_enqueued_jobs { post revoke_admin_version_path(@version), params: { reason: "malware" } }
+    DataPlane.root.join("revocations.json").delete
+
+    assert_raises(DataPlane::Regenerate::CorruptKillListError) { DataPlane::Regenerate.all }
+  end
+
+  test "a signed-but-malformed kill list aborts regeneration" do
+    sign_in_as @admin
+    perform_enqueued_jobs { post revoke_admin_version_path(@version), params: { reason: "malware" } }
+    Revocation.delete_all
+
+    broken = "{ not json"
+    DataPlane.root.join("revocations.json").write(broken)
+    DataPlane.root.join("revocations.json.sig").write(DataPlane::Signer.sign_base64(broken))
+
+    assert_raises(DataPlane::Regenerate::CorruptKillListError) { DataPlane::Regenerate.all }
+    assert_equal 0, Revocation.count
+  end
+
+  test "regeneration proceeds normally when no kill list has ever been written" do
+    DataPlane.root.join("revocations.json").delete if DataPlane.root.join("revocations.json").exist?
+    DataPlane.root.join("revocations.json.sig").delete if DataPlane.root.join("revocations.json.sig").exist?
+
+    DataPlane::Regenerate.all
+    assert DataPlane.root.join("revocations.json").exist?, "first run bootstraps the kill list"
   end
 end
