@@ -40,7 +40,7 @@ module Authentication
     def request_authentication
       # Only GET destinations can be returned to — replaying a POST as a GET
       # after sign-in would 404/405
-      session[:return_to_after_authenticating] = request.get? ? request.url : nil
+      session[:return_to_after_authenticating] = (request.get? || request.head?) ? request.url : nil
       redirect_to new_session_path
     end
 
