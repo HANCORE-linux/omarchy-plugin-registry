@@ -9,7 +9,8 @@ class DataPlaneController < ActionController::API
 
   # Decoded route params must look exactly like names before they touch a
   # path — %2F, dots, and anything else fails closed here.
-  NAME_SEGMENT = /\A[a-z0-9][a-z0-9_-]*\z/
+  # One naming contract — routing rules can never drift from model validation
+  NAME_SEGMENT = NameRules::NAME_FORMAT
 
   def index_file
     return head :not_found unless params[:publisher].to_s.match?(NAME_SEGMENT) && params[:plugin].to_s.match?(NAME_SEGMENT)

@@ -39,13 +39,17 @@ module DataPlane
         # plane are re-learned and ENFORCED before anything is signed, so
         # every file written below reflects post-takedown state.
         generator.reconcile_disk_revocations!
-        # Every promised artifact is verified (and restored if needed) BEFORE
-        # any signed file is written — an unrecoverable artifact aborts the
-        # whole run with the prior index intact.
-        Plugin.find_each { |p| generator.ensure_artifacts!(p) }
+        # The kill list signs IMMEDIATELY after reconciliation — emergency
+        # containment must never be held hostage by an unrelated plugin's
+        # corrupt artifact failing the preflight below.
         generator.write_config
         generator.write_revocations
+        # Every promised artifact is verified (and restored if needed) BEFORE
+        # any index is written — an unrecoverable artifact aborts the rest of
+        # the run with every prior index intact, kill list already out.
+        Plugin.find_each { |p| generator.ensure_artifacts!(p) }
         Plugin.find_each { |p| generator.write_plugin_index(p) }
+        generator.warn_orphan_indexes!
         generator.write_all_listing
       end
     end
@@ -71,6 +75,22 @@ module DataPlane
             "recover the artifact (or take the version down) before regenerating"
         end
         DataPlane.atomic_write(version.tarball_path, bytes)
+      end
+    end
+
+    # A restored database may predate ENTIRE plugin rows. Their surviving
+    # signed indexes are deliberately left untouched (clients keep verifying
+    # them until freshness expires) and flagged every run so the loss is
+    # visible to an operator before expiry hides it.
+    def warn_orphan_indexes!
+      index_root = DataPlane.root.join("index")
+      return unless index_root.exist?
+      known = Plugin.includes(:publisher).map { |p| "#{p.publisher.name}/#{p.name}.json" }.to_set
+      index_root.glob("*/*.json").each do |file|
+        relative = file.relative_path_from(index_root).to_s
+        next if known.include?(relative)
+        Rails.logger.warn("[DataPlane] orphan signed index #{relative} — no matching plugin row " \
+          "(database restored from an older backup?); left untouched, restore the row or remove the pair")
       end
     end
 

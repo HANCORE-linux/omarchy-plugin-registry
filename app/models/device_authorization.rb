@@ -4,6 +4,7 @@
 # receives a freshly minted scoped token. The token plaintext is held
 # encrypted only until the CLI claims it, then wiped.
 class DeviceAuthorization < ApplicationRecord
+  belongs_to :api_token, optional: true
   EXPIRATION = 15.minutes
   USER_CODE_ALPHABET = "BCDFGHJKLMNPQRSTVWXZ23456789".chars.freeze # no lookalikes
   POLL_INTERVAL = 5 # seconds, advisory for clients
@@ -45,7 +46,9 @@ class DeviceAuthorization < ApplicationRecord
 
   def approve!(user:, publisher:, plugin_name:)
     token = ApiToken.mint!(user:, publisher:, plugin_name:)
-    update!(status: :approved, user:, publisher:, plugin_name:,
+    # The EXACT minted token is referenced — polling must report this token's
+    # expiry, not whichever same-scope token happens to be newest
+    update!(status: :approved, user:, publisher:, plugin_name:, api_token: token,
       token_ciphertext: self.class.encryptor.encrypt_and_sign(token.plaintext_token))
     token
   end

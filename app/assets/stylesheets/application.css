@@ -66,6 +66,7 @@
   --rule-shadow: 0 1px 0 var(--ink);
   --rule-shadow-on-dark: 0 1px 0 var(--paper);
   --glow: 0 0 14px rgba(237, 76, 200, 0.8), 0 0 26px rgba(237, 76, 200, 0.6);
+  --glow-filter: drop-shadow(0 0 14px rgba(237, 76, 200, 0.8)) drop-shadow(0 0 26px rgba(237, 76, 200, 0.6));
 
   --ease: cubic-bezier(0.19, 1, 0.22, 1);
   --transition: 0.25s var(--ease);
@@ -222,7 +223,7 @@ pre code { background: none; padding: 0; }
 .hero { padding: 72px 0 64px; }
 .hero h1 { margin: 10px 0 18px; max-width: 17em; }
 .hero p { max-width: 52em; color: var(--text-inverse-soft); }
-.hero .glow-mark { height: 64px; width: auto; color: var(--pink); filter: drop-shadow(0 0 14px rgba(237, 76, 200, 0.8)) drop-shadow(0 0 26px rgba(237, 76, 200, 0.6)); margin-bottom: 28px; }
+.hero .glow-mark { height: 64px; width: auto; color: var(--pink); filter: var(--glow-filter); margin-bottom: 28px; }
 .hero__stats { display: flex; gap: 48px; margin-top: 40px; flex-wrap: wrap; }
 .hero__stat b { display: block; font-family: var(--sans); font-size: 44px; font-weight: 500; line-height: 1; }
 .hero__stat span { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-inverse-soft); }

@@ -36,13 +36,11 @@ module Api
         when authorization.claimed?
           render json: { error: "expired_token" }, status: :bad_request
         else
-          api_token = ApiToken.usable.where(user: authorization.user, publisher: authorization.publisher,
-            plugin_name: authorization.plugin_name).order(created_at: :desc).first
           render json: {
             token: authorization.claim!,
             token_type: "bearer",
             scope: "#{authorization.publisher.name}/#{authorization.plugin_name}",
-            expires_at: api_token&.expires_at&.utc&.iso8601
+            expires_at: authorization.api_token&.expires_at&.utc&.iso8601
           }
         end
       end

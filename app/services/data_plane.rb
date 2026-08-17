@@ -50,6 +50,7 @@ module DataPlane
 
   def atomic_write(relative_path, content)
     path = root.join(relative_path)
+    FileUtils.mkdir_p(path.dirname)
     temp = root.join("#{relative_path}.tmp-#{Process.pid}-#{SecureRandom.hex(4)}")
     temp.open("wb") { |f| f.write(content) }
     File.rename(temp, path)

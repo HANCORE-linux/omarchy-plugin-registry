@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_17_160001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_17_170001) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -91,6 +91,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_160001) do
   end
 
   create_table "device_authorizations", force: :cascade do |t|
+    t.integer "api_token_id"
     t.datetime "created_at", null: false
     t.string "device_code_digest", null: false
     t.datetime "expires_at", null: false
@@ -101,6 +102,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_160001) do
     t.datetime "updated_at", null: false
     t.string "user_code", null: false
     t.integer "user_id"
+    t.index ["api_token_id"], name: "index_device_authorizations_on_api_token_id"
     t.index ["device_code_digest"], name: "index_device_authorizations_on_device_code_digest", unique: true
     t.index ["publisher_id"], name: "index_device_authorizations_on_publisher_id"
     t.index ["user_code"], name: "index_device_authorizations_on_user_code", unique: true
@@ -313,6 +315,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_160001) do
   add_foreign_key "comments", "plugins"
   add_foreign_key "comments", "users"
   add_foreign_key "daily_downloads", "plugin_versions"
+  add_foreign_key "device_authorizations", "api_tokens"
   add_foreign_key "device_authorizations", "publishers"
   add_foreign_key "device_authorizations", "users"
   add_foreign_key "login_codes", "users"

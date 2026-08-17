@@ -126,7 +126,13 @@ module Registry
         ].each do |pattern|
           text.scan(pattern) { |m| dynamic_network_sites << site_digest(m) }
         end
-        text.scan(%r{["'](/(?:etc|usr|var|opt|home)[^"'\s]*)["']}) { |m| paths << m[0] }
+        # EVERY literal absolute target is filesystem capability — /proc, /sys,
+        # /run, /tmp and friends are exactly where secrets and control surfaces
+        # live (/proc/self/environ), so no prefix allowlist. file:// URLs are
+        # filesystem access dressed as a URL. Conservative overmatch is the
+        # point: growth routes to a human.
+        text.scan(%r{["'](/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]{2,}[^"'\s]*)["']}) { |m| paths << m[0] }
+        text.scan(%r{file://(/[^"'\s]+)}i) { |m| paths << m[0] }
         # Filesystem paths BUILT at runtime (env() + concatenation, homePath,
         # StandardPaths, pieces of paths glued with +) are conservatively
         # modeled as dynamic-path sites: static analysis can't see the final
