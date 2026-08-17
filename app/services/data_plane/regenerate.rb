@@ -36,8 +36,16 @@ module DataPlane
     REVOCATIONS_TTL = 24.hours
     INDEX_TTL = 7.days
 
+    # One strictly-increasing generation per regeneration run: clients order
+    # signed files by this integer (timestamps can collide within a second).
+    def generation
+      @generation ||= RegistryCounter.next!("data_plane_generation")
+    end
+
     def freshness(ttl)
-      { "generated_at" => Time.current.utc.iso8601, "expires_at" => ttl.from_now.utc.iso8601 }
+      { "generation" => generation,
+        "generated_at" => Time.current.utc.iso8601,
+        "expires_at" => ttl.from_now.utc.iso8601 }
     end
 
     def write_config

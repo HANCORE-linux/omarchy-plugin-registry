@@ -18,7 +18,7 @@ module Registry
 
     def self.enabled? = Rails.application.config.x.ai_review_command.present?
 
-    def self.review(version:, tarball:, fingerprint:, scan_findings:, previous: nil, capability_growth: [])
+    def self.review(version:, tarball:, fingerprint:, scan_findings:, previous: nil, capability_growth: [], changed_files: [])
       return Result.new("pass", [ "ai review disabled" ]) unless enabled?
 
       payload = {
@@ -30,6 +30,7 @@ module Registry
         # Update context: what the last reviewed version looked like, so the
         # reviewer judges the CHANGE, not just the snapshot
         previous: previous && { version: previous.version, fingerprint: previous.capability_fingerprint },
+        changed_files: changed_files,
         capability_growth: capability_growth,
         files: tarball.contents.transform_values { |c| c.dup.force_encoding(Encoding::UTF_8).scrub }
       }
@@ -52,10 +53,20 @@ module Registry
     MAX_OUTPUT_BYTES = 1.megabyte
 
     # Bounded in time AND output, with the child reliably killed on timeout —
-    # stalled adapters must not accumulate as zombie processes.
+    # stalled adapters must not accumulate as zombie processes. The child runs
+    # with a SCRUBBED environment (unsetenv_others): it processes
+    # attacker-controlled plugin source and must never see REGISTRY_SIGNING_SEED,
+    # SECRET_KEY_BASE, SMTP credentials, or anything else from the app env.
+    # Adapters that need API keys read them from their own config files; run
+    # them under a separate UID (systemd DynamicUser / a sidecar) for full
+    # filesystem isolation — see docs/deploy.md.
+    ADAPTER_ENV = lambda do
+      { "PATH" => ENV["PATH"], "HOME" => Dir.tmpdir, "LANG" => ENV["LANG"] }.compact
+    end
+
     def self.run_command(command, stdin_data)
       require "open3"
-      Open3.popen2(command) do |stdin, stdout, wait_thread|
+      Open3.popen2(ADAPTER_ENV.call, command, unsetenv_others: true) do |stdin, stdout, wait_thread|
         writer = Thread.new do
           stdin.write(stdin_data)
         rescue Errno::EPIPE

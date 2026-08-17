@@ -231,7 +231,7 @@ class MomusRemediationsTest < ActionDispatch::IntegrationTest
     rsa = OpenSSL::PKey::RSA.new(2048)
     jwk = JWT::JWK.new(rsa.public_key)
     Rails.application.config.x.github_oidc_jwks = { keys: [ jwk.export.merge(alg: "RS256", use: "sig", kid: jwk.kid) ] }
-    claims = { iss: "https://token.actions.githubusercontent.com", aud: "plugins.omarchy.org",
+    claims = { iss: "https://token.actions.githubusercontent.com", aud: "plugins.omarchy.org", jti: SecureRandom.uuid,
       exp: 5.minutes.from_now.to_i, repository: "acme/clock", repository_id: "7", repository_owner_id: "8",
       sub: "repo:acme/clock:environment:release",
       workflow_ref: "acme/clock/.github/workflows/publish.yml@refs/heads/main",

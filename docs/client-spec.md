@@ -28,9 +28,11 @@ kill list especially.
 1. Reject expired files. For `revocations.json` (regenerated every 10 minutes,
    24h expiry) fail CLOSED: an expired kill list means the mirror is stale or
    rolled back, so treat installs/updates as blocked until a fresh one verifies.
-2. **Monotonicity**: persist the last accepted `generated_at` per file and
-   reject anything older — a still-unexpired but older signed copy is a
-   rollback and must not replace a newer kill list.
+2. **Monotonicity**: signed files carry an integer `generation` that strictly
+   increases with every regeneration. Persist the last accepted generation per
+   file and reject anything lower-or-equal-but-different — a still-unexpired
+   older signed copy is a rollback and must not replace a newer kill list.
+   (`generated_at` is informational; order by `generation`.)
 
 ## `omarchy plugin add <publisher>/<name>`
 

@@ -31,9 +31,11 @@ module Registry
         .order(version_sort_key: :desc).first
       growth = CapabilityFingerprint.growth(previous&.capability_fingerprint, fingerprint)
 
-      # 3. AI review (escalate-only)
+      # 3. AI review (escalate-only) — updates carry the file-level diff so the
+      # reviewer judges the change, not just the snapshot
+      changed_files = changed_files_since(previous, tarball) if AiReview.enabled?
       ai = AiReview.review(version:, tarball:, fingerprint:, scan_findings: findings,
-        previous: previous, capability_growth: growth)
+        previous: previous, capability_growth: growth, changed_files: changed_files || [])
 
       # An admin may have rejected or security-held this version while the
       # scan ran — never overwrite a terminal state with a pipeline outcome.
@@ -66,6 +68,17 @@ module Registry
     end
 
     private
+
+    def changed_files_since(previous, tarball)
+      return [] unless previous&.tarball&.attached?
+      previous_digests = TarballInspector.inspect_bytes(previous.tarball.download).digests
+      added = tarball.files - previous_digests.keys
+      changed = tarball.files.select { |f| previous_digests[f] && previous_digests[f] != tarball.digests[f] }
+      removed = previous_digests.keys - tarball.files
+      added.map { |f| "+#{f}" } + changed.map { |f| "~#{f}" } + removed.map { |f| "-#{f}" }
+    rescue TarballInspector::InvalidTarball
+      []
+    end
 
     # Even a fully clean version waits out a short hold before going live —
     # worm-speed propagation dies to a cheap delay.

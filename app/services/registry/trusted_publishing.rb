@@ -56,7 +56,9 @@ module Registry
     # refused (the CI job already got its publish token).
     def self.reject_replay!(claims)
       jti = claims["jti"].to_s
-      return if jti.blank? # older tokens without jti fall back to expiry alone
+      # GitHub always issues jti; a token without one cannot be deduplicated
+      # and therefore cannot be exchanged
+      raise ExchangeError, "OIDC token missing jti" if jti.blank?
       unless Rails.cache.write("oidc_jti:#{jti}", 1, unless_exist: true, expires_in: 15.minutes)
         raise ExchangeError, "OIDC token already exchanged"
       end

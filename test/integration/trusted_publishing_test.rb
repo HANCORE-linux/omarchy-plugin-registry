@@ -25,6 +25,7 @@ class TrustedPublishingTest < ActionDispatch::IntegrationTest
     claims = {
       iss: "https://token.actions.githubusercontent.com",
       aud: "plugins.omarchy.org",
+      jti: SecureRandom.uuid,
       exp: 5.minutes.from_now.to_i,
       repository: "acme/weather",
       repository_id: "424242",

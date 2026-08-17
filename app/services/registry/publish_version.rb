@@ -40,17 +40,20 @@ module Registry
 
     def authorize!
       fail! "publisher is suspended", status: :forbidden if publisher.suspended?
-      fail! "account is suspended", status: :forbidden if user.suspended_at.present?
+      # The seed system identity is permanently suspended (it can never sign
+      # in) — its user-level checks are meaningless for seeding
       return if @system_seed
+      fail! "account is suspended", status: :forbidden if user.suspended_at.present?
       fail! "namespace is unclaimed — prove control of the source repo to claim it", status: :forbidden unless publisher.claimed?
       membership = user.memberships.find_by(publisher: publisher)
       fail! "you are not a member of #{publisher.name}", status: :forbidden if membership.nil?
       # Roster changes are an account-takeover vector: freshly ADDED members
-      # wait out a cooldown before publishing through the namespace. Only the
-      # FOUNDING membership (the earliest, i.e. the creator) is exempt —
-      # collaborators added minutes after org creation are not.
-      if membership.created_at > User::PUBLISH_COOLDOWN.ago &&
-          membership.id != publisher.memberships.minimum(:id)
+      # wait out a cooldown before publishing through the namespace. Exemption
+      # is pinned to the membership CREATED WITH the namespace itself (within
+      # a minute) — it can't drift to whoever holds the lowest id after a
+      # founder removal, and later collaborators are never exempt.
+      founding = membership.created_at <= publisher.created_at + 1.minute
+      if membership.created_at > User::PUBLISH_COOLDOWN.ago && !founding
         fail! "recently added members wait #{User::PUBLISH_COOLDOWN.inspect} before publishing to #{publisher.name}", status: :forbidden
       end
       fail! "add a passkey or enable two-factor authentication to publish", status: :forbidden unless user.second_factor?

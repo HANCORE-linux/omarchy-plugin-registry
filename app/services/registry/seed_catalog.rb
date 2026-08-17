@@ -9,8 +9,13 @@ module Registry
   class SeedCatalog
     SYSTEM_EMAIL = "registry@omarchy.org".freeze
 
+    # Permanently suspended: the system identity exists only as a provenance
+    # marker for seeded versions and can never sign in interactively.
     def self.system_user
-      User.find_or_create_by!(email_address: SYSTEM_EMAIL) { |u| u.name = "Omarchy Registry" }
+      User.find_or_create_by!(email_address: SYSTEM_EMAIL) do |u|
+        u.name = "Omarchy Registry"
+        u.suspended_at = Time.current
+      end
     end
 
     def self.import(entries, snapshotter: RepoSnapshot.method(:tarball_for))
