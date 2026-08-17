@@ -54,12 +54,14 @@ class DeviceAuthorization < ApplicationRecord
     update!(status: :denied, user:)
   end
 
-  # One-shot: hands the token to the CLI and destroys the plaintext.
+  # One-shot: the atomic status flip decides the single winner among
+  # concurrent polls; only the winner decrypts.
   def claim!
-    raise ActiveRecord::RecordInvalid, self unless approved?
-    plaintext = self.class.encryptor.decrypt_and_verify(token_ciphertext)
-    update!(status: :claimed, token_ciphertext: nil)
-    plaintext
+    ciphertext = token_ciphertext
+    claimed_rows = self.class.where(id: id, status: :approved)
+      .update_all(status: :claimed, token_ciphertext: nil)
+    raise ActiveRecord::RecordInvalid, self unless claimed_rows == 1 && ciphertext.present?
+    self.class.encryptor.decrypt_and_verify(ciphertext)
   end
 
   def expired? = expires_at.past?

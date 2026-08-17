@@ -2,8 +2,10 @@ module DataPlane
   # Regenerates the static index. Cheap at Omarchy's scale — the whole index
   # can be rebuilt on every publish (the crates.io degenerate case).
   class Regenerate
-    def self.plugin(plugin)
-      new.write_plugin_index(plugin)
+    # A per-plugin trigger still rebuilds everything (cheap at this scale) —
+    # writing the one index first and then rewriting it under a second
+    # generation would just churn two generations for one publish.
+    def self.plugin(_plugin)
       all
     end
 

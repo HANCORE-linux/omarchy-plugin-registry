@@ -7,13 +7,19 @@ class DataPlaneController < ActionController::API
   def revocations = serve("revocations.json#{sig_suffix}", type: content_type_for_json)
   def signing_key = serve("signing-key.pub", type: "text/plain")
 
+  # Decoded route params must look exactly like names before they touch a
+  # path — %2F, dots, and anything else fails closed here.
+  NAME_SEGMENT = /\A[a-z0-9][a-z0-9_-]*\z/
+
   def index_file
+    return head :not_found unless params[:publisher].to_s.match?(NAME_SEGMENT) && params[:plugin].to_s.match?(NAME_SEGMENT)
     serve("index/#{params[:publisher]}/#{params[:plugin]}.json#{sig_suffix}", type: content_type_for_json)
   end
 
   def tarball
+    return head :not_found unless params[:publisher].to_s.match?(NAME_SEGMENT) && params[:plugin].to_s.match?(NAME_SEGMENT)
     filename = params[:plugin_file]
-    version = filename[/\A#{Regexp.escape(params[:plugin])}-(.+)\.tar\.gz\z/, 1]
+    version = filename[/\A#{Regexp.escape(params[:plugin])}-([0-9A-Za-z.\-+]+)\.tar\.gz\z/, 1]
     return head :not_found unless version
     served = serve("dl/#{params[:publisher]}/#{params[:plugin]}/#{filename}",
       type: "application/gzip", disposition: "attachment", filename: filename,
@@ -32,10 +38,12 @@ class DataPlaneController < ActionController::API
   def content_type_for_json = params[:sig].present? ? "text/plain" : "application/json"
 
   # Returns truthy only when the file was actually sent. Indexes are mutable
-  # (short cache); immutable tarballs pass their own cache_control.
+  # (short cache); immutable tarballs pass their own cache_control. The
+  # containment check runs on the CANONICALIZED absolute path — ../ segments
+  # or encoded separators can never escape the data-plane root.
   def serve(relative_path, type:, disposition: "inline", filename: nil, cache_control: "public, max-age=60")
-    path = DataPlane.root.join(relative_path)
-    unless path.file? && path.to_s.start_with?(DataPlane.root.to_s)
+    path = File.expand_path(relative_path, DataPlane.root.to_s)
+    unless path.start_with?(DataPlane.root.to_s + File::SEPARATOR) && File.file?(path)
       head :not_found
       return false
     end

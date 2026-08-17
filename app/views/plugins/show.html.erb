@@ -18,6 +18,13 @@
   <div class="notice-banner notice-banner--danger">
     <strong>Security notice.</strong> One or more versions of this plugin were revoked. Affected installs have been disabled.
   </div>
+<% elsif (withdrawn = @versions.select(&:yanked?)).any? %>
+  <div class="notice-banner notice-banner--warning">
+    <strong>Withdrawn versions.</strong>
+    <% withdrawn.first(3).each do |version| %>
+      v<%= version.version %> was yanked<%= " — #{version.yank_reason}" if version.yank_reason.present? %>.
+    <% end %>
+  </div>
 <% end %>
 
 <div class="page-head">

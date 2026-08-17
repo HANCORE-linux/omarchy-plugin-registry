@@ -13,7 +13,8 @@ class OrgsController < ApplicationController
       display_name: params.dig(:publisher, :display_name), kind: :org)
     if @publisher.save
       Membership.create!(publisher: @publisher, user: Current.user, role: :owner)
-      AuditEvent.record!(actor: Current.user, action: "org.create", subject: @publisher)
+      AuditEvent.record!(actor: Current.user, action: "org.create", subject: @publisher,
+        public: true, metadata: { name: @publisher.name })
       redirect_to dashboard_path, notice: "Org #{@publisher.name} created."
     else
       render :new, status: :unprocessable_entity

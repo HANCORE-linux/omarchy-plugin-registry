@@ -66,7 +66,13 @@ class Plugin < ApplicationRecord
 
     latest = latest_published_version
     if latest
-      readme_content = latest.tarball.attached? ? Registry::TarballInspector.inspect_bytes(latest.tarball.download).readme : nil
+      # Best effort only: a missing or unreadable historical tarball must
+      # never block the takedown transaction this runs inside
+      readme_content = begin
+        latest.tarball.attached? ? Registry::TarballInspector.inspect_bytes(latest.tarball.download).readme : nil
+      rescue StandardError
+        nil
+      end
       update!(
         latest_version: latest.version,
         summary: latest.manifest["description"],

