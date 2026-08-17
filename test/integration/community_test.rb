@@ -58,7 +58,8 @@ class CommunityTest < ActionDispatch::IntegrationTest
     report = Report.last
     assert_nil report.resolved_at
 
-    admin = User.create!(email_address: "admin@example.com", name: "Admin", admin: true)
+    admin = User.create!(email_address: "admin@example.com", name: "Admin", admin: true,
+      otp_secret: ROTP::Base32.random, otp_enabled_at: Time.current)
     sign_in_as admin
     post resolve_admin_report_path(report, hide: 1)
     assert comment.reload.hidden?

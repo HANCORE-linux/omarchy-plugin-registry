@@ -8,6 +8,13 @@ module StepUpAuthentication
 
   private
 
+  # For second-factor MANAGEMENT (adding/removing factors): open on first
+  # enrollment, gated once any factor exists — email compromise must not be
+  # able to add an attacker-controlled factor next to a real one.
+  def require_step_up_if_second_factor_enrolled
+    require_recent_second_factor if Current.user.second_factor?
+  end
+
   def require_recent_second_factor
     user = Current.user
     unless user.second_factor?

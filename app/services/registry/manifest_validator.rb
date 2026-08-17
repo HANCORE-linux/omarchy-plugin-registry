@@ -3,10 +3,19 @@ module Registry
   # All registry metadata derives from the manifest inside the tarball — no
   # sidecar metadata is accepted (kills the manifest-confusion bug class).
   #
-  # TODO: sync ALLOWED_KINDS and the kind/entry-point table verbatim with
-  # bin/omarchy-plugin-validate from the Quattro repo before launch.
+  # KIND_ENTRY_RULES is the registry's authoritative kind/entry-point contract;
+  # the Quattro-side validator must stay in lockstep (tracked in docs/client-spec.md).
   class ManifestValidator
-    ALLOWED_KINDS = %w[bar-widget panel popout service command theme].freeze
+    # kind => allowed entry-point extensions
+    KIND_ENTRY_RULES = {
+      "bar-widget" => %w[.qml],
+      "panel" => %w[.qml],
+      "popout" => %w[.qml],
+      "service" => %w[.qml .sh],
+      "command" => %w[.sh],
+      "theme" => %w[.json .css]
+    }.freeze
+    ALLOWED_KINDS = KIND_ENTRY_RULES.keys.freeze
     ID_FORMAT = /\A[A-Za-z0-9][A-Za-z0-9._-]*\z/
     SPDX_FORMAT = /\A[A-Za-z0-9.+\-]+(?:\s(?:OR|AND|WITH)\s[A-Za-z0-9.+\-]+)*\z/
 
@@ -82,6 +91,11 @@ module Registry
           next
         end
         errors << "entry point #{path} not found in tarball" unless tarball.include?(path)
+
+        allowed = KIND_ENTRY_RULES[kind]
+        if allowed && allowed.exclude?(File.extname(path).downcase)
+          errors << "entry point for #{kind} must be #{allowed.join(' or ')} (got #{path})"
+        end
       end
     end
 

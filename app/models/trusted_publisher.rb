@@ -4,9 +4,10 @@
 # creates it.
 class TrustedPublisher < ApplicationRecord
   PROVIDERS = %w[github].freeze
-  # Resurrection-attack mitigations: these trigger in the context of another
-  # repo's code and must never mint tokens.
-  FORBIDDEN_EVENTS = %w[pull_request_target workflow_run].freeze
+  # Resurrection-attack mitigations: pull_request runs fork code, and
+  # pull_request_target/workflow_run run in another context's blast radius.
+  # None of them mint tokens.
+  FORBIDDEN_EVENTS = %w[pull_request pull_request_target workflow_run].freeze
 
   belongs_to :publisher
   belongs_to :created_by, class_name: "User"
@@ -18,17 +19,21 @@ class TrustedPublisher < ApplicationRecord
   validates :workflow, presence: true, format: { with: %r{\A\.github/workflows/[\w.-]+\.ya?ml\z} }
   validates :environment, presence: true
 
-  # workflow_ref identifies the caller workflow on direct runs; on reusable-
-  # workflow runs job_workflow_ref points at the called workflow instead. We
-  # pin the registered workflow via workflow_ref, and when job_workflow_ref is
-  # present it must ALSO match — a registered workflow that delegates to an
-  # arbitrary reusable workflow does not get to mint tokens.
+  # The environment binding is GitHub's `sub` contract: a job that runs in a
+  # pinned environment carries sub = "repo:<owner>/<repo>:environment:<env>".
+  # That is the primary check — the top-level environment claim is redundant
+  # confirmation when present, never a substitute. workflow_ref identifies the
+  # caller workflow on direct runs; on reusable-workflow runs job_workflow_ref
+  # points at the called workflow instead, and when present it must ALSO match
+  # — a registered workflow delegating to an arbitrary reusable workflow does
+  # not get to mint tokens.
   def matches?(claims)
     expected_prefix = "#{repository}/#{workflow}@"
     claims["repository"] == repository &&
+      claims["sub"] == "repo:#{repository}:environment:#{environment}" &&
       claims["workflow_ref"].to_s.start_with?(expected_prefix) &&
       (claims["job_workflow_ref"].blank? || claims["job_workflow_ref"].to_s.start_with?(expected_prefix)) &&
-      claims["environment"] == environment &&
+      (claims["environment"].blank? || claims["environment"] == environment) &&
       FORBIDDEN_EVENTS.exclude?(claims["event_name"])
   end
 end

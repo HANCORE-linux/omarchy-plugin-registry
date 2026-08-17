@@ -41,8 +41,12 @@ module Registry
       readme_content = nil
       unpacked = 0
 
+      entry_count = 0
       each_tar_entry do |entry|
-        raise InvalidTarball, "too many files" if @files.length >= MAX_ENTRIES
+        # Count EVERY entry (directories included) so an archive can't smuggle
+        # unbounded headers past a files-only limit.
+        entry_count += 1
+        raise InvalidTarball, "too many entries" if entry_count > MAX_ENTRIES
 
         path = clean_path(entry.full_name)
         case

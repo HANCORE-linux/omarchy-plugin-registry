@@ -1,6 +1,7 @@
 module Settings
   class PasskeysController < ApplicationController
     before_action :require_recent_second_factor, only: :destroy
+    before_action :require_step_up_if_second_factor_enrolled, only: %i[options create]
 
     # POST /settings/passkeys/options — creation options for the browser ceremony
     def options
@@ -27,7 +28,9 @@ module Settings
         nickname: params[:nickname].presence || "Passkey"
       )
       AuditEvent.record!(actor: Current.user, action: "passkey.register", subject: Current.user)
-      mark_second_factor_verified!
+      # Only FIRST enrollment bootstraps verification; adding a factor later
+      # required step-up already and must not extend it via registration.
+      mark_second_factor_verified! if Current.user.passkeys.count == 1 && !Current.user.otp_enabled?
       render json: { ok: true }
     rescue WebAuthn::Error, JSON::ParserError => e
       render json: { error: "Passkey registration failed: #{e.message}" }, status: :unprocessable_entity

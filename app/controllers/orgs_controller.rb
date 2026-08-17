@@ -1,5 +1,8 @@
 class OrgsController < ApplicationController
   before_action :require_recent_second_factor, only: :add_member
+  # Namespaces are first-claim and burned forever — throttle bulk squatting
+  rate_limit to: 5, within: 1.day, only: :create,
+    with: -> { redirect_to dashboard_path, alert: "Org creation is limited to a few per day." }
 
   def new
     @publisher = Publisher.new(kind: :org)

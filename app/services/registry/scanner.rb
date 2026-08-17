@@ -12,9 +12,23 @@ module Registry
 
     TEXT_EXTENSIONS = %w[.qml .js .mjs .sh .bash .json .md .txt .yml .yaml .toml .conf .css .svg .xml .html .ini .desktop].freeze
 
-    # Benign asset types allowed through unscanned; anything else unscannable
-    # (executables, libraries, archives, unknown binaries) is flagged.
-    ASSET_EXTENSIONS = %w[.png .jpg .jpeg .gif .webp .ico .ttf .otf .woff .woff2 .mp3 .wav .ogg].freeze
+    # Benign asset types allowed through unscanned — but only when the content
+    # actually matches the claimed type. A script named icon.png is a payload.
+    ASSET_MAGIC = {
+      ".png" => [ "\x89PNG".b ],
+      ".jpg" => [ "\xFF\xD8\xFF".b ],
+      ".jpeg" => [ "\xFF\xD8\xFF".b ],
+      ".gif" => [ "GIF87a".b, "GIF89a".b ],
+      ".webp" => [ "RIFF".b ],
+      ".ico" => [ "\x00\x00\x01\x00".b, "\x00\x00\x02\x00".b ],
+      ".ttf" => [ "\x00\x01\x00\x00".b, "true".b ],
+      ".otf" => [ "OTTO".b ],
+      ".woff" => [ "wOFF".b ],
+      ".woff2" => [ "wOF2".b ],
+      ".mp3" => [ "ID3".b, "\xFF\xFB".b, "\xFF\xF3".b, "\xFF\xF2".b ],
+      ".wav" => [ "RIFF".b ],
+      ".ogg" => [ "OggS".b ]
+    }.freeze
 
     # Invisible/bidi characters used to hide code from review (the GlassWorm
     # trick). A leading BOM is stripped before scanning; any other occurrence
@@ -41,10 +55,10 @@ module Registry
           text = content.dup.force_encoding(Encoding::UTF_8)
           text = text.scrub unless text.valid_encoding?
           scan_file(path, text.delete_prefix("\uFEFF"))
-        elsif !ASSET_EXTENSIONS.include?(File.extname(path).downcase)
+        elsif !genuine_asset?(path, content)
           # Unscannable non-asset content ships anyway \u2014 never unreviewed.
           findings << Finding.new("binary-payload", :flag, path,
-            "file type is not scannable (#{File.extname(path).presence || 'no extension'}); a human must look")
+            "file is not a scannable type or a recognizable asset (#{File.extname(path).presence || 'no extension'}); a human must look")
         end
       end
       # Reviewed bytes must be ALL the bytes: anything past the per-file scan
@@ -66,6 +80,13 @@ module Registry
     private
 
     PLAIN_FILENAMES = %w[readme license licence copying notice authors changelog contributing codeowners].freeze
+
+    def genuine_asset?(path, content)
+      magics = ASSET_MAGIC[File.extname(path).downcase]
+      return false if magics.nil?
+      head = content.byteslice(0, 8).to_s.b
+      magics.any? { |magic| head.start_with?(magic) }
+    end
 
     def scannable?(path, content)
       ext = File.extname(path).downcase

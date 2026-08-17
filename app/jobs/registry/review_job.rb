@@ -16,9 +16,12 @@ module Registry
       scanner.scan
       findings = scanner.findings.map(&:as_json)
 
-      # 2. Capability fingerprint + delta vs last published version
+      # 2. Capability fingerprint + delta vs the last version that CLEARED
+      # review (published or waiting out its hold) — comparing only against
+      # published versions would let capabilities ratchet up unreviewed through
+      # a chain of versions submitted inside one hold window.
       fingerprint = CapabilityFingerprint.compute(tarball)
-      previous = plugin.versions.published.where.not(id: version.id)
+      previous = plugin.versions.where(state: [ :published, :held ]).where.not(id: version.id)
         .order(version_sort_key: :desc).first
       growth = CapabilityFingerprint.growth(previous&.capability_fingerprint, fingerprint)
 

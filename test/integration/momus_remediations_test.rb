@@ -114,7 +114,8 @@ class MomusRemediationsTest < ActionDispatch::IntegrationTest
     version = PluginVersion.last
     assert version.processing?
 
-    admin = User.create!(email_address: "admin@example.com", name: "Admin", admin: true)
+    admin = User.create!(email_address: "admin@example.com", name: "Admin", admin: true,
+      otp_secret: ROTP::Base32.random, otp_enabled_at: Time.current)
     sign_in_as admin
     post approve_admin_version_path(version)
     assert_redirected_to admin_root_path

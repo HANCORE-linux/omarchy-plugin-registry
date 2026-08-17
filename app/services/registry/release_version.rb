@@ -4,6 +4,7 @@ module Registry
   class ReleaseVersion
     def self.call(version, actor: nil)
       raise ArgumentError, "cannot release a #{version.state} version" unless version.releasable?
+      raise ArgumentError, "cannot release into a #{version.plugin.state} plugin" unless version.plugin.active?
 
       bytes = version.tarball.download
       raise "tarball checksum mismatch at release" unless Digest::SHA256.hexdigest(bytes) == version.sha256

@@ -2,7 +2,8 @@ require "test_helper"
 
 class AdminTakedownTest < ActionDispatch::IntegrationTest
   setup do
-    @admin = User.create!(email_address: "admin@example.com", name: "Admin", admin: true)
+    @admin = User.create!(email_address: "admin@example.com", name: "Admin", admin: true,
+      otp_secret: ROTP::Base32.random, otp_enabled_at: Time.current)
     @dev = User.create!(email_address: "dev@example.com", name: "Dev",
       otp_secret: ROTP::Base32.random, otp_enabled_at: Time.current)
     publisher = Publisher.create!(name: "acme", kind: :org)
