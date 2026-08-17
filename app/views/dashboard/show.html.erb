@@ -14,7 +14,7 @@
   <% if pending_invites.any? %>
     <section>
       <h2>Invitations</h2>
-      <table class="table" style="max-width: 560px;">
+      <table class="table u-max-mid">
         <tbody>
           <% pending_invites.each do |invite| %>
             <tr>
@@ -41,7 +41,7 @@
     <section>
       <h2><%= publisher.name %> <% if publisher.org? %><span class="badge">org</span><% end %></h2>
       <% if publisher.org? && @user.owner_of?(publisher) %>
-        <table class="table" style="max-width: 640px; margin-bottom: 18px;">
+        <table class="table u-max-narrow u-gap-bottom">
           <thead><tr><th>Member</th><th>Role</th><th></th></tr></thead>
           <tbody>
             <% publisher.memberships.includes(:user).each do |membership| %>

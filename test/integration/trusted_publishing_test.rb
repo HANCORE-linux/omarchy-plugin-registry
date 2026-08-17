@@ -42,6 +42,21 @@ class TrustedPublishingTest < ActionDispatch::IntegrationTest
     JWT.encode(claims, @rsa, "RS256", kid: @kid)
   end
 
+  test "the same OIDC token cannot be exchanged twice (jti replay)" do
+    original_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+    replayable = oidc_token
+
+    post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "weather", token: replayable }
+    assert_response :created
+
+    post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "weather", token: replayable }
+    assert_response :unauthorized
+    assert_includes response.parsed_body["error"], "already exchanged"
+  ensure
+    Rails.cache = original_cache
+  end
+
   test "exchanges a valid OIDC token and publishes with provenance" do
     post "/api/v1/trusted/exchange", params: { publisher: "acme", plugin: "weather", token: oidc_token }
     assert_response :created

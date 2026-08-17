@@ -78,6 +78,10 @@ config switch to disable). On a hit for an installed plugin@version:
   `Authorization: Bearer <token>` and the tar.gz as the raw body. 201 means
   accepted into the review pipeline (live after a short hold), 409 means the
   version number is burned, 422 carries a human-readable validation error.
+- Retention: a submission that never publishes (quarantined, untouched by
+  review for 90 days) expires to rejected and its bytes are deleted; its
+  version number stays burned forever. Rejected uploads lose their bytes
+  after 30 days. Published and yanked bytes are kept indefinitely.
 - CI: exchange a GitHub Actions OIDC token (`aud: plugins.omarchy.org`) at
   `POST /api/v1/trusted/exchange {token, publisher, plugin}` for a 30-minute
   publish token — the declared `publisher`/`plugin` scope is REQUIRED and

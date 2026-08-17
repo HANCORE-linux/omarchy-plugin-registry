@@ -13,6 +13,12 @@ module DataPlane
     # would make clients accept the silent drop.
     class IndexContinuityError < StandardError; end
 
+    # Raised when a published/yanked version's frozen bytes are missing or
+    # corrupt and Active Storage can't supply verified replacement bytes —
+    # regeneration aborts BEFORE writing anything, preserving the prior
+    # signed index byte-for-byte.
+    class ArtifactIntegrityError < StandardError; end
+
     # A per-plugin trigger still rebuilds everything (cheap at this scale) —
     # writing the one index first and then rewriting it under a second
     # generation would just churn two generations for one publish.
@@ -33,32 +39,38 @@ module DataPlane
         # plane are re-learned and ENFORCED before anything is signed, so
         # every file written below reflects post-takedown state.
         generator.reconcile_disk_revocations!
+        # Every promised artifact is verified (and restored if needed) BEFORE
+        # any signed file is written — an unrecoverable artifact aborts the
+        # whole run with the prior index intact.
+        Plugin.find_each { |p| generator.ensure_artifacts!(p) }
         generator.write_config
         generator.write_revocations
-        # Artifacts BEFORE any index that promises them — including all.json
-        Plugin.find_each do |p|
-          generator.restore_missing_tarballs(p)
-          generator.write_plugin_index(p)
-        end
+        Plugin.find_each { |p| generator.write_plugin_index(p) }
         generator.write_all_listing
       end
     end
 
     # Full regeneration must be able to rebuild the ENTIRE data plane from the
-    # database — indexes that reference tarballs the directory doesn't hold
-    # would 404 (or worse, a sync --delete would drop survivors).
-    def restore_missing_tarballs(plugin)
+    # database, and every artifact a signed index will promise is CHECKSUMMED
+    # first: a frozen file that rotted re-restores from verified Active
+    # Storage bytes, and a version with no valid bytes anywhere aborts the run
+    # (fail closed — the prior signed index survives byte-for-byte).
+    def ensure_artifacts!(plugin)
       plugin.versions.where(state: [ :published, :yanked ]).find_each do |version|
-        next if DataPlane.root.join(version.tarball_path).exist?
-        next unless version.tarball.attached?
-        bytes = version.tarball.download
-        # A stored blob that no longer matches the signed checksum must never
-        # be served — skip loudly, don't freeze corruption
-        unless Digest::SHA256.hexdigest(bytes) == version.sha256
-          Rails.logger.error("[DataPlane] checksum mismatch restoring #{version.tarball_path} — skipped")
-          next
+        path = DataPlane.root.join(version.tarball_path)
+        next if path.exist? && Digest::SHA256.file(path).hexdigest == version.sha256
+        unless version.tarball.attached?
+          raise ArtifactIntegrityError,
+            "#{version.tarball_path} is missing or corrupt with no stored blob to restore from — " \
+            "recover the artifact (or take the version down) before regenerating"
         end
-        DataPlane.freeze_tarball(version, bytes)
+        bytes = version.tarball.download
+        unless Digest::SHA256.hexdigest(bytes) == version.sha256
+          raise ArtifactIntegrityError,
+            "stored blob for #{version.tarball_path} fails its checksum — nothing valid to serve; " \
+            "recover the artifact (or take the version down) before regenerating"
+        end
+        DataPlane.atomic_write(version.tarball_path, bytes)
       end
     end
 
@@ -120,14 +132,7 @@ module DataPlane
       verify_index_continuity!(plugin, relative)
       lines = [ JSON.generate({ "meta" => true }.merge(freshness(INDEX_TTL))) ]
       plugin.versions.where(state: [ :published, :yanked ]).order(:version_sort_key).each do |v|
-        # ANY version whose bytes are unrecoverable must not be promised by a
-        # freshly signed index — flag it loudly instead.
-        if !DataPlane.root.join(v.tarball_path).exist?
-          Rails.logger.error("[DataPlane] #{v.tarball_path} unrecoverable — omitted from signed index")
-          AuditEvent.record!(action: "version.artifact_unrecoverable", subject: v,
-            metadata: { plugin: plugin.full_name, version: v.version })
-          next
-        end
+        # ensure_artifacts! verified every promised artifact before any write
         lines << JSON.generate(version_entry(v))
       end
       DataPlane.write(relative, lines.join("\n") + "\n")
@@ -183,13 +188,6 @@ module DataPlane
     def write_all_listing
       plugins = Plugin.listed.includes(:publisher).filter_map do |plugin|
         next unless plugin.latest_version
-        # The directory must not advertise a latest whose bytes the plugin
-        # index just declined to promise
-        latest = plugin.versions.find_by(version: plugin.latest_version)
-        if latest && !DataPlane.root.join(latest.tarball_path).exist?
-          Rails.logger.error("[DataPlane] #{plugin.full_name} latest #{latest.version} unrecoverable — omitted from all.json")
-          next
-        end
         {
           "publisher" => plugin.publisher.name,
           "name" => plugin.name,

@@ -1,5 +1,5 @@
 <% content_for :title, "Claim #{@publisher.name} — Omarchy Plugins" %>
-<div class="form-page" style="max-width: 620px;">
+<div class="form-page u-max-narrow">
   <p class="eyebrow">Claim a seeded namespace</p>
   <h1>Prove it's your repo.</h1>
   <p><strong><%= @publisher.name %></strong> was seeded from
@@ -14,6 +14,6 @@
     <p class="field-errors">We don't recognize that forge for raw-file checks. Email
       <a href="mailto:registry@omarchy.org">registry@omarchy.org</a> and a human will verify.</p>
   <% end %>
-  <p class="hint" style="margin-top: 16px;">This proof happens once. After the claim, the
+  <p class="hint u-gap-top-sm">This proof happens once. After the claim, the
     namespace belongs to your account — the repo link becomes plain metadata.</p>
 </div>

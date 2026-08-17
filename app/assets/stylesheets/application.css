@@ -305,7 +305,14 @@ pre code { background: none; padding: 0; }
 .linklike:hover { color: var(--magenta); }
 .code-chip { font-family: var(--mono); background: var(--surface-tint); padding: 2px 8px; }
 .u-gap-top { margin-top: 24px; }
+.u-gap-top-sm { margin-top: 14px; }
+.u-gap-bottom-sm { margin-bottom: 10px; }
+.u-gap-bottom-lg { margin-bottom: 24px; }
+.u-max-field { max-width: 260px; }
+.u-full-width { width: 100%; }
+.u-gap-bottom { margin-bottom: 18px; }
 .u-max-narrow { max-width: 640px; }
+.u-max-mid { max-width: 560px; }
 
 /* ---------- Notices ---------- */
 

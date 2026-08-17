@@ -106,8 +106,13 @@ module Registry
 
         # Literal endpoints in ANY supported scheme — http(s) and WebSocket
         # (QML WebSocket url properties, new WebSocket("wss://...")) — are
-        # network capability; a new literal wss:// endpoint is growth.
-        text.scan(%r{(?:https?|wss?)://([a-z0-9.-]+\.[a-z]{2,}|\d{1,3}(?:\.\d{1,3}){3})}i) { |m| hosts << m[0].downcase }
+        # network capability; a new literal endpoint is growth. The authority
+        # grammar covers dotted hosts, SINGLE-LABEL hosts (localhost, intranet
+        # names), IPv4, and bracketed IPv6 — local-network access is exactly
+        # the capability an update must not gain silently.
+        text.scan(%r{(?:https?|wss?)://(?:[^@/\s"']*@)?(\[[0-9a-f:.]+\]|[a-z0-9_-]+(?:\.[a-z0-9_-]+)*)}i) do |m|
+          hosts << m[0].downcase
+        end
         # Network APIs with computed URLs, also per call site
         [
           /\bfetch\s*\(\s*(?!["'])[^\n]{0,160}/,

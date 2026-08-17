@@ -8,7 +8,7 @@
   <section>
     <h2>Passkeys</h2>
     <% if @user.passkeys.any? %>
-      <table class="table" style="max-width: 560px;">
+      <table class="table u-max-mid">
         <thead><tr><th>Name</th><th>Last used</th><th></th></tr></thead>
         <tbody>
           <% @user.passkeys.each do |passkey| %>
@@ -37,7 +37,7 @@
               form: { data: { turbo_confirm: "Disable TOTP? Your backup codes stop working; re-enrolling generates a fresh secret." } } %>
       </p>
       <% if @backup_codes.present? %>
-        <h4 style="margin-bottom: 10px;">Backup codes — shown once, save them now</h4>
+        <h4 class="u-gap-bottom-sm">Backup codes — shown once, save them now</h4>
         <p class="lede">Each works once if you lose your authenticator. They will not be displayed again.</p>
         <ul class="backup-codes">
           <% @backup_codes.each do |code| %><li><code><%= code %></code></li><% end %>
@@ -48,7 +48,7 @@
       <div class="qr-box"><%= @qr_svg.html_safe %></div>
       <p class="muted">Or enter the secret manually: <code><%= @user.otp_secret %></code></p>
       <%= form_with url: settings_two_factor_path, method: :patch do |form| %>
-        <div class="field" style="max-width: 260px; margin-top: 24px;">
+        <div class="field u-max-field u-gap-top">
           <label for="code">Code from your app</label>
           <input type="text" name="code" id="code" class="code-input" inputmode="numeric" maxlength="6" required>
         </div>

@@ -88,7 +88,7 @@
           <p><%= comment.body %></p>
         </div>
       <% end %>
-      <p class="muted" style="margin-top: 12px;"><% if @comments.empty? %>No comments yet.<% end %></p>
+      <p class="muted u-gap-top-sm"><% if @comments.empty? %>No comments yet.<% end %></p>
 
       <% if authenticated? %>
         <%= form_with url: plugin_comments_path(@publisher.name, @plugin.name) do %>

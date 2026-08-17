@@ -11,7 +11,8 @@ Rails.application.configure do
     policy.frame_ancestors :none
   end
 
-  # Importmap's inline <script> tags carry a per-request nonce
-  config.content_security_policy_nonce_generator = ->(request) { request.session.id.to_s.presence || SecureRandom.base64(16) }
+  # Importmap's inline <script> tags carry a TRUE per-request nonce — never
+  # the session id, which would repeat across every response of a session
+  config.content_security_policy_nonce_generator = ->(_request) { SecureRandom.base64(16) }
   config.content_security_policy_nonce_directives = %w[script-src]
 end
