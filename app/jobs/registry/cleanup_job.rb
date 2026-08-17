@@ -6,7 +6,12 @@ module Registry
     def perform
       DeviceAuthorization.where(expires_at: ...1.day.ago).delete_all
       LoginCode.where(created_at: ...1.day.ago).delete_all
-      ApiToken.where(expires_at: ...30.days.ago).delete_all
+      # Tokens referenced by a version are provenance records — their
+      # revocation state gates held releases — and the FK is restrictive;
+      # only unreferenced expired tokens age out.
+      ApiToken.where(expires_at: ...30.days.ago)
+        .where.not(id: PluginVersion.where.not(api_token_id: nil).select(:api_token_id))
+        .delete_all
       Session.expired.delete_all
       purge_rejected_tarballs
       resume_stuck_pipeline_work

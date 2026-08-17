@@ -36,6 +36,9 @@ module Admin
     def approve
       return bad_transition! unless @version.quarantined?
       hold = Rails.application.config.x.publish_hold
+      # Approval provenance survives the delayed hold: the release job knows a
+      # human reviewed these bytes and skips the credential-liveness veto
+      @version.update!(approved_at: Time.current, approved_by: Current.user)
       if hold.to_i.positive?
         @version.update!(state: :held, hold_until: hold.from_now)
         Registry::ReleaseJob.set(wait_until: @version.hold_until).perform_later(@version)

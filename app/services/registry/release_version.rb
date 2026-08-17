@@ -37,9 +37,9 @@ module Registry
       # PIPELINE release fires: a token revoked during the hold window (stolen
       # token killed, trusted-publisher registration removed — which revokes
       # its minted tokens) quarantines the version for human review instead of
-      # shipping. An explicit admin approval of a quarantined version is a
-      # human override and skips this.
-      if version.held? && version.api_token&.revoked_at&.present?
+      # shipping. An explicit admin approval (approved_at provenance) is a
+      # human override — the bytes were reviewed — and skips only this veto.
+      if version.held? && version.approved_at.nil? && version.api_token&.revoked_at&.present?
         version.update!(state: :quarantined, hold_until: nil,
           review_notes: "#{version.review_notes} [submitting credential revoked during hold]".strip)
         AuditEvent.record!(action: "version.credential_revoked", subject: version,

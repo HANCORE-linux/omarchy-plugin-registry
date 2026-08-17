@@ -104,7 +104,10 @@ module Registry
           end
         end
 
-        text.scan(%r{https?://([a-z0-9.-]+\.[a-z]{2,}|\d{1,3}(?:\.\d{1,3}){3})}i) { |m| hosts << m[0].downcase }
+        # Literal endpoints in ANY supported scheme — http(s) and WebSocket
+        # (QML WebSocket url properties, new WebSocket("wss://...")) — are
+        # network capability; a new literal wss:// endpoint is growth.
+        text.scan(%r{(?:https?|wss?)://([a-z0-9.-]+\.[a-z]{2,}|\d{1,3}(?:\.\d{1,3}){3})}i) { |m| hosts << m[0].downcase }
         # Network APIs with computed URLs, also per call site
         [
           /\bfetch\s*\(\s*(?!["'])[^\n]{0,160}/,
@@ -114,7 +117,7 @@ module Registry
           # ("https://" + host) is a computed destination, not a literal host
           /\b(?:fetch|WebSocket)\s*\(\s*["'][^"']*["']\s*\+[^\n]{0,160}/,
           /\.open\s*\(\s*["'][A-Z]+["']\s*,\s*["'][^"']*["']\s*\+[^\n]{0,160}/,
-          /["']https?:\/\/[^"']*["']\s*\+[^\n]{0,160}/
+          /["'](?:https?|wss?):\/\/[^"']*["']\s*\+[^\n]{0,160}/
         ].each do |pattern|
           text.scan(pattern) { |m| dynamic_network_sites << site_digest(m) }
         end
