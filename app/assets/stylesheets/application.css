@@ -193,6 +193,23 @@ pre code { background: none; padding: 0; }
 .button--danger, button.button--danger { background: var(--danger); color: var(--paper); }
 .button--small, button.button--small { padding: 9px 12px; font-size: 12px; }
 
+/* ---------- Copy button ---------- */
+
+.copy-button {
+  font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+  text-transform: uppercase; cursor: pointer;
+  background: transparent; color: inherit;
+  border: 1px solid var(--hairline-on-dark-soft);
+  padding: 5px 9px; border-radius: 6px; flex-shrink: 0;
+  transition: color var(--transition), border-color var(--transition);
+}
+.copy-button:hover { color: var(--pink); border-color: var(--pink); }
+/* Confirmation mint is fixed — the button always sits on a code-dark surface,
+   except the --inline variant which borrows the page's soft rule */
+.copy-button--done, .copy-button--done:hover { color: #6fdbaf; border-color: #6fdbaf; }
+.copy-button--inline { border-color: var(--hairline-soft); margin-left: 6px; vertical-align: middle; }
+.copy-button--inline.copy-button--done { color: var(--success); border-color: var(--success); }
+
 /* ---------- Badges ---------- */
 
 .badge {
@@ -301,7 +318,8 @@ pre code { background: none; padding: 0; }
 .sidebar { display: flex; flex-direction: column; gap: 28px; font-size: 13px; }
 .sidebar section { border-top: 1px solid var(--hairline); padding-top: 14px; }
 .sidebar h4 { text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; margin-bottom: 10px; }
-.sidebar .install-cmd { background: var(--ink); color: var(--paper); padding: 12px 14px; font-size: 13px; overflow-x: auto; white-space: nowrap; }
+.sidebar .install-cmd { background: var(--ink); color: var(--paper); padding: 10px 10px 10px 14px; font-size: 13px; display: flex; align-items: center; gap: 10px; }
+.install-cmd__text { flex: 1; overflow-x: auto; white-space: nowrap; }
 .sidebar .install-cmd .prompt { color: var(--pink); }
 .sidebar dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; }
 .sidebar dt { color: var(--text-muted); }
@@ -378,8 +396,10 @@ pre code { background: none; padding: 0; }
 }
 .field textarea { width: 100%; }
 
-.token-reveal { background: var(--ink); color: var(--paper); padding: 16px 20px; margin-bottom: 24px; overflow-x: auto; }
+.token-reveal { background: var(--ink); color: var(--paper); padding: 16px 20px; margin-bottom: 24px; }
 .token-reveal code { background: none; color: var(--pink); font-size: 15px; }
+.token-reveal__row { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+.token-reveal__row code { flex: 1; overflow-x: auto; }
 
 .backup-codes { columns: 2; font-size: 15px; background: var(--surface-tint); padding: 16px 24px; max-width: 340px; }
 .backup-codes li { margin-left: 1em; }

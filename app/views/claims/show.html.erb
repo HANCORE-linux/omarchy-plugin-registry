@@ -6,7 +6,13 @@
     <a href="<%= @publisher.seed_source_url %>"><%= @publisher.seed_source_url %></a>.
     To claim it, commit a file named <code><%= Registry::RepoProof::CLAIM_FILE %></code> to the
     default branch containing exactly this token:</p>
-  <div class="token-reveal"><code><%= @challenge %></code></div>
+  <div class="token-reveal" data-controller="clipboard" data-clipboard-text-value="<%= @challenge %>">
+    <div class="token-reveal__row">
+      <code><%= @challenge %></code>
+      <button type="button" class="copy-button" data-clipboard-target="button"
+              data-action="clipboard#copy" aria-label="Copy claim token">Copy</button>
+    </div>
+  </div>
   <% if @claim_url %>
     <p class="muted">We'll check <code><%= @claim_url %></code>.</p>
     <%= button_to "Verify and claim", verify_claim_path(@publisher.name), class: "button" %>

@@ -46,7 +46,11 @@
     <% else %>
       <p class="lede">Scan with any TOTP app, then confirm with a code.</p>
       <div class="qr-box"><%= @qr_svg.html_safe %></div>
-      <p class="muted">Or enter the secret manually: <code><%= @provisional_secret %></code></p>
+      <p class="muted" data-controller="clipboard" data-clipboard-text-value="<%= @provisional_secret %>">
+        Or enter the secret manually: <code><%= @provisional_secret %></code>
+        <button type="button" class="copy-button copy-button--inline" data-clipboard-target="button"
+                data-action="clipboard#copy" aria-label="Copy TOTP secret">Copy</button>
+      </p>
       <%= form_with url: settings_two_factor_path, method: :patch do |form| %>
         <div class="field u-max-field u-gap-top">
           <label for="code">Code from your app</label>
