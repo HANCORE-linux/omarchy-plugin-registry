@@ -111,8 +111,7 @@
         <div class="install-cmd" data-controller="clipboard"
              data-clipboard-text-value="omarchy plugin add <%= @plugin.full_name %>">
           <span class="install-cmd__text"><span class="prompt">$</span> omarchy plugin add <%= @plugin.full_name %></span>
-          <button type="button" class="copy-button" data-clipboard-target="button"
-                  data-action="clipboard#copy" aria-label="Copy install command">Copy</button>
+          <%= render "shared/copy_button", label: "Copy install command" %>
         </div>
       <% else %>
         <p class="muted">Not installable — no version has cleared review.</p>

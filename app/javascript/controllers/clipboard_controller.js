@@ -28,14 +28,8 @@ export default class extends Controller {
   }
 
   confirm() {
-    const button = this.buttonTarget
-    if (!this.original) this.original = button.textContent
-    button.textContent = "Copied"
-    button.classList.add("copy-button--done")
+    this.buttonTarget.classList.add("copy-button--done")
     clearTimeout(this.timer)
-    this.timer = setTimeout(() => {
-      button.textContent = this.original
-      button.classList.remove("copy-button--done")
-    }, 1600)
+    this.timer = setTimeout(() => this.buttonTarget.classList.remove("copy-button--done"), 1600)
   }
 }

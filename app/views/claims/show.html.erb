@@ -9,8 +9,7 @@
   <div class="token-reveal" data-controller="clipboard" data-clipboard-text-value="<%= @challenge %>">
     <div class="token-reveal__row">
       <code><%= @challenge %></code>
-      <button type="button" class="copy-button" data-clipboard-target="button"
-              data-action="clipboard#copy" aria-label="Copy claim token">Copy</button>
+      <%= render "shared/copy_button", label: "Copy claim token" %>
     </div>
   </div>
   <% if @claim_url %>
