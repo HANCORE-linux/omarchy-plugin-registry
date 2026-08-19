@@ -64,12 +64,6 @@ SAMPLES.each do |sample|
 
       #{sample[:summary]}
 
-      ## Install
-
-      ```
-      omarchy plugin add ryanrhughes/#{sample[:name]}
-      ```
-
       ## Features
 
       - Zero configuration, sensible defaults

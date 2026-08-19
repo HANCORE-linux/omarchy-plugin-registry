@@ -20,4 +20,36 @@ class CopyButtonSystemTest < ApplicationSystemTestCase
       assert_selector "button.copy-button--done"
     end
   end
+
+  test "readme code blocks get an injected copy control" do
+    dev = User.create!(email_address: "dev2@example.com", name: "Dev",
+      otp_secret: ROTP::Base32.random, otp_enabled_at: Time.current)
+    publisher = Publisher.create!(name: "bcme", kind: :org)
+    Membership.create!(publisher:, user: dev, role: :owner, founding: true)
+    readme = "# Widget
+
+Great widget.
+
+## Config
+
+```
+widget --set theme=tokyo-night
+```
+"
+    perform_enqueued_jobs do
+      Registry::PublishVersion.new(user: dev, publisher:, plugin_name: "widget",
+        tarball_bytes: TarballBuilder.build(
+          manifest: TarballBuilder.manifest(id: "bcme.widget"),
+          files: { "Widget.qml" => "import QtQuick
+Item {}
+", "README.md" => readme }
+        )).call
+    end
+
+    visit plugin_path("bcme", "widget")
+    within(".readme .codeblock") do
+      find("button.copy-button--floating").click
+      assert_selector "button.copy-button--done"
+    end
+  end
 end

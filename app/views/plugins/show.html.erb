@@ -45,7 +45,7 @@
 
 <div class="plugin-layout container">
   <article>
-    <div class="readme">
+    <div class="readme" data-controller="readme-code">
       <% if @plugin.readme.present? %>
         <%= render_markdown @plugin.readme %>
       <% else %>

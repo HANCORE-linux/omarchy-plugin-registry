@@ -216,6 +216,14 @@ pre code { background: none; padding: 0; }
    except the --inline variant which borrows the page's soft rule */
 .copy-button--done, .copy-button--done:hover { color: #6fdbaf; border-color: #6fdbaf; }
 .copy-button--inline { border-color: var(--hairline-soft); margin-left: 6px; vertical-align: middle; }
+.codeblock { position: relative; }
+.readme .codeblock { margin-bottom: 1em; }
+.readme .codeblock pre { margin-bottom: 0; }
+.copy-button--floating {
+  position: absolute; top: 8px; right: 8px;
+  background: var(--code-bg); color: var(--code-fg); opacity: 0.55;
+}
+.codeblock:hover .copy-button--floating, .copy-button--floating:focus-visible { opacity: 1; }
 .copy-button--inline.copy-button--done { color: var(--success); border-color: var(--success); }
 
 /* ---------- Badges ---------- */

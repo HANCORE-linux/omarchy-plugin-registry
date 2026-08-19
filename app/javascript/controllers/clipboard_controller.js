@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { copyText } from "lib/clipboard"
 
 // One-click copy for install commands and one-time secrets. The exact text
 // travels in a value (never scraped from the DOM, so prompts and truncation
@@ -8,22 +9,7 @@ export default class extends Controller {
   static values = { text: String }
 
   async copy() {
-    const text = this.textValue
-    try {
-      await navigator.clipboard.writeText(text)
-    } catch {
-      // Clipboard API can be unavailable (permissions, older engines) —
-      // fall back to the selection-based path
-      const scratch = document.createElement("textarea")
-      scratch.value = text
-      scratch.setAttribute("readonly", "")
-      scratch.style.position = "absolute"
-      scratch.style.left = "-9999px"
-      document.body.appendChild(scratch)
-      scratch.select()
-      document.execCommand("copy")
-      scratch.remove()
-    }
+    await copyText(this.textValue)
     this.confirm()
   }
 
