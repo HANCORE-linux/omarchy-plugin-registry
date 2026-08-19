@@ -63,6 +63,8 @@
   --bg: var(--paper);
   --btn-bg: var(--ink);
   --btn-fg: var(--paper);
+  --code-bg: var(--ink);
+  --code-fg: var(--paper);
 
   --sans: "Clash Grotesk", "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
@@ -77,43 +79,55 @@
   --container: 1100px;
 }
 
-/* Dark mode (DESIGN.md — both modes first-class, same two colors trading
-   ROLES). Physical tokens stay fixed; only role tokens change, so components
-   that hardcode the ink-surface world (.section-dark, pre, footer) keep
-   rendering correctly. */
+/* Dark mode — Tokyo Night ground. The ink/paper role-swap produced one flat
+   blue mass divided by near-white rules; Omarchy's flagship desktop theme is
+   Tokyo Night, so dark mode borrows its LAYERS instead: division comes from
+   surface tone (chrome < ground < raised < lifted), rules are quiet blue-gray,
+   and the print double-rule is off. Brand accents (pink/magenta) unchanged;
+   physical ink/paper tokens stay fixed for components that need them (QR). */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0d0826;               /* the ground is ink */
-    --surface: #110c2e;
-    --surface-tint: #09051d;
+    /* Tokyo Night layers */
+    --tn-chrome: #16161e;        /* the frame: header, footer, dark bands */
+    --tn-ground: #1a1b26;        /* the page */
+    --tn-raised: #1f2335;        /* cards and panels */
+    --tn-lifted: #292e42;        /* hover, chips, inline code */
+
+    --bg: var(--tn-ground);
+    --surface: var(--tn-raised);
+    --surface-tint: var(--tn-lifted);
     --magenta: #ff8aff;          /* bright pink comes out at night */
 
-    --btn-bg: #f8f5f2;
-    --btn-fg: #0d0826;
+    --btn-bg: #c0caf5;
+    --btn-fg: var(--tn-chrome);
 
-    --hairline: rgba(248, 245, 242, 0.9);
-    --hairline-soft: rgba(248, 245, 242, 0.2);
+    /* Rules are TONE, not light */
+    --hairline: #3b4261;
+    --hairline-soft: #24283b;
+    --hairline-on-dark: #3b4261;
+    --hairline-on-dark-soft: #292e42;
 
-    --text: #f8f5f2;
-    --text-soft: rgba(248, 245, 242, 0.75);
-    --text-muted: rgba(248, 245, 242, 0.55);
+    --text: #c0caf5;
+    --text-soft: #a9b1d6;
+    --text-muted: #565f89;
+    --text-inverse: #c0caf5;
+    --text-inverse-soft: #a9b1d6;
 
-    --success: #3dbd8c;
-    --warning: #efb35a;
-    --danger: #e96a6a;
-    --success-soft: rgba(61, 189, 140, 0.16);
-    --warning-soft: rgba(239, 179, 90, 0.16);
-    --danger-soft: rgba(233, 106, 106, 0.16);
-    --info: #8b96f0;
+    --success: #9ece6a;
+    --warning: #e0af68;
+    --danger: #f7768e;
+    --success-soft: rgba(158, 206, 106, 0.13);
+    --warning-soft: rgba(224, 175, 104, 0.13);
+    --danger-soft: rgba(247, 118, 142, 0.13);
+    --info: #7aa2f7;
 
-    --rule-shadow: 0 1px 0 rgba(248, 245, 242, 0.9);
+    --code-bg: var(--tn-chrome);
+    --code-fg: #c0caf5;
+
+    /* The letterpress double-rule reads as glare on a dark ground */
+    --rule-shadow: none;
+    --rule-shadow-on-dark: none;
   }
-  .qr-box { background: #ffffff; } /* QR must stay scannable */
-  .badge { background: rgba(255, 138, 255, 0.16); }
-  .badge--ok { background: rgba(61, 189, 140, 0.16); }
-  pre, .install-cmd, .token-reveal { border: 1px solid var(--hairline-soft); }
-  /* Lifted danger red needs dark text for contrast on destructive controls */
-  .button--danger, button.button--danger { color: #0d0826; }
 }
 
 /* ---------- Reset-ish ---------- */
@@ -142,7 +156,9 @@ a:hover { color: var(--magenta); }
 
 code, pre { font-family: var(--mono); }
 code { background: var(--surface-tint); padding: 0.1em 0.35em; font-size: 0.93em; }
-pre { background: var(--ink); color: var(--paper); padding: 16px 20px; overflow-x: auto; font-size: 13px; line-height: 1.6; }
+pre { background: var(--code-bg); color: var(--code-fg); padding: 16px 20px; overflow-x: auto; font-size: 13px; line-height: 1.6; }
+/* The markdown renderer inlines its own code background — the brand one wins */
+.readme pre { background: var(--code-bg) !important; }
 pre code { background: none; padding: 0; }
 
 ::selection { background: var(--pink); color: var(--ink); }
@@ -407,4 +423,38 @@ pre code { background: none; padding: 0; }
 @media (max-width: 700px) {
   .site-header { flex-direction: column; }
   .hero { padding: 48px 0 40px; }
+}
+
+/* ---------- Dark-mode component layer (must FOLLOW base rules) ---------- */
+
+@media (prefers-color-scheme: dark) {
+  /* The frame sits one layer below the page */
+  .site-header { background: var(--tn-chrome); }
+  .section-dark, .site-footer { background: var(--tn-chrome); }
+  .page-head { background: var(--tn-chrome); }
+
+  /* Code sinks into the frame layer instead of blending with the page */
+  pre, .install-cmd, .token-reveal {
+    background: var(--code-bg); color: var(--code-fg);
+    border: 1px solid var(--hairline-soft);
+  }
+  .sidebar .install-cmd { background: var(--code-bg); color: var(--code-fg); }
+
+  /* Sidebar sections become quiet raised panels — division by tone */
+  .sidebar section { background: var(--tn-raised); border: 1px solid var(--hairline-soft); padding: 14px 16px; }
+
+  .qr-box { background: #ffffff; } /* QR must stay scannable */
+  .badge { background: rgba(255, 138, 255, 0.14); }
+  ::selection { background: var(--magenta); color: var(--tn-chrome); }
+  /* Lifted danger red needs dark text for contrast on destructive controls */
+  .button--danger, button.button--danger { color: var(--tn-chrome); }
+  .button:hover { color: var(--tn-chrome); }
+  .section-dark .button { background: var(--btn-bg); color: var(--btn-fg); }
+  .rate-diamond { color: var(--tn-lifted); }
+
+  /* Scrollbars belong to the theme too */
+  * { scrollbar-width: thin; scrollbar-color: #3b4261 transparent; }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: #3b4261; border-radius: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
 }
