@@ -18,6 +18,14 @@ E2E staging box `omarchy-plugins` (Proxmox, Debian 13), reached over Tailscale:
 - **Image registry**: self-hosted `registry:2` on the VM
   (`omarchy-plugins.manatee-piranha.ts.net:5443`, htpasswd user `kamal`,
   password in `.kamal/local/registry_password`, data under `/opt/registry`).
+- **Public ingress**: a Cloudflare Tunnel accessory (`cloudflared`) serves
+  `omarchy-plugins.ryanhughes.me` — the canonical `REGISTRY_BASE_URL` — via
+  Cloudflare's edge; the ts.net name stays reachable inside the tailnet
+  (`ADDITIONAL_HOSTS`). Tunnel is remotely managed (ingress config in the
+  Cloudflare dashboard, token in `.kamal/local/tunnel_token`); DNS is a
+  proxied CNAME `omarchy-plugins` →
+  `3fe84e30-e646-43e0-8352-4e1bb474b152.cfargotunnel.com`. Passkeys bind to
+  the canonical host — enroll them on the public domain.
 - **Mail**: a Mailpit accessory catches login-code email — web UI at
   `http://omarchy-plugins:8025`. Swap the `SMTP_*` env for a real provider
   before launch.
