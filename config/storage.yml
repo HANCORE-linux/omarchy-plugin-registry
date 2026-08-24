@@ -6,6 +6,20 @@ local:
   service: Disk
   root: <%= Rails.root.join("storage") %>
 
+# Cloudflare R2 (S3-compatible). Selected in production when R2_ACCESS_KEY_ID
+# is set — see config/environments/production.rb and docs/deploy.md. The
+# checksum settings are required: R2 rejects the SDK's default streaming
+# CRC checksums.
+cloudflare:
+  service: S3
+  endpoint: <%= ENV.fetch("R2_ENDPOINT", "https://29ac8c38cc3371d2f4ceda8bf3db43c1.r2.cloudflarestorage.com") %>
+  access_key_id: <%= ENV["R2_ACCESS_KEY_ID"] %>
+  secret_access_key: <%= ENV["R2_SECRET_ACCESS_KEY"] %>
+  region: auto
+  bucket: <%= ENV.fetch("R2_BUCKET", "omarchy-plugin-registry") %>
+  request_checksum_calculation: when_required
+  response_checksum_validation: when_required
+
 # Use bin/rails credentials:edit to set the AWS secrets (as aws:access_key_id|secret_access_key)
 # amazon:
 #   service: S3

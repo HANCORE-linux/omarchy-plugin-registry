@@ -24,7 +24,9 @@ Rails.application.configure do
   # config.asset_host = "http://assets.example.com"
 
   # Store uploaded files on the local file system (see config/storage.yml for options).
-  config.active_storage.service = :local
+  # Cloudflare R2 when credentials are configured (tarball originals survive
+  # loss of the app volume); local disk otherwise. See docs/deploy.md.
+  config.active_storage.service = ENV["R2_ACCESS_KEY_ID"].present? ? :cloudflare : :local
 
   # Assume all access to the app is happening through a SSL-terminating reverse proxy.
   config.assume_ssl = true

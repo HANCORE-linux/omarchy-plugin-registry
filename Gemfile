@@ -71,3 +71,5 @@ gem "commonmarker"              # Readme rendering on plugin pages
 gem "ed25519"                   # Index/kill-list signing (minisign-style detached sigs)
 gem "jwt"                       # OIDC trusted publishing (GitHub Actions token verification)
 gem "webauthn"                  # Passkeys
+
+gem "aws-sdk-s3", "~> 1.229", require: false # Active Storage on Cloudflare R2 (S3-compatible)

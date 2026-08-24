@@ -64,15 +64,29 @@ env:
     # web UI at http://omarchy-plugins:8025 instead of a real mailbox.
     SMTP_ADDRESS: omarchy-plugins.manatee-piranha.ts.net
     SMTP_PORT: "1025"
+    # AI review (escalate-only). The adapter ships in the image; its Anthropic
+    # key lives OUTSIDE the app env (AiReview scrubs env) at /ai/anthropic_key
+    # via the /opt/registry-ai bind mount. Enable by writing the key file on
+    # the host, then uncommenting — with the command set but no key, every
+    # publish is flagged into quarantine (fail closed).
+    # AI_REVIEW_COMMAND: /rails/script/ai_review_adapter
+    # Cloudflare R2 for Active Storage originals — uncomment (with the R2_*
+    # secrets below) once R2 is enabled on the account and an API token
+    # exists. Bucket: omarchy-plugin-registry.
+    # R2_BUCKET: omarchy-plugin-registry
   secret:
     - RAILS_MASTER_KEY
     - REGISTRY_SIGNING_SEED
+    # - R2_ACCESS_KEY_ID
+    # - R2_SECRET_ACCESS_KEY
 
 volumes:
   # SQLite databases, Active Storage blobs, and the data plane all live under
   # /rails/storage — losing this volume loses accounts, audit, and revocations.
   - "omarchy_registry_storage:/rails/storage"
   - "omarchy_registry_witness:/witness"
+  # AI review adapter credentials (read-only; see AI_REVIEW_COMMAND above).
+  - "/opt/registry-ai:/ai:ro"
 
 # E2E mail catcher: SMTP on 1025 (STARTTLS, real cert so the app's mandatory
 # TLS verification passes), web UI on 8025 (tailnet/LAN only).
