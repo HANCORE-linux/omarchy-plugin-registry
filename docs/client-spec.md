@@ -34,6 +34,14 @@ kill list especially.
    older signed copy is a rollback and must not replace a newer kill list.
    (`generated_at` is informational; order by `generation`.)
 
+**Cache skew**: a file and its sidecar `.sig` are cached independently, so a
+fetch that straddles a regeneration can pair bytes and signature from
+different generations. Fetch the file first, read its (still-unverified)
+`generation`, and fetch the signature as `<path>.sig?g=<generation>` — the
+query busts the mismatched cache entry while staying cacheable per
+generation (the server ignores it). Retry once on verification failure;
+only then treat it as an attack.
+
 ## `omarchy plugin add <publisher>/<name>`
 
 1. Fetch + verify the plugin's index file; pick the highest non-`yanked`
