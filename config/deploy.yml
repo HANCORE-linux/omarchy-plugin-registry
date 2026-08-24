@@ -23,7 +23,9 @@ servers:
     cmd: bin/jobs
 
 proxy:
-  host: omarchy-plugins.manatee-piranha.ts.net
+  hosts:
+    - omarchy-plugins.ryanhughes.me
+    - omarchy-plugins.manatee-piranha.ts.net
   # Tailscale-minted Let's Encrypt cert (no public 80/443 on this box).
   # Renew: docs/deploy.md "Kamal" section — certs last ~90 days.
   ssl:
@@ -50,8 +52,11 @@ builder:
 
 env:
   clear:
-    REGISTRY_BASE_URL: https://omarchy-plugins.manatee-piranha.ts.net
-    REGISTRY_HOST: omarchy-plugins.manatee-piranha.ts.net
+    # Public/canonical host is the Cloudflare Tunnel; the ts.net name stays
+    # reachable for tailnet-only access (deploys, Mailpit, fallback).
+    REGISTRY_BASE_URL: https://omarchy-plugins.ryanhughes.me
+    REGISTRY_HOST: omarchy-plugins.ryanhughes.me
+    ADDITIONAL_HOSTS: omarchy-plugins.manatee-piranha.ts.net
     # Witness on its own volume so an app-volume restore can't silently roll
     # back the signed kill list — see docs/deploy.md.
     REGISTRY_WITNESS_PATH: /witness/kill_list_generation
@@ -72,6 +77,18 @@ volumes:
 # E2E mail catcher: SMTP on 1025 (STARTTLS, real cert so the app's mandatory
 # TLS verification passes), web UI on 8025 (tailnet/LAN only).
 accessories:
+  # Cloudflare Tunnel: public ingress for omarchy-plugins.ryanhughes.me.
+  # Remotely managed (ingress config lives in Cloudflare, tunnel id
+  # 3fe84e30-e646-43e0-8352-4e1bb474b152): edge -> this container ->
+  # https://kamal-proxy:443 with the ts.net originServerName for cert
+  # verification. Token in .kamal/local/tunnel_token.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    host: omarchy-plugins
+    cmd: tunnel --no-autoupdate run
+    env:
+      secret:
+        - TUNNEL_TOKEN
   mailpit:
     image: axllent/mailpit:v1.27
     host: omarchy-plugins
