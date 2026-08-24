@@ -71,7 +71,9 @@ Rails.application.configure do
       port: ENV.fetch("SMTP_PORT", 587).to_i,
       user_name: ENV["SMTP_USERNAME"],
       password: ENV["SMTP_PASSWORD"],
-      authentication: :plain,
+      # Only request SMTP-AUTH when credentials are configured — the mail gem
+      # raises if authentication is set with no user name (e.g. Mailpit).
+      authentication: (:plain if ENV["SMTP_USERNAME"].present?),
       # REQUIRED TLS — credentials and login codes never travel plaintext
       enable_starttls: true
     }.compact
