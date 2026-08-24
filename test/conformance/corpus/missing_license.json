@@ -1,20 +1,20 @@
 {
- "name": "missing_license",
- "manifest": {
-  "schemaVersion": 1,
-  "id": "acme.weather",
-  "name": "Weather",
-  "version": "1.0.0",
-  "kinds": [
-   "bar-widget"
-  ],
-  "entryPoints": {
-   "bar-widget": "Widget.qml"
-  }
- },
- "files": {
-  "Widget.qml": "x"
- },
- "expect": "invalid",
- "reason": "license is required"
+  "name": "missing_license",
+  "manifest": {
+    "schemaVersion": 1,
+    "id": "acme.weather",
+    "name": "Weather",
+    "version": "1.0.0",
+    "kinds": [
+      "bar-widget"
+    ],
+    "entryPoints": {
+      "barWidget": "Widget.qml"
+    }
+  },
+  "files": {
+    "Widget.qml": "x"
+  },
+  "expect": "invalid",
+  "reason": "license is required"
 }

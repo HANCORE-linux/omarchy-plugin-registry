@@ -84,12 +84,12 @@ class MomusRemediationsTest < ActionDispatch::IntegrationTest
     assert_equal original_readme, plugin.readme
   end
 
-  test "manifest with mismatched entryPoints keys is rejected" do
+  test "manifest missing its kind's mapped entry-point key is rejected" do
     publish TarballBuilder.build(manifest: TarballBuilder.manifest(
       "kinds" => [ "bar-widget" ],
-      "entryPoints" => { "bar-widget" => "Widget.qml", "service" => "Widget.qml" }))
+      "entryPoints" => { "service" => "Widget.qml" }))
     assert_response :unprocessable_entity
-    assert_match(/entryPoints keys must exactly match kinds/, response.parsed_body["error"])
+    assert_match(/requires an 'entryPoints.barWidget'/, response.parsed_body["error"])
   end
 
   test "non-https repository URLs are rejected" do

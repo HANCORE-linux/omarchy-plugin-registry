@@ -1,21 +1,21 @@
 {
- "name": "unknown_kind",
- "manifest": {
-  "schemaVersion": 1,
-  "id": "acme.weather",
-  "name": "Weather",
-  "version": "1.0.0",
-  "kinds": [
-   "rootkit"
-  ],
-  "entryPoints": {
-   "rootkit": "Widget.qml"
+  "name": "unknown_kind",
+  "manifest": {
+    "schemaVersion": 1,
+    "id": "acme.weather",
+    "name": "Weather",
+    "version": "1.0.0",
+    "kinds": [
+      "rootkit"
+    ],
+    "entryPoints": {
+      "rootkit": "Widget.qml"
+    },
+    "license": "MIT"
   },
-  "license": "MIT"
- },
- "files": {
-  "Widget.qml": "x"
- },
- "expect": "invalid",
- "reason": "unknown kinds"
+  "files": {
+    "Widget.qml": "x"
+  },
+  "expect": "invalid",
+  "reason": "unknown kinds"
 }

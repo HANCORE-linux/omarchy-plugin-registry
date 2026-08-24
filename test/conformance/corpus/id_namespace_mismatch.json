@@ -1,21 +1,21 @@
 {
- "name": "id_namespace_mismatch",
- "manifest": {
-  "schemaVersion": 1,
-  "id": "evil.weather",
-  "name": "Weather",
-  "version": "1.0.0",
-  "kinds": [
-   "bar-widget"
-  ],
-  "entryPoints": {
-   "bar-widget": "Widget.qml"
+  "name": "id_namespace_mismatch",
+  "manifest": {
+    "schemaVersion": 1,
+    "id": "evil.weather",
+    "name": "Weather",
+    "version": "1.0.0",
+    "kinds": [
+      "bar-widget"
+    ],
+    "entryPoints": {
+      "barWidget": "Widget.qml"
+    },
+    "license": "MIT"
   },
-  "license": "MIT"
- },
- "files": {
-  "Widget.qml": "x"
- },
- "expect": "invalid",
- "reason": "must be acme.weather"
+  "files": {
+    "Widget.qml": "x"
+  },
+  "expect": "invalid",
+  "reason": "must be acme.weather"
 }

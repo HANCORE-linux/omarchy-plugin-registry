@@ -1,20 +1,23 @@
 {
-  "name": "service_shell_entrypoint",
+  "name": "valid_bar_and_overlay",
   "manifest": {
     "schemaVersion": 1,
     "id": "acme.weather",
-    "name": "Weather",
+    "name": "Weather bar",
     "version": "1.0.0",
     "kinds": [
-      "service"
+      "bar",
+      "overlay"
     ],
     "entryPoints": {
-      "service": "daemon.sh"
+      "bar": "Bar.qml",
+      "overlay": "Overlay.qml"
     },
     "license": "MIT"
   },
   "files": {
-    "daemon.sh": "#!/bin/sh\n"
+    "Bar.qml": "x",
+    "Overlay.qml": "x"
   },
   "expect": "valid"
 }

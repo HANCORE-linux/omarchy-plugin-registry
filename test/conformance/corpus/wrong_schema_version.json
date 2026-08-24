@@ -1,21 +1,21 @@
 {
- "name": "wrong_schema_version",
- "manifest": {
-  "schemaVersion": 2,
-  "id": "acme.weather",
-  "name": "Weather",
-  "version": "1.0.0",
-  "kinds": [
-   "bar-widget"
-  ],
-  "entryPoints": {
-   "bar-widget": "Widget.qml"
+  "name": "wrong_schema_version",
+  "manifest": {
+    "schemaVersion": 2,
+    "id": "acme.weather",
+    "name": "Weather",
+    "version": "1.0.0",
+    "kinds": [
+      "bar-widget"
+    ],
+    "entryPoints": {
+      "barWidget": "Widget.qml"
+    },
+    "license": "MIT"
   },
-  "license": "MIT"
- },
- "files": {
-  "Widget.qml": "x"
- },
- "expect": "invalid",
- "reason": "schemaVersion"
+  "files": {
+    "Widget.qml": "x"
+  },
+  "expect": "invalid",
+  "reason": "schemaVersion"
 }

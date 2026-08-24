@@ -1,23 +1,22 @@
 {
- "name": "entrypoint_kind_mismatch",
- "manifest": {
-  "schemaVersion": 1,
-  "id": "acme.weather",
-  "name": "Weather",
-  "version": "1.0.0",
-  "kinds": [
-   "bar-widget"
-  ],
-  "entryPoints": {
-   "bar-widget": "Widget.qml",
-   "service": "S.qml"
+  "name": "entrypoint_kind_mismatch",
+  "manifest": {
+    "schemaVersion": 1,
+    "id": "acme.weather",
+    "name": "Weather",
+    "version": "1.0.0",
+    "kinds": [
+      "bar-widget"
+    ],
+    "entryPoints": {
+      "service": "S.qml"
+    },
+    "license": "MIT"
   },
-  "license": "MIT"
- },
- "files": {
-  "Widget.qml": "x",
-  "S.qml": "x"
- },
- "expect": "invalid",
- "reason": "exactly match kinds"
+  "files": {
+    "Widget.qml": "x",
+    "S.qml": "x"
+  },
+  "expect": "invalid",
+  "reason": "requires an 'entryPoints.barWidget'"
 }

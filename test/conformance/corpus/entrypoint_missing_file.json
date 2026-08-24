@@ -1,21 +1,21 @@
 {
- "name": "entrypoint_missing_file",
- "manifest": {
-  "schemaVersion": 1,
-  "id": "acme.weather",
-  "name": "Weather",
-  "version": "1.0.0",
-  "kinds": [
-   "bar-widget"
-  ],
-  "entryPoints": {
-   "bar-widget": "Missing.qml"
+  "name": "entrypoint_missing_file",
+  "manifest": {
+    "schemaVersion": 1,
+    "id": "acme.weather",
+    "name": "Weather",
+    "version": "1.0.0",
+    "kinds": [
+      "bar-widget"
+    ],
+    "entryPoints": {
+      "barWidget": "Missing.qml"
+    },
+    "license": "MIT"
   },
-  "license": "MIT"
- },
- "files": {
-  "Widget.qml": "x"
- },
- "expect": "invalid",
- "reason": "not found in tarball"
+  "files": {
+    "Widget.qml": "x"
+  },
+  "expect": "invalid",
+  "reason": "not found in tarball"
 }

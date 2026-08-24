@@ -1,21 +1,20 @@
 {
-  "name": "non_string_name",
+  "name": "valid_menu",
   "manifest": {
     "schemaVersion": 1,
     "id": "acme.weather",
-    "name": 123,
+    "name": "Weather menu",
     "version": "1.0.0",
     "kinds": [
-      "bar-widget"
+      "menu"
     ],
     "entryPoints": {
-      "barWidget": "Widget.qml"
+      "menu": "Menu.qml"
     },
     "license": "MIT"
   },
   "files": {
-    "Widget.qml": "x"
+    "Menu.qml": "x"
   },
-  "expect": "invalid",
-  "reason": "must be a string"
+  "expect": "valid"
 }

@@ -97,7 +97,7 @@ class PublishFlowTest < ActionDispatch::IntegrationTest
   end
 
   test "rejects missing entry point and missing license" do
-    publish TarballBuilder.build(manifest: TarballBuilder.manifest("entryPoints" => { "bar-widget" => "Missing.qml" }))
+    publish TarballBuilder.build(manifest: TarballBuilder.manifest("entryPoints" => { "barWidget" => "Missing.qml" }))
     assert_match(/not found in tarball/, response.parsed_body["error"])
 
     publish TarballBuilder.build(manifest: TarballBuilder.manifest(license: nil, version: "1.0.1"))

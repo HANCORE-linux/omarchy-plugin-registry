@@ -9,7 +9,7 @@ module TarballBuilder
     "name" => "Weather",
     "version" => "1.0.0",
     "kinds" => [ "bar-widget" ],
-    "entryPoints" => { "bar-widget" => "Widget.qml" },
+    "entryPoints" => { "barWidget" => "Widget.qml" },
     "license" => "MIT"
   }.freeze
 

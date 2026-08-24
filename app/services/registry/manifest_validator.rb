@@ -6,13 +6,16 @@ module Registry
   # KIND_ENTRY_RULES is the registry's authoritative kind/entry-point contract;
   # the Quattro-side validator must stay in lockstep (tracked in docs/client-spec.md).
   class ManifestValidator
-    # kind => allowed entry-point extensions
+    # kind => required entryPoints key + allowed extensions. This mirrors the
+    # Quattro-side omarchy-plugin-validate kind table EXACTLY (bar-widget maps
+    # to the camelCase barWidget key; the rest match their kind name).
     KIND_ENTRY_RULES = {
-      "bar-widget" => %w[.qml],
-      "panel" => %w[.qml],
-      "popout" => %w[.qml],
-      "service" => %w[.qml .sh],
-      "command" => %w[.sh]
+      "bar" => { key: "bar", extensions: %w[.qml] },
+      "bar-widget" => { key: "barWidget", extensions: %w[.qml] },
+      "menu" => { key: "menu", extensions: %w[.qml] },
+      "overlay" => { key: "overlay", extensions: %w[.qml] },
+      "panel" => { key: "panel", extensions: %w[.qml] },
+      "service" => { key: "service", extensions: %w[.qml .sh] }
     }.freeze
     ALLOWED_KINDS = KIND_ENTRY_RULES.keys.freeze
     # Deferred by the design ("maybe: themes join the same registry") — no
@@ -118,21 +121,28 @@ module Registry
       entry_points = manifest["entryPoints"]
       return errors << "entryPoints must be an object" unless entry_points.is_a?(Hash)
 
+      # Quattro semantics: every declared kind must have its mapped entry-point
+      # key; extra keys are allowed but every value is validated.
       kinds = Array(manifest["kinds"])
-      if kinds.any? && kinds.all? { |k| k.is_a?(String) } && entry_points.keys.sort != kinds.sort
-        errors << "entryPoints keys must exactly match kinds (kinds: #{kinds.sort.join(', ')}; entryPoints: #{entry_points.keys.sort.join(', ')})"
+      kinds.select { |k| k.is_a?(String) }.each do |kind|
+        rule = KIND_ENTRY_RULES[kind]
+        next unless rule
+        unless entry_points.key?(rule[:key])
+          errors << "kind '#{kind}' requires an 'entryPoints.#{rule[:key]}' to load"
+        end
       end
 
-      entry_points.each do |kind, path|
+      extension_rules = KIND_ENTRY_RULES.values.to_h { |r| [ r[:key], r[:extensions] ] }
+      entry_points.each do |key, path|
         unless path.is_a?(String) && !path.start_with?("/") && !path.split("/").include?("..")
-          errors << "entry point for #{kind} must be a relative path inside the plugin"
+          errors << "entry point for #{key} must be a relative path inside the plugin"
           next
         end
         errors << "entry point #{path} not found in tarball" unless tarball.include?(path)
 
-        allowed = KIND_ENTRY_RULES[kind]
+        allowed = extension_rules[key]
         if allowed && allowed.exclude?(File.extname(path).downcase)
-          errors << "entry point for #{kind} must be #{allowed.join(' or ')} (got #{path})"
+          errors << "entry point for #{key} must be #{allowed.join(' or ')} (got #{path})"
         end
       end
     end

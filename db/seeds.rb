@@ -40,7 +40,7 @@ SAMPLES = [
   { name: "pomodoro", summary: "A tomato timer that respects your focus and your bar space.",
     kinds: [ "bar-widget" ], versions: %w[1.0.0] },
   { name: "now-playing", summary: "MPRIS now-playing with scrubbing, artwork, and taste.",
-    kinds: [ "bar-widget", "popout" ], versions: %w[0.5.0 0.6.0] }
+    kinds: [ "bar-widget", "panel" ], versions: %w[0.5.0 0.6.0] }
 ]
 
 SAMPLES.each do |sample|
@@ -55,7 +55,7 @@ SAMPLES.each do |sample|
       "description" => sample[:summary],
       "version" => version,
       "kinds" => sample[:kinds],
-      "entryPoints" => sample[:kinds].index_with { "Widget.qml" },
+      "entryPoints" => sample[:kinds].to_h { |k| [ Registry::ManifestValidator::KIND_ENTRY_RULES.fetch(k)[:key], "Widget.qml" ] },
       "license" => "MIT",
       "repository" => "https://github.com/ryanrhughes/#{sample[:name]}"
     }
