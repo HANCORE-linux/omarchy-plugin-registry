@@ -3,6 +3,45 @@
 One Rails app (control plane) + a directory of static files (data plane) synced
 to object storage behind a CDN. Installs never touch Rails.
 
+## Kamal (the supported path)
+
+`config/deploy.yml` deploys web + jobs to a single host. Current target is the
+E2E staging box `omarchy-plugins` (Proxmox, Debian 13), reached over Tailscale:
+
+- **TLS**: no public 80/443, so kamal-proxy serves a Let's Encrypt cert minted
+  by Tailscale DNS-01. Renew (~90 days; check `openssl x509 -enddate -noout
+  -in .kamal/local/tls.crt`): on the VM `tailscale cert --cert-file
+  /root/omarchy-plugins.crt --key-file /root/omarchy-plugins.key
+  omarchy-plugins.manatee-piranha.ts.net`, scp both to `.kamal/local/tls.{crt,key}`,
+  copy to `/opt/registry/certs/` + `docker restart registry` on the VM, then
+  `bin/kamal proxy reboot` and `bin/kamal accessory reboot mailpit`.
+- **Image registry**: self-hosted `registry:2` on the VM
+  (`omarchy-plugins.manatee-piranha.ts.net:5443`, htpasswd user `kamal`,
+  password in `.kamal/local/registry_password`, data under `/opt/registry`).
+- **Mail**: a Mailpit accessory catches login-code email — web UI at
+  `http://omarchy-plugins:8025`. Swap the `SMTP_*` env for a real provider
+  before launch.
+- **Secrets**: everything `.kamal/secrets` reads lives git-ignored in
+  `.kamal/local/` (TLS cert/key, `signing_seed`, `registry_password`) —
+  back that directory up; the signing seed especially (custody note below).
+
+```sh
+bin/kamal setup                                            # first deploy
+bin/kamal app exec 'bin/rails registry:grant_admin[you@omarchy.org]'
+bin/kamal deploy                                           # every deploy after
+```
+
+`bin/kamal console` / `logs` / `shell` / `dbc` are aliased. The config mounts
+`omarchy_registry_storage` at `/rails/storage` (databases + data plane — the
+volume the rest of this document is about) and a separate
+`omarchy_registry_witness` volume for `REGISTRY_WITNESS_PATH` (ideally backed
+by a second disk so an app-volume restore can't also roll back the witness —
+not possible on the current single-volume staging box; revisit for
+production). Production cutover to plugins.omarchy.org: swap `proxy.host`,
+the `REGISTRY_*`/`SMTP_*` env, `ssl: true` (needs public 80/443), and the
+image registry. The sections below describe what the deploy must provide and
+apply to any orchestration.
+
 ## Required environment
 
 | Variable | Purpose |

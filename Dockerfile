@@ -32,7 +32,7 @@ FROM base AS build
 
 # Install packages needed to build gems
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y build-essential git libvips libyaml-dev pkg-config && \
+    apt-get install --no-install-recommends -y build-essential git libssl-dev libvips libyaml-dev pkg-config && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Install application gems
@@ -60,9 +60,13 @@ RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
 # Final stage for app image
 FROM base
 
-# Run and own only the runtime files as a non-root user for security
+# Run and own only the runtime files as a non-root user for security.
+# /witness pre-exists rails-owned so a named volume mounted there (the
+# kill-list rollback witness, REGISTRY_WITNESS_PATH) inherits writable
+# ownership on first creation.
 RUN groupadd --system --gid 1000 rails && \
-    useradd rails --uid 1000 --gid 1000 --create-home --shell /bin/bash
+    useradd rails --uid 1000 --gid 1000 --create-home --shell /bin/bash && \
+    mkdir /witness && chown rails:rails /witness
 USER 1000:1000
 
 # Copy built artifacts: gems, application

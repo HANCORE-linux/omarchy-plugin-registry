@@ -33,4 +33,7 @@
 # Ignore key files for decrypting credentials and more.
 /config/*.key
 
+# Local deploy secrets: TLS cert/key, signing seed, registry password.
+/.kamal/local/
+
 .momus/
