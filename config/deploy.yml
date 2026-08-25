@@ -74,15 +74,14 @@ env:
     # configured via /ai/base_url + /ai/model + /ai/effort. Swap for a hosted
     # key file (openai_key/anthropic_key) at launch.
     AI_REVIEW_COMMAND: /rails/script/ai_review_adapter
-    # Cloudflare R2 for Active Storage originals — uncomment (with the R2_*
-    # secrets below) once R2 is enabled on the account and an API token
-    # exists. Bucket: omarchy-plugin-registry.
-    # R2_BUCKET: omarchy-plugin-registry
+    # Cloudflare R2 for Active Storage originals (tarball uploads survive
+    # loss of the app volume). Credentials in .kamal/local/r2_*.
+    R2_BUCKET: omarchy-plugins
   secret:
     - RAILS_MASTER_KEY
     - REGISTRY_SIGNING_SEED
-    # - R2_ACCESS_KEY_ID
-    # - R2_SECRET_ACCESS_KEY
+    - R2_ACCESS_KEY_ID
+    - R2_SECRET_ACCESS_KEY
 
 volumes:
   # SQLite databases, Active Storage blobs, and the data plane all live under
