@@ -103,7 +103,7 @@
           <% @tokens.each do |token| %>
             <tr>
               <td><code><%= token.token_hint %></code></td>
-              <td><%= token.publisher.name %>/<%= token.plugin_name %></td>
+              <td><%= token.scope_label %></td>
               <td><%= time_ago_in_words(token.expires_at) %></td>
               <td class="actions"><%= button_to "Revoke", token_path(token), method: :delete, class: "button button--ghost button--small" %></td>
             </tr>
