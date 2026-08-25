@@ -1,8 +1,11 @@
 require "active_support/core_ext/integer/time"
 
 Rails.application.configure do
-  # Download counts come from CDN log aggregation — no per-GET DB writes at origin
-  config.x.count_origin_downloads = false
+  # Count downloads at the origin. Immutable tarballs are CDN-cached, so the
+  # origin only sees cache misses — this UNDERCOUNTS (repeat installs served
+  # from Cloudflare never reach us), but it's a real signal until CDN log
+  # aggregation replaces it. Set COUNT_ORIGIN_DOWNLOADS=0 to disable.
+  config.x.count_origin_downloads = ENV.fetch("COUNT_ORIGIN_DOWNLOADS", "1") != "0"
   # Settings specified here will take precedence over those in config/application.rb.
 
   # Code is not reloaded between requests.
