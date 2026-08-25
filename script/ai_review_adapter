@@ -13,7 +13,9 @@
 # files, never from env:
 #   /ai/openai_key     -> OpenAI (preferred when both exist)
 #   /ai/anthropic_key  -> Anthropic
+#   /ai/base_url       -> OpenAI-compatible endpoint (vLLM etc.; key optional)
 #   /ai/model          -> optional model id override
+#   /ai/effort         -> thinking effort ("high" default; "off" disables)
 #
 # The payload contains ATTACKER-CONTROLLED plugin source. It is data, never
 # instructions: the model is told to ignore any directives inside it, and this
@@ -84,13 +86,23 @@ PROMPT
 
 openai_key = read_ai_file("openai_key")
 anthropic_key = read_ai_file("anthropic_key")
-flag!("adapter: no API key in #{AI_DIR} (openai_key or anthropic_key)") unless openai_key || anthropic_key
+base_url = read_ai_file("base_url")
+# An OpenAI-compatible base_url (vLLM etc.) needs no real key — the auth
+# header just has to exist.
+openai_key ||= "local" if base_url
+unless openai_key || anthropic_key
+  flag!("adapter: no credentials in #{AI_DIR} (openai_key, anthropic_key, or base_url)")
+end
 
 provider = openai_key ? :openai : :anthropic
 model = read_ai_file("model") || (provider == :openai ? "gpt-5.6-sol" : "claude-opus-5")
+# Thinking effort: provider-dependent vocabulary (OpenAI: high; vLLM/Qwen:
+# xhigh/medium/low). "off" disables the thinking config entirely.
+effort = read_ai_file("effort") || "high"
 
 RubyLLM.configure do |config|
   config.openai_api_key = openai_key
+  config.openai_api_base = base_url if base_url
   config.anthropic_api_key = anthropic_key
   config.request_timeout = HTTP_TIMEOUT
   config.max_retries = 1
@@ -116,11 +128,11 @@ else
 end
 
 response = begin
-  # High thinking effort: maps to OpenAI reasoning_effort and Anthropic
-  # thinking config — security review is worth the extra reasoning tokens.
-  RubyLLM.chat(model: model, provider: provider, assume_model_exists: true)
-    .with_thinking(effort: :high)
-    .with_instructions(SYSTEM_PROMPT)
+  chat = RubyLLM.chat(model: model, provider: provider, assume_model_exists: true)
+  # Maps to OpenAI reasoning_effort / Anthropic thinking config — security
+  # review is worth the extra reasoning tokens.
+  chat = chat.with_thinking(effort: effort.to_sym) unless %w[off none].include?(effort)
+  chat.with_instructions(SYSTEM_PROMPT)
     .ask("Review request JSON:\n\n#{user_content}")
 rescue StandardError => e
   flag!("adapter: #{provider} request failed: #{e.class}: #{e.message[0, 160]}")
