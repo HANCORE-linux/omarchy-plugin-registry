@@ -16,21 +16,23 @@
 
   <body>
     <header class="site-header">
-      <%= link_to root_path, class: "site-header__brand" do %>
-        <%= render "shared/logo", class: "site-header__logo" %>
-        <span class="site-header__wordmark">Omarchy <em>Plugins</em></span>
-      <% end %>
-      <nav class="site-header__nav">
-        <%= link_to "Plugins", root_path %>
-        <%= link_to "Publishing", publishing_path %>
-        <%= link_to "Governance", governance_path %>
-        <% if authenticated? %>
-          <% if Current.user&.admin? %><%= link_to "Admin", admin_root_path %><% end %>
-          <%= link_to "Dashboard", dashboard_path, class: "button" %>
-        <% else %>
-          <%= link_to "Sign in", new_session_path, class: "button" %>
+      <div class="site-header__inner container">
+        <%= link_to root_path, class: "site-header__brand" do %>
+          <%= render "shared/logo", class: "site-header__logo" %>
+          <span class="site-header__wordmark">Omarchy <em>Plugins</em></span>
         <% end %>
-      </nav>
+        <nav class="site-header__nav">
+          <%= link_to "Plugins", root_path %>
+          <%= link_to "Publishing", publishing_path %>
+          <%= link_to "Governance", governance_path %>
+          <% if authenticated? %>
+            <% if Current.user&.admin? %><%= link_to "Admin", admin_root_path %><% end %>
+            <%= link_to "Dashboard", dashboard_path, class: "button" %>
+          <% else %>
+            <%= link_to "Sign in", new_session_path, class: "button" %>
+          <% end %>
+        </nav>
+      </div>
     </header>
 
     <% if authenticated? && Current.user&.recovery_requested_at %>

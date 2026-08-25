@@ -127,8 +127,13 @@
           <dt>Size</dt><dd><%= number_to_human_size(@latest.size_bytes) %></dd>
           <dt>SHA-256</dt><dd><code><%= @latest.sha256.first(12) %>…</code></dd>
         <% end %>
-        <% if @plugin.repository_url.present? %>
-          <dt>Source</dt><dd><%= link_to @plugin.repository_url.sub(%r{\Ahttps?://}, ""), @plugin.repository_url %></dd>
+        <% if (source = source_repo(@plugin.repository_url)) %>
+          <dt>Source</dt>
+          <dd>
+            <%= link_to source[:url], class: "source-link", title: source[:url] do %>
+              <%= render "shared/source_icon", icon: source[:icon] %><span><%= source[:label] %></span>
+            <% end %>
+          </dd>
         <% end %>
       </dl>
     </section>
