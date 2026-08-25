@@ -315,6 +315,7 @@ pre code { background: none; padding: 0; }
 .directory__sort a.active { background: var(--btn-bg); color: var(--btn-fg); }
 
 .plugin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 20px; }
+.directory__pager { justify-content: center; align-items: center; margin-top: 32px; }
 
 .plugin-card {
   border: 1px solid var(--hairline); background: var(--surface);

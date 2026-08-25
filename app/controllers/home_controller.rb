@@ -8,9 +8,12 @@ class HomeController < ApplicationController
     "name" => { name: :asc }
   }.freeze
 
+  PER_PAGE = 24
+
   def index
     @query = params[:q].to_s.strip
     @sort = SORTS.key?(params[:sort]) ? params[:sort] : "downloads"
+    @page = [ params[:page].to_i, 1 ].max
 
     # Plugins without a published version stay visible while genuinely in
     # review; burned names and rejected-only submissions don't pollute the
@@ -23,7 +26,12 @@ class HomeController < ApplicationController
       scope = scope.where(
         "LOWER(plugins.name) LIKE :q OR LOWER(plugins.summary) LIKE :q OR LOWER(plugins.normalized_name) LIKE :q", q: like)
     end
-    @plugins = scope.order(SORTS[@sort]).limit(60)
+    # id as tiebreaker: downloads/rating ties would otherwise let rows drift
+    # between pages as OFFSET slides across an unstable order
+    plugins = scope.order(SORTS[@sort]).order(:id)
+      .offset((@page - 1) * PER_PAGE).limit(PER_PAGE + 1).to_a
+    @more = plugins.length > PER_PAGE
+    @plugins = plugins.first(PER_PAGE)
     @stats = {
       plugins: Plugin.listed.where.not(latest_version: nil).count,
       publishers: Publisher.claimed.count,

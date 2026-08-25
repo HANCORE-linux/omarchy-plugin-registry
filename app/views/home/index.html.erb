@@ -44,7 +44,21 @@
         <% end %>
       <% end %>
     </div>
+  <% elsif @page > 1 %>
+    <p class="muted">Nothing on this page — <%= link_to "back to the first page", root_path(q: @query.presence, sort: @sort) %>.</p>
   <% else %>
     <p class="muted"><% if @query.present? %>Nothing matches “<%= @query %>”.<% else %>No plugins published yet — <%= link_to "be the first", publishing_path %>.<% end %></p>
+  <% end %>
+
+  <% if @page > 1 || @more %>
+    <div class="form-inline u-gap-top directory__pager">
+      <% if @page > 1 %>
+        <%= link_to "← Prev", root_path(q: @query.presence, sort: @sort, page: (@page - 1 if @page - 1 > 1)), class: "button button--ghost button--small" %>
+      <% end %>
+      <span class="muted">Page <%= @page %></span>
+      <% if @more %>
+        <%= link_to "Next →", root_path(q: @query.presence, sort: @sort, page: @page + 1), class: "button button--ghost button--small" %>
+      <% end %>
+    </div>
   <% end %>
 </section>
