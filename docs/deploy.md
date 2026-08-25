@@ -113,4 +113,7 @@ under-review and uninstallable.
 
 - Admin queue: `/admin` (quarantined/held versions, reports, kill list).
 - `bin/rails registry:regenerate` rebuilds the whole data plane from the DB.
-- Publish hold window: `config.x.publish_hold` (15 min default in production).
+- Publish hold window: off by default (`PUBLISH_HOLD_SECONDS`, 0). Set it to
+  a number of seconds during an incident to delay review-clean versions going
+  live; the security gates are the deterministic scan + AI review, with
+  per-plugin submission quotas (5 pending, 12/day) throttling abuse.

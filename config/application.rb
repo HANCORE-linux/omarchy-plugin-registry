@@ -32,8 +32,13 @@ module OmarchyPluginRegistry
     config.x.data_plane_root = Rails.root.join("storage/data_plane")
     config.x.registry_base_url = ENV.fetch("REGISTRY_BASE_URL", "https://plugins.omarchy.org")
 
-    # Publish hold window: even clean versions wait before going live (worm brake).
-    config.x.publish_hold = 15.minutes
+    # Publish hold window: a delay before a review-clean version goes live.
+    # Off by default — the deterministic scan + AI review are the security
+    # gates, and per-plugin submission quotas throttle abuse; a bare timer with
+    # nothing watching it only delays honest publishes. Re-enable per incident
+    # by setting PUBLISH_HOLD_SECONDS (it becomes the trigger surface for
+    # automatic anomaly checks if we add them).
+    config.x.publish_hold = ENV.fetch("PUBLISH_HOLD_SECONDS", "0").to_i.seconds
 
     # Shell command for LLM review of submissions (reads JSON on stdin, prints
     # {"verdict":..., "reasons":[...]}). Unset = AI review disabled.
