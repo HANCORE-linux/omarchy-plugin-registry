@@ -18,16 +18,29 @@ class DeviceAuthorization < ApplicationRecord
 
   scope :active, -> { where(expires_at: Time.current..) }
 
-  def self.start!
+  # requested_* are UNAUTHENTICATED display hints from the CLI so the approval
+  # page can show what the terminal wants instead of asking the human to
+  # re-type it. They never grant anything: approval still binds to a namespace
+  # the signed-in user is a member of, chosen in the browser.
+  def self.start!(requested_publisher: nil, requested_plugin: nil)
     raw = "omd_" + SecureRandom.base58(30)
     authorization = create!(
       device_code_digest: digest(raw),
       user_code: generate_user_code,
-      expires_at: EXPIRATION.from_now
+      expires_at: EXPIRATION.from_now,
+      requested_publisher_name: sanitize_hint(requested_publisher),
+      requested_plugin_name: sanitize_hint(requested_plugin)
     )
     authorization.instance_variable_set(:@plaintext_device_code, raw)
     authorization
   end
+
+  def self.sanitize_hint(value)
+    hint = value.to_s.downcase.strip
+    hint.match?(NameRules::NAME_FORMAT) ? hint : nil
+  end
+
+  def requested_scope? = requested_publisher_name.present? && requested_plugin_name.present?
 
   def self.find_by_device_code(raw)
     active.find_by(device_code_digest: digest(raw.to_s))
@@ -44,7 +57,10 @@ class DeviceAuthorization < ApplicationRecord
     "#{cleaned[0, 4]}-#{cleaned[4, 4]}"
   end
 
-  def approve!(user:, publisher:, plugin_name:)
+  # Account-wide by default: the token can publish to any namespace the user
+  # belongs to (membership is enforced at publish time). Passing a publisher
+  # and/or plugin_name narrows it — kept for a future "tighter scope" UI.
+  def approve!(user:, publisher: nil, plugin_name: nil)
     token = ApiToken.mint!(user:, publisher:, plugin_name:)
     # The EXACT minted token is referenced — polling must report this token's
     # expiry, not whichever same-scope token happens to be newest

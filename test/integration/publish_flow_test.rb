@@ -43,11 +43,17 @@ class PublishFlowTest < ActionDispatch::IntegrationTest
     assert_equal 1, plugin.versions.first.reload.downloads_count
   end
 
-  test "rejects wrong token scope" do
+  test "rejects a narrower token that does not cover the target plugin" do
     other = ApiToken.mint!(user: @user, publisher: @publisher, plugin_name: "clock")
     publish TarballBuilder.build, token: other.plaintext_token
     assert_response :forbidden
-    assert_match(/not scoped/, response.parsed_body["error"])
+    assert_match(/does not cover/, response.parsed_body["error"])
+  end
+
+  test "account-wide token publishes any of the user's plugins" do
+    account = ApiToken.mint!(user: @user)
+    publish TarballBuilder.build, token: account.plaintext_token
+    assert_response :created
   end
 
   test "rejects bad or missing token" do

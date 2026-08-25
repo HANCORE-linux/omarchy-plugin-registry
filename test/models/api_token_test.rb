@@ -30,11 +30,33 @@ class ApiTokenTest < ActiveSupport::TestCase
     end
   end
 
-  test "authorizes only its own namespace and plugin" do
+  test "per-plugin token authorizes only its own namespace and plugin" do
     token = ApiToken.mint!(user: @user, publisher: @publisher, plugin_name: "weather")
     other = Publisher.create!(name: "buttons", kind: :org)
     assert token.authorizes?(@publisher, "weather")
     assert_not token.authorizes?(@publisher, "clock")
     assert_not token.authorizes?(other, "weather")
+  end
+
+  test "namespace-wide token authorizes any plugin in its publisher only" do
+    token = ApiToken.mint!(user: @user, publisher: @publisher)
+    other = Publisher.create!(name: "buttons", kind: :org)
+    assert token.authorizes?(@publisher, "weather")
+    assert token.authorizes?(@publisher, "anything-new")
+    assert_not token.authorizes?(other, "weather")
+    assert_equal "acme/*", token.scope_label
+  end
+
+  test "account-wide token (the default) authorizes any target" do
+    token = ApiToken.mint!(user: @user)
+    other = Publisher.create!(name: "buttons", kind: :org)
+    assert token.authorizes?(@publisher, "weather")
+    assert token.authorizes?(other, "anything")
+    assert_match(/account/, token.scope_label)
+  end
+
+  test "a plugin_name without a publisher is rejected" do
+    token = ApiToken.new(user: @user, plugin_name: "weather", expires_at: 7.days.from_now)
+    assert_not token.valid?
   end
 end

@@ -15,7 +15,7 @@ module Api
         render json: {
           token: token.plaintext_token,
           token_type: "bearer",
-          scope: "#{token.publisher.name}/#{token.plugin_name}",
+          scope: token.scope_label,
           expires_at: token.expires_at.utc.iso8601
         }, status: :created
       rescue Registry::TrustedPublishing::ExchangeError => e

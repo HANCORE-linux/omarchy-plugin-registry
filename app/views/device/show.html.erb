@@ -4,22 +4,21 @@
   <% if @authorization %>
     <h1>Approve this terminal?</h1>
     <p>A device holding code <strong class="code-chip"><%= @authorization.user_code %></strong> wants a
-      publish token. Only approve if you just ran <code>omarchy plugin publish</code> yourself.</p>
+      publish token for your account. Only approve if you just ran
+      <code>omarchy plugin publish</code> yourself and the code above matches your terminal.</p>
+    <% if @authorization.requested_scope? %>
+      <p class="hint">The terminal said it's publishing
+        <strong><%= @authorization.requested_publisher_name %>/<%= @authorization.requested_plugin_name %></strong>.</p>
+    <% end %>
+    <div class="field">
+      <label>Grants</label>
+      <p class="hint">A push-only token that can publish new versions to any namespace you belong to
+        (<%= Current.user.publishers.map(&:name).join(", ").presence || "none yet" %>).
+        It's push-only — it can't yank, change owners, or touch account settings — expires in 7 days,
+        and every version still goes through review before it can go live.</p>
+    </div>
     <%= form_with url: approve_device_path do |form| %>
       <input type="hidden" name="code" value="<%= @authorization.user_code %>">
-      <div class="field">
-        <label for="publisher_name">Namespace</label>
-        <select name="publisher_name" id="publisher_name" class="select u-full-width">
-          <% Current.user.publishers.each do |publisher| %>
-            <option value="<%= publisher.name %>"><%= publisher.name %></option>
-          <% end %>
-        </select>
-      </div>
-      <div class="field">
-        <label for="plugin_name">Plugin</label>
-        <input type="text" name="plugin_name" id="plugin_name" required pattern="[a-z0-9][a-z0-9_-]*" placeholder="weather">
-        <p class="hint">The token is push-only and scoped to exactly this plugin.</p>
-      </div>
       <button type="submit" class="button">Approve</button>
       <button type="submit" name="decision" value="deny" class="button button--ghost">Deny</button>
     <% end %>

@@ -57,7 +57,7 @@ module Registry
       fail! "add a passkey or enable two-factor authentication to publish", status: :forbidden unless user.second_factor?
       fail! "publishing is paused after a recent account change — try again later", status: :forbidden if user.in_publish_cooldown?
       if token && !token.authorizes?(publisher, plugin_name)
-        fail! "token is not scoped to #{publisher.name}/#{plugin_name}", status: :forbidden
+        fail! "token scope (#{token.scope_label}) does not cover #{publisher.name}/#{plugin_name}", status: :forbidden
       end
     end
 

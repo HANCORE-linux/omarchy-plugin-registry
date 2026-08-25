@@ -20,19 +20,16 @@ class DeviceController < ApplicationController
       return redirect_to dashboard_path, notice: "Denied. The CLI has been told no."
     end
 
-    publisher = Current.user.publishers.find_by(name: params[:publisher_name])
-    plugin_name = params[:plugin_name].to_s.downcase.strip
-    if publisher.nil? || !plugin_name.match?(NameRules::NAME_FORMAT)
-      return redirect_to device_path(code: params[:code]), alert: "Pick a namespace and a valid plugin name."
-    end
-
+    # Account-wide token: it can publish to any namespace this user belongs to
+    # (each publish still enforces membership, MFA, cooldowns, and the review
+    # pipeline). Tighter scoping lands later.
     begin
-      authorization.approve!(user: Current.user, publisher:, plugin_name:)
+      token = authorization.approve!(user: Current.user)
     rescue ActiveRecord::RecordInvalid => e
       return redirect_to dashboard_path, alert: e.record.errors.full_messages.join("; ")
     end
     AuditEvent.record!(actor: Current.user, action: "device.approve", subject: authorization,
-      metadata: { scope: "#{publisher.name}/#{plugin_name}" })
-    redirect_to dashboard_path, notice: "Approved — your terminal has its token. It expires in 7 days."
+      metadata: { scope: token.scope_label })
+    redirect_to dashboard_path, notice: "Approved — your terminal has a publish token for your account. It expires in 7 days."
   end
 end

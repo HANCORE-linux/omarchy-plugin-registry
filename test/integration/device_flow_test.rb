@@ -26,7 +26,7 @@ class DeviceFlowTest < ActionDispatch::IntegrationTest
     assert_response :success
     token = response.parsed_body["token"]
     assert token.start_with?("omp_")
-    assert_equal "acme/weather", response.parsed_body["scope"]
+    assert_match(/account/, response.parsed_body["scope"])
 
     # Token is single-claim
     post "/api/v1/device/token", params: { device_code: device_code }
@@ -57,6 +57,62 @@ class DeviceFlowTest < ActionDispatch::IntegrationTest
       post "/api/v1/device/token", params: { device_code: device_code }
       assert_response :bad_request
     end
+  end
+
+  test "account-wide token publishes multiple plugins from one approval" do
+    post "/api/v1/device/code"
+    device_code = response.parsed_body["device_code"]
+    user_code = response.parsed_body["user_code"]
+
+    sign_in_as @user
+    post approve_device_path, params: { code: user_code }
+    assert_redirected_to dashboard_path
+
+    post "/api/v1/device/token", params: { device_code: device_code }
+    token = response.parsed_body["token"]
+    assert_match(/account/, response.parsed_body["scope"])
+
+    # One token, two different plugins in the namespace — no re-approval
+    %w[weather clock].each do |name|
+      post "/api/v1/plugins/acme/#{name}/versions",
+        params: TarballBuilder.build(manifest: TarballBuilder.manifest("id" => "acme.#{name}", "name" => name)),
+        headers: { "Authorization" => "Bearer #{token}", "Content-Type" => "application/gzip" }
+      assert_response :created, "publishing #{name} failed: #{response.body}"
+    end
+  end
+
+  test "account-wide token cannot reach a namespace the user does not belong to" do
+    stranger = Publisher.create!(name: "someone-else", kind: :org)
+    post "/api/v1/device/code"
+    device_code = response.parsed_body["device_code"]
+    user_code = response.parsed_body["user_code"]
+    sign_in_as @user
+    post approve_device_path, params: { code: user_code }
+    post "/api/v1/device/token", params: { device_code: device_code }
+    token = response.parsed_body["token"]
+
+    post "/api/v1/plugins/#{stranger.name}/weather/versions", params: TarballBuilder.build,
+      headers: { "Authorization" => "Bearer #{token}", "Content-Type" => "application/gzip" }
+    assert_includes [ 403, 404 ], response.status
+  end
+
+  test "the requested scope hint is shown as context but does not limit the token" do
+    post "/api/v1/device/code", params: { publisher: "acme", plugin: "weather" }
+    user_code = response.parsed_body["user_code"]
+    sign_in_as @user
+    get device_path(code: user_code)
+    assert_response :success
+    assert_select "p.hint", /acme\/weather/           # context line
+    assert_select "input[name=plugin_name]", false    # no plugin field to fat-finger
+    assert_select "select[name=publisher_name]", false
+  end
+
+  test "a malformed requested scope hint is dropped, not stored" do
+    post "/api/v1/device/code", params: { publisher: "Bad Name!", plugin: "../etc" }
+    assert_response :created
+    auth = DeviceAuthorization.find_by_user_code(response.parsed_body["user_code"])
+    assert_nil auth.requested_publisher_name
+    assert_nil auth.requested_plugin_name
   end
 
   test "approval requires MFA" do

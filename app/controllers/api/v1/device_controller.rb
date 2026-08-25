@@ -11,9 +11,12 @@ module Api
       rate_limit to: 240, within: 15.minutes, only: :token, store: RATE_LIMIT_STORE,
         with: -> { render json: { error: "slow_down" }, status: :too_many_requests }
 
-      # POST /api/v1/device/code — CLI starts the flow
+      # POST /api/v1/device/code — CLI starts the flow, optionally naming the
+      # publisher/plugin it wants so the approval page can display the scope
+      # instead of making the human re-type it
       def code
-        authorization = DeviceAuthorization.start!
+        authorization = DeviceAuthorization.start!(
+          requested_publisher: params[:publisher], requested_plugin: params[:plugin])
         render json: {
           device_code: authorization.plaintext_device_code,
           user_code: authorization.user_code,
@@ -45,7 +48,7 @@ module Api
           render json: {
             token: plaintext,
             token_type: "bearer",
-            scope: "#{authorization.publisher.name}/#{authorization.plugin_name}",
+            scope: authorization.api_token&.scope_label,
             expires_at: authorization.api_token&.expires_at&.utc&.iso8601
           }
         end

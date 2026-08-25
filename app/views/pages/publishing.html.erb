@@ -24,7 +24,9 @@ $ tar czf weather-1.0.0.tar.gz manifest.json Widget.qml README.md
 $ curl -X POST --data-binary @weather-1.0.0.tar.gz \
     -H "Authorization: Bearer omp_…" \
     https://plugins.omarchy.org/api/v1/plugins/you/weather/versions</pre>
-    <p>Tokens are push-only, scoped to a single plugin, and expire in 7 days. Every version —
+    <p>A publish token from <code>omarchy plugin publish</code> is push-only, covers any plugin in
+      your namespaces, and expires in 7 days (CI tokens from trusted publishing are minted per
+      plugin). Push-only means it can't yank, transfer ownership, or change account settings. Every version —
       first publish or update — runs the same review pipeline: structural validation, malware
       scanning, a capability fingerprint, and a short hold before going live. Versions are
       immutable: once <code>you/weather@1.0.0</code> exists, those bytes are frozen forever.</p>

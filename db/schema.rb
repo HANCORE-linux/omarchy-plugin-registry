@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_17_180001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_044323) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -43,9 +43,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_180001) do
     t.datetime "created_at", null: false
     t.datetime "expires_at", null: false
     t.datetime "last_used_at"
-    t.string "plugin_name", null: false
+    t.string "plugin_name"
     t.json "provenance"
-    t.integer "publisher_id", null: false
+    t.integer "publisher_id"
     t.datetime "revoked_at"
     t.string "token_digest", null: false
     t.string "token_hint", null: false
@@ -97,6 +97,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_180001) do
     t.datetime "expires_at", null: false
     t.string "plugin_name"
     t.integer "publisher_id"
+    t.string "requested_plugin_name"
+    t.string "requested_publisher_name"
     t.integer "status", default: 0, null: false
     t.string "token_ciphertext"
     t.datetime "updated_at", null: false
