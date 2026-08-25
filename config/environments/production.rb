@@ -79,8 +79,10 @@ Rails.application.configure do
       # Only request SMTP-AUTH when credentials are configured — the mail gem
       # raises if authentication is set with no user name (e.g. Mailpit).
       authentication: (:plain if ENV["SMTP_USERNAME"].present?),
-      # REQUIRED TLS — credentials and login codes never travel plaintext
-      enable_starttls: true
+      # TLS required by default — credentials and login codes never travel
+      # plaintext over a network. SMTP_STARTTLS=0 exists solely for a mail
+      # catcher on the same private docker network (staging Mailpit).
+      enable_starttls: ENV.fetch("SMTP_STARTTLS", "1") != "0"
     }.compact
   end
 

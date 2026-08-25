@@ -1,12 +1,13 @@
 # Kamal deployment — companion to docs/deploy.md, which explains every
 # REGISTRY_* variable and the data-plane layout.
 #
-# Current target: E2E staging on the homelab VM `omarchy-plugins`, reached over
-# Tailscale (MagicDNS resolves the bare name; the public cert is minted with
-# `tailscale cert` on the VM and lives in .kamal/local/ — see docs/deploy.md).
-# Production cutover to plugins.omarchy.org = swap proxy.host, the REGISTRY_*
-# env below, SSL back to `ssl: true` (Let's Encrypt needs public 80/443), and
-# the image registry.
+# Current target: staging at omarchy-plugins.ryanhughes.me. Public traffic
+# enters through the Cloudflare Tunnel (cloudflared accessory); kamal-proxy
+# serves plain HTTP on the docker network — the tunnel is the encrypted
+# transport, so no origin certificate exists to renew. Deploys reach the host
+# over Tailscale SSH (the bare `omarchy-plugins` name).
+# Production cutover to plugins.omarchy.org = swap proxy.host, REGISTRY_* env,
+# and the tunnel's public hostname.
 service: omarchy-plugin-registry
 
 image: registry/omarchy-plugin-registry
@@ -23,21 +24,22 @@ servers:
     cmd: bin/jobs
 
 proxy:
-  hosts:
-    - omarchy-plugins.ryanhughes.me
-    - omarchy-plugins.manatee-piranha.ts.net
-  # Tailscale-minted Let's Encrypt cert (no public 80/443 on this box).
-  # Renew: docs/deploy.md "Kamal" section — certs last ~90 days.
-  ssl:
-    certificate_pem: SSL_CERT_PEM
-    private_key_pem: SSL_KEY_PEM
+  host: omarchy-plugins.ryanhughes.me
+  # No TLS at the proxy: the only ingress is the Cloudflare Tunnel, which is
+  # encrypted end-to-end and connects to kamal-proxy over the private docker
+  # network (config.assume_ssl keeps Rails treating requests as https).
+  ssl: false
   # Thruster listens on 80 inside the container.
   app_port: 80
   healthcheck:
     path: /up
 
-# Self-hosted image registry on the VM itself (registry:2 behind the same
-# Tailscale cert, htpasswd auth) — no external registry account needed.
+# Self-hosted image registry on the VM (registry:2, htpasswd auth) — internal
+# deploy plumbing, never user-facing. This is the LAST tailscale-FQDN usage:
+# its TLS cert is minted for this name (renew ~90 days: `tailscale cert` on
+# the VM, copy to /opt/registry/certs, `docker restart registry`). Swap to
+# ghcr.io/omacom-io/omarchy-plugin-registry when an org PAT with
+# write:packages exists.
 registry:
   server: omarchy-plugins.manatee-piranha.ts.net:5443
   username: kamal
@@ -52,18 +54,18 @@ builder:
 
 env:
   clear:
-    # Public/canonical host is the Cloudflare Tunnel; the ts.net name stays
-    # reachable for tailnet-only access (deploys, Mailpit, fallback).
     REGISTRY_BASE_URL: https://omarchy-plugins.ryanhughes.me
     REGISTRY_HOST: omarchy-plugins.ryanhughes.me
-    ADDITIONAL_HOSTS: omarchy-plugins.manatee-piranha.ts.net
     # Witness on its own volume so an app-volume restore can't silently roll
     # back the signed kill list — see docs/deploy.md.
     REGISTRY_WITNESS_PATH: /witness/kill_list_generation
-    # Mailpit accessory (STARTTLS via the same cert): login codes land in the
-    # web UI at http://omarchy-plugins:8025 instead of a real mailbox.
-    SMTP_ADDRESS: omarchy-plugins.manatee-piranha.ts.net
+    # Mailpit accessory, reached over the private docker network: login codes
+    # land in the web UI at http://omarchy-plugins:8025 instead of a real
+    # mailbox. STARTTLS is off for this in-host hop only — a real SMTP
+    # provider at launch drops SMTP_STARTTLS and gets verified TLS again.
+    SMTP_ADDRESS: omarchy-plugin-registry-mailpit
     SMTP_PORT: "1025"
+    SMTP_STARTTLS: "0"
     # AI review (escalate-only, via RubyLLM). The adapter ships in the image;
     # its API key lives OUTSIDE the app env (AiReview scrubs env) via the
     # /opt/registry-ai bind mount: /ai/openai_key (preferred) or
@@ -91,14 +93,12 @@ volumes:
   # AI review adapter credentials (read-only; see AI_REVIEW_COMMAND above).
   - "/opt/registry-ai:/ai:ro"
 
-# E2E mail catcher: SMTP on 1025 (STARTTLS, real cert so the app's mandatory
-# TLS verification passes), web UI on 8025 (tailnet/LAN only).
 accessories:
-  # Cloudflare Tunnel: public ingress for omarchy-plugins.ryanhughes.me.
+  # Cloudflare Tunnel: the ONLY public ingress, for omarchy-plugins.ryanhughes.me.
   # Remotely managed (ingress config lives in Cloudflare, tunnel id
   # 3fe84e30-e646-43e0-8352-4e1bb474b152): edge -> this container ->
-  # https://kamal-proxy:443 with the ts.net originServerName for cert
-  # verification. Token in .kamal/local/tunnel_token.
+  # http://kamal-proxy:80 over the private docker network. Token in
+  # .kamal/local/tunnel_token.
   cloudflared:
     image: cloudflare/cloudflared:latest
     host: omarchy-plugins
@@ -106,17 +106,11 @@ accessories:
     env:
       secret:
         - TUNNEL_TOKEN
+  # E2E mail catcher: the app delivers to it by container name on the docker
+  # network; web UI published on 8025 (tailnet/LAN only).
   mailpit:
     image: axllent/mailpit:v1.27
     host: omarchy-plugins
-    port: "1025:1025"
-    env:
-      clear:
-        MP_SMTP_TLS_CERT: /certs/tls.crt
-        MP_SMTP_TLS_KEY: /certs/tls.key
-    files:
-      - .kamal/local/tls.crt:/certs/tls.crt
-      - .kamal/local/tls.key:/certs/tls.key
     options:
       publish:
         - "8025:8025"

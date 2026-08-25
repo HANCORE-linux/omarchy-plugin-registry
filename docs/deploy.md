@@ -8,22 +8,22 @@ to object storage behind a CDN. Installs never touch Rails.
 `config/deploy.yml` deploys web + jobs to a single host. Current target is the
 E2E staging box `omarchy-plugins` (Proxmox, Debian 13), reached over Tailscale:
 
-- **TLS**: no public 80/443, so kamal-proxy serves a Let's Encrypt cert minted
-  by Tailscale DNS-01. Renew (~90 days; check `openssl x509 -enddate -noout
-  -in .kamal/local/tls.crt`): on the VM `tailscale cert --cert-file
-  /root/omarchy-plugins.crt --key-file /root/omarchy-plugins.key
-  omarchy-plugins.manatee-piranha.ts.net`, scp both to `.kamal/local/tls.{crt,key}`,
-  copy to `/opt/registry/certs/` + `docker restart registry` on the VM, then
-  `bin/kamal proxy reboot` and `bin/kamal accessory reboot mailpit`.
-- **Image registry**: self-hosted `registry:2` on the VM
-  (`omarchy-plugins.manatee-piranha.ts.net:5443`, htpasswd user `kamal`,
-  password in `.kamal/local/registry_password`, data under `/opt/registry`).
+- **TLS**: terminated at the Cloudflare edge. The tunnel is the encrypted
+  transport to the VM and hands requests to kamal-proxy over the private
+  docker network as plain HTTP (`proxy.ssl: false`; `config.assume_ssl` keeps
+  Rails treating them as https). No origin certificate exists to renew.
+- **Image registry**: self-hosted `registry:2` on the VM (htpasswd user
+  `kamal`, password in `.kamal/local/registry_password`, data under
+  `/opt/registry`). Internal deploy plumbing only — it's the one remaining
+  tailscale-FQDN name and carries the one remaining cert (renew ~90 days:
+  `tailscale cert` on the VM, copy to `/opt/registry/certs/`,
+  `docker restart registry`); swap to ghcr.io/omacom-io when an org PAT
+  with write:packages exists.
 - **Public ingress**: a Cloudflare Tunnel accessory (`cloudflared`) serves
-  `omarchy-plugins.ryanhughes.me` — the canonical `REGISTRY_BASE_URL` — via
-  Cloudflare's edge; the ts.net name stays reachable inside the tailnet
-  (`ADDITIONAL_HOSTS`). Tunnel is remotely managed (ingress config in the
-  Cloudflare dashboard, token in `.kamal/local/tunnel_token`); DNS is a
-  proxied CNAME `omarchy-plugins` →
+  `omarchy-plugins.ryanhughes.me` — the canonical `REGISTRY_BASE_URL` and the
+  ONLY hostname the app answers to. Tunnel is remotely managed (ingress
+  config in the Cloudflare dashboard, token in `.kamal/local/tunnel_token`);
+  DNS is a proxied CNAME `omarchy-plugins` →
   `3fe84e30-e646-43e0-8352-4e1bb474b152.cfargotunnel.com`. Passkeys bind to
   the canonical host — enroll them on the public domain.
 - **Mail**: a Mailpit accessory catches login-code email — web UI at
