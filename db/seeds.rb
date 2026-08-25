@@ -112,6 +112,8 @@ lumen = publisher_for("lumenlabs", kind: :org, owner: COMMUNITY[0])
 tidal = publisher_for("tidalworks", kind: :org, owner: COMMUNITY[1])
 kai = publisher_for("kai", kind: :personal, owner: COMMUNITY[1])
 juno = publisher_for("junomarsh", kind: :personal, owner: COMMUNITY[3])
+petra = publisher_for("vogelworks", kind: :org, owner: COMMUNITY[4])
+sam = publisher_for("sokafor", kind: :personal, owner: COMMUNITY[2])
 
 CATALOG = [
   { publisher: lumen, name: "lumen-clock", summary: "A clock that knows when you are on call.",
@@ -140,7 +142,49 @@ CATALOG = [
     downloads: 14_030, views: 27_600, ratings: [ 4, 5, 4, 4, 5 ] },
   { publisher: juno, name: "quick-notes", summary: "A scratchpad that opens faster than your editor.",
     kinds: [ "menu" ], license: "MIT", versions: %w[0.7.0 0.8.0],
-    downloads: 2_205, views: 6_310, ratings: [ 4, 4 ] }
+    downloads: 2_205, views: 6_310, ratings: [ 4, 4 ] },
+  { publisher: lumen, name: "lumen-notify", summary: "Notification history you can actually search.",
+    kinds: [ "panel" ], license: "MIT", versions: %w[1.0.0 1.1.0],
+    downloads: 11_240, views: 20_115, ratings: [ 5, 4, 5, 4 ] },
+  { publisher: lumen, name: "keycast", summary: "Shows the keys you press, for screencasts and pairing.",
+    kinds: [ "overlay" ], license: "Apache-2.0", versions: %w[0.3.0 0.4.0 0.4.1],
+    downloads: 7_880, views: 14_002, ratings: [ 4, 5, 4 ] },
+  { publisher: tidal, name: "anchor", summary: "Pins a window to every workspace, without the wrangling.",
+    kinds: [ "service" ], license: "MIT", versions: %w[1.2.0],
+    downloads: 4_410, views: 7_330, ratings: [ 4, 4, 5 ] },
+  { publisher: tidal, name: "moorings", summary: "Saves and restores window layouts per project.",
+    kinds: [ "menu", "service" ], license: "BSD-3-Clause", versions: %w[0.6.0 0.7.0],
+    downloads: 6_902, views: 11_450, ratings: [ 5, 4, 4, 5, 4 ] },
+  { publisher: kai, name: "cpu-thermals", summary: "Temperature and fan curves at a glance.",
+    kinds: [ "bar-widget" ], license: "GPL-3.0-only", versions: %w[2.1.0 2.2.0],
+    downloads: 13_570, views: 24_880, ratings: [ 5, 5, 4, 4, 5 ] },
+  { publisher: kai, name: "vpn-status", summary: "Know which tunnel you are on before you paste the secret.",
+    kinds: [ "bar-widget" ], license: "MIT", versions: %w[1.0.0 1.0.1],
+    downloads: 8_120, views: 13_990, ratings: [ 5, 4 ] },
+  { publisher: juno, name: "moon-phase", summary: "The moon, in your bar, for no practical reason.",
+    kinds: [ "bar-widget" ], license: "ISC", versions: %w[1.0.0],
+    downloads: 1_980, views: 5_240, ratings: [ 5, 5, 4 ] },
+  { publisher: juno, name: "clipboard-well", summary: "Clipboard history with fuzzy search and pinning.",
+    kinds: [ "menu", "service" ], license: "MIT", versions: %w[2.0.0 2.1.0 2.2.0],
+    downloads: 19_775, views: 38_400, ratings: [ 5, 5, 5, 4, 5, 4 ] },
+  { publisher: petra, name: "gitline", summary: "Branch, dirty state, and CI status for the repo you are in.",
+    kinds: [ "bar-widget" ], license: "MPL-2.0", versions: %w[1.3.0 1.4.0],
+    downloads: 16_330, views: 29_770, ratings: [ 5, 5, 4, 5 ] },
+  { publisher: petra, name: "standup", summary: "Nudges you to stand up, politely, then insistently.",
+    kinds: [ "service" ], license: "MIT", versions: %w[0.9.0],
+    downloads: 3_505, views: 7_002, ratings: [ 3, 4, 4 ] },
+  { publisher: petra, name: "palette-peek", summary: "Eyedropper and palette inspector for the whole screen.",
+    kinds: [ "overlay", "menu" ], license: "Apache-2.0", versions: %w[0.5.0 0.5.1],
+    downloads: 5_240, views: 10_880, ratings: [ 4, 5 ] },
+  { publisher: sam, name: "pomo-panel", summary: "The pomodoro timer, expanded into a full session panel.",
+    kinds: [ "panel" ], license: "MIT", versions: %w[1.0.0 1.1.0],
+    downloads: 9_060, views: 17_220, ratings: [ 4, 4, 5, 4 ] },
+  { publisher: sam, name: "disk-watch", summary: "Warns before the disk fills, not after the build fails.",
+    kinds: [ "service" ], license: "ISC", versions: %w[1.0.0 1.0.1 1.0.2],
+    downloads: 12_400, views: 21_640, ratings: [ 5, 4, 5 ] },
+  { publisher: sam, name: "scratch-term", summary: "A drop-down terminal that remembers where it was.",
+    kinds: [ "overlay" ], license: "GPL-3.0-only", versions: %w[3.0.0],
+    downloads: 21_090, views: 44_310, ratings: [ 5, 5, 5, 4, 5 ] }
 ]
 
 COMMENT_BODIES = [
