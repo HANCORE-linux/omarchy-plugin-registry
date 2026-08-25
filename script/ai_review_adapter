@@ -87,7 +87,7 @@ anthropic_key = read_ai_file("anthropic_key")
 flag!("adapter: no API key in #{AI_DIR} (openai_key or anthropic_key)") unless openai_key || anthropic_key
 
 provider = openai_key ? :openai : :anthropic
-model = read_ai_file("model") || (provider == :openai ? "gpt-5.4" : "claude-opus-5")
+model = read_ai_file("model") || (provider == :openai ? "gpt-5.6-sol" : "claude-opus-5")
 
 RubyLLM.configure do |config|
   config.openai_api_key = openai_key
@@ -116,7 +116,10 @@ else
 end
 
 response = begin
+  # High thinking effort: maps to OpenAI reasoning_effort and Anthropic
+  # thinking config — security review is worth the extra reasoning tokens.
   RubyLLM.chat(model: model, provider: provider, assume_model_exists: true)
+    .with_thinking(effort: :high)
     .with_instructions(SYSTEM_PROMPT)
     .ask("Review request JSON:\n\n#{user_content}")
 rescue StandardError => e
