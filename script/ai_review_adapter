@@ -19,12 +19,15 @@
 # instructions: the model is told to ignore any directives inside it, and this
 # script never executes or evals anything from the payload.
 
-# The scrub also strips GEM_HOME/BUNDLE_PATH; in the production image gems
-# live under /usr/local/bundle. Restore before bundler loads.
+# The scrub also strips the bundle env; restore the production image's exact
+# build-time settings (gems under /usr/local/bundle, dev group excluded) so
+# bundler/setup resolves the same gem set that was installed.
 ENV["BUNDLE_GEMFILE"] ||= File.expand_path("../Gemfile", __dir__)
 if File.directory?("/usr/local/bundle")
   ENV["GEM_HOME"] ||= "/usr/local/bundle"
   ENV["BUNDLE_PATH"] ||= "/usr/local/bundle"
+  ENV["BUNDLE_WITHOUT"] ||= "development"
+  ENV["BUNDLE_DEPLOYMENT"] ||= "1"
 end
 require "bundler/setup"
 require "json"
