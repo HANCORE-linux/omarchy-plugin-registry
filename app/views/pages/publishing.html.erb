@@ -39,6 +39,20 @@ $ curl -X POST --data-binary @weather-1.0.0.tar.gz \
       <li>Manifest <code>id</code> must equal <code>yourhandle.pluginname</code>.</li>
     </ul>
 
+    <h2>Make it look good</h2>
+    <p>Ship one screenshot named <code>preview.png</code> (or <code>.jpg</code>, <code>.webp</code>,
+      <code>.gif</code>) at the tarball root and the directory shows it on your card, your plugin
+      page gets a click-to-zoom preview, and your share links get a proper card. Animated GIFs stay
+      animated on the plugin page. No resizing needed — the registry generates optimized renditions;
+      just keep stills under 40 megapixels and recordings at 1440p or below.</p>
+    <p>Two optional manifest fields drive browsing:
+      <code>category</code> — one of
+      <% Registry::Taxonomy::CATEGORIES.each do |c| %><code><%= c %></code><%= " · " unless c == Registry::Taxonomy::CATEGORIES.last %><% end %> —
+      and <code>tags</code>, up to <%= Registry::Taxonomy::MAX_TAGS %> from the curated list
+      (<% Registry::Taxonomy::TAGS.each do |t| %><code><%= t %></code><%= ", " unless t == Registry::Taxonomy::TAGS.last %><% end %>).
+      Missing a tag that obviously should exist? Ask in an issue — the list is curated on purpose,
+      so filters stay meaningful.</p>
+
     <h2>Prefer hands-off?</h2>
     <p>Register <span class="term">trusted publishing</span> from your dashboard (repo +
       workflow + environment, GitHub Actions today) and tagging <code>v1.0.0</code> publishes

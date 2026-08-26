@@ -82,14 +82,16 @@ class MomusRoundEightTest < ActionDispatch::IntegrationTest
     assert_response :created
   end
 
-  test "plugins without a published version stay visible in the directory" do
-    placeholder = @publisher.plugins.create!(name: "failedseed", state: :quarantined, summary: "seed failed")
+  test "plugins without a published version are hidden from the public directory" do
+    @publisher.plugins.create!(name: "failedseed", state: :quarantined, summary: "seed failed")
     get root_path
     assert_response :success
-    assert_match "failedseed", response.body
-    assert_match "Under review", response.body
+    assert_no_match(/failedseed/, response.body)
 
     get publisher_path("acme")
-    assert_match "failedseed", response.body
+    assert_no_match(/failedseed/, response.body)
+
+    get plugin_path("acme", "failedseed")
+    assert_response :not_found
   end
 end

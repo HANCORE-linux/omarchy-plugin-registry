@@ -58,6 +58,10 @@ module OmarchyPluginRegistry
     # Injectable GitHub repo-identity lookup for trusted-publishing registration
     config.x.github_repo_lookup = nil
 
+    # Test seam for display-only repo enrichment (stars/releases) — a callable
+    # taking "owner/repo" and returning the stats hash.
+    config.x.repo_stats_lookup = nil
+
     # Origin-side download counting (production uses CDN log aggregation instead)
     config.x.count_origin_downloads = true
 

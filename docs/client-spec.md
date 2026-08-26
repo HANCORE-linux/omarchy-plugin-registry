@@ -103,6 +103,19 @@ config switch to disable). On a hit for an installed plugin@version:
   environment; the repo's numeric identity is pinned on first exchange.
 - `omarchy plugin new` should scaffold `manifest.json` (with `license`,
   `repository`), a widget, a readme, and the trusted-publishing workflow.
+- Optional manifest fields the registry validates and the client validator
+  must mirror (conformance corpus: `taxonomy_*.json`): `category` (one of the
+  registry's curated category slugs) and `tags` (≤3 from the curated tag
+  list). Unknown values are publish-time errors, not warnings.
+- `omarchy plugin add publisher/name@1.2.0` pins an exact version: resolve
+  that version line from the signed index (yanked lines never resolve),
+  verify sha256, install, and record the pin in the install receipt so
+  `omarchy plugin update` skips it until the pin is removed. The site's
+  per-version pages advertise this syntax.
+- Optional root preview: exactly one of `preview.png|jpg|jpeg|webp|gif`
+  (animated GIF allowed). The registry renders card/detail/share images from
+  it; a corrupt or format-mismatched preview fails the publish. Client-side
+  `omarchy-plugin-validate` should check the magic bytes match the extension.
 
 ## Demotions at launch
 

@@ -1,0 +1,22 @@
+{
+  "name": "taxonomy_unknown_category",
+  "manifest": {
+    "schemaVersion": 1,
+    "id": "acme.weather",
+    "name": "Weather",
+    "version": "1.0.0",
+    "kinds": [
+      "bar-widget"
+    ],
+    "entryPoints": {
+      "barWidget": "Widget.qml"
+    },
+    "license": "MIT",
+    "category": "Weather Stuff"
+  },
+  "files": {
+    "Widget.qml": "x"
+  },
+  "expect": "invalid",
+  "reason": "category must be one of"
+}

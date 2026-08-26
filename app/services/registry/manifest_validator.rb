@@ -50,6 +50,8 @@ module Registry
       check_license
       check_repository
       check_min_omarchy_version
+      check_category
+      check_tags
       errors.empty?
     end
 
@@ -215,6 +217,28 @@ module Registry
           false
         end
       end
+    end
+
+    # Optional curated browse metadata — one category, up to three tags, all
+    # from the fixed Taxonomy lists (free-form labels fragment the directory).
+    def check_category
+      category = manifest["category"]
+      return if category.nil?
+      unless category.is_a?(String) && Taxonomy.category?(category)
+        errors << "category must be one of: #{Taxonomy::CATEGORIES.join(', ')} (got #{category.inspect})"
+      end
+    end
+
+    def check_tags
+      tags = manifest["tags"]
+      return if tags.nil?
+      unless tags.is_a?(Array) && tags.all? { |t| t.is_a?(String) }
+        return errors << "tags must be an array of strings"
+      end
+      errors << "at most #{Taxonomy::MAX_TAGS} tags allowed" if tags.length > Taxonomy::MAX_TAGS
+      errors << "tags must be unique" if tags.uniq.length != tags.length
+      unknown = tags.reject { |t| Taxonomy.tag?(t) }
+      errors << "unknown tags: #{unknown.join(', ')} (allowed: #{Taxonomy::TAGS.join(', ')})" if unknown.any?
     end
 
     # Rendered as a link on the plugin page — https only, sane length.

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_044323) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_120003) do
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
@@ -181,6 +181,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_044323) do
   end
 
   create_table "plugins", force: :cascade do |t|
+    t.string "category"
     t.integer "comments_count", default: 0, null: false
     t.datetime "created_at", null: false
     t.integer "downloads_count", default: 0, null: false
@@ -189,15 +190,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_044323) do
     t.string "latest_version"
     t.string "name", null: false
     t.string "normalized_name", null: false
+    t.json "preview_meta", default: {}, null: false
     t.integer "publisher_id", null: false
     t.integer "ratings_count", default: 0, null: false
     t.integer "ratings_sum", default: 0, null: false
     t.text "readme"
+    t.json "repo_stats", default: {}, null: false
+    t.datetime "repo_stats_synced_at"
     t.string "repository_url"
     t.integer "state", default: 0, null: false
     t.string "summary"
+    t.json "tags", default: [], null: false
     t.datetime "updated_at", null: false
     t.integer "views_count", default: 0, null: false
+    t.index ["category"], name: "index_plugins_on_category"
     t.index ["normalized_name"], name: "index_plugins_on_normalized_name"
     t.index ["publisher_id", "name"], name: "index_plugins_on_publisher_id_and_name", unique: true
     t.index ["publisher_id"], name: "index_plugins_on_publisher_id"

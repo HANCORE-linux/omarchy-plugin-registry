@@ -3,7 +3,10 @@
   <head>
     <title><%= content_for(:title) || "Omarchy Plugins" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="description" content="The Omarchy plugin registry — hosted, scanned, revocable. Browse, install, and publish plugins for Omarchy.">
+    <meta name="description" content="<%= content_for(:meta_description) || ApplicationHelper::DEFAULT_META_DESCRIPTION %>">
+    <%= content_for(:social) || social_meta(title: content_for(:title) || "Omarchy Plugins",
+          description: ApplicationHelper::DEFAULT_META_DESCRIPTION, image_path: og_site_path, url_path: request.path) %>
+    <link rel="alternate" type="application/atom+xml" title="Recent releases" href="<%= feed_path %>">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
     <%= yield :head %>

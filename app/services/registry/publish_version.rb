@@ -30,6 +30,7 @@ module Registry
       find_or_build_plugin!
       check_version!
       validate_manifest!
+      validate_preview!
       create_version!
       version
     end
@@ -151,6 +152,15 @@ module Registry
     def validate_manifest!
       validator = ManifestValidator.new(manifest: tarball.manifest, publisher:, plugin_name:, tarball:)
       fail! validator.errors.join("; ") unless validator.valid?
+    end
+
+    # The preview is optional, but a broken one fails HERE — instant CLI
+    # feedback — instead of freezing junk into an immutable release.
+    def validate_preview!
+      return if tarball.preview_bytes.nil?
+      PreviewImage.validate!(tarball.preview_bytes, name: tarball.preview_name)
+    rescue PreviewImage::InvalidPreview => e
+      fail! e.message
     end
 
     # Structural validation is synchronous (instant CLI feedback); everything

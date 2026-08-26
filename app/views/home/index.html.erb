@@ -16,48 +16,83 @@
   </div>
 </section>
 
+<% if @recent&.any? %>
+  <section class="recent-band" aria-label="Recently added plugins">
+    <div class="container">
+      <div class="recent-band__head">
+        <p class="eyebrow">Recently added</p>
+        <%= link_to "sort by newest →", directory_path(sort: "newest"), class: "recent-band__more" %>
+      </div>
+      <div class="recent-band__row">
+        <% @recent.each do |plugin| %>
+          <%= link_to plugin_path(plugin.publisher.name, plugin.name), class: "recent-card" do %>
+            <span class="recent-card__name"><span class="ns"><%= plugin.publisher.name %>/</span><%= plugin.name %></span>
+            <span class="recent-card__summary"><%= plugin.summary %></span>
+            <span class="recent-card__meta"><span class="diamond">◆</span> v<%= plugin.latest_version %>
+              · <%= time_ago_in_words(Time.zone.parse(plugin.first_published_at.to_s)) %> ago</span>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  </section>
+<% end %>
+
 <section class="directory container">
-  <%= form_with url: root_path, method: :get, class: "directory__bar" do %>
-    <input type="search" name="q" value="<%= @query %>" placeholder="Search plugins…" aria-label="Search plugins">
+  <%= form_with url: root_path, method: :get, class: "directory__bar", data: { controller: "search-focus" } do %>
+    <input type="search" name="q" value="<%= @query %>"
+      placeholder="Search plugins… (try @publisher, tag:media, kind:bar)" aria-label="Search plugins"
+      data-search-focus-target="input" aria-keyshortcuts="Control+K">
+    <% if @category %><input type="hidden" name="category" value="<%= @category %>"><% end %>
+    <% if @tag %><input type="hidden" name="tag" value="<%= @tag %>"><% end %>
+    <kbd class="directory__kbd" title="Focus search">Ctrl K</kbd>
     <div class="directory__sort">
       <% HomeController::SORTS.each_key do |sort| %>
-        <%= link_to sort, root_path(q: @query.presence, sort: sort), class: ("active" if @sort == sort) %>
+        <%= link_to sort, directory_path(sort: (sort unless sort == "downloads")), class: ("active" if @sort == sort) %>
       <% end %>
     </div>
   <% end %>
 
-  <% if @plugins.any? %>
-    <div class="plugin-grid">
-      <% @plugins.each do |plugin| %>
-        <%= link_to plugin_path(plugin.publisher.name, plugin.name), class: "plugin-card" do %>
-          <h3><span class="ns"><%= plugin.publisher.name %>/</span><%= plugin.name %></h3>
-          <p><%= plugin.summary %></p>
-          <div class="plugin-card__meta">
-            <% if plugin.latest_version %>
-              <span><span class="diamond">◆</span> v<%= plugin.latest_version %></span>
-              <span><%= compact_number(plugin.downloads_count) %> downloads</span>
-              <% if plugin.kinds.any? %><span><%= plugin.kinds.first %></span><% end %>
-            <% else %>
-              <span class="badge badge--warning">Under review</span>
-            <% end %>
-          </div>
+  <% if @category_counts.any? %>
+    <nav class="directory__filters" aria-label="Filter by category">
+      <%= link_to "All", directory_path(category: nil), class: "chip #{'chip--active' if @category.nil?}" %>
+      <% Registry::Taxonomy::CATEGORIES.each do |category| %>
+        <% count = @category_counts[category] %>
+        <% next unless count %>
+        <%= link_to directory_path(category: (category unless @category == category)),
+              class: "chip #{'chip--active' if @category == category}" do %>
+          <%= Registry::Taxonomy.label(category) %> <span class="chip__count"><%= count %></span>
         <% end %>
       <% end %>
+      <% if @tag %>
+        <%= link_to directory_path(tag: nil), class: "chip chip--active", title: "Clear tag filter" do %>
+          tag:<%= @tag %> <span aria-hidden="true">×</span>
+        <% end %>
+      <% end %>
+    </nav>
+  <% end %>
+
+  <% if @query.present? || @category || @tag %>
+    <p class="muted directory__count" role="status"><%= pluralize(@total, "plugin") %> found</p>
+  <% end %>
+
+  <% if @plugins.any? %>
+    <div class="plugin-grid">
+      <%= render partial: "plugin_card", collection: @plugins, as: :plugin %>
     </div>
   <% elsif @page > 1 %>
-    <p class="muted">Nothing on this page — <%= link_to "back to the first page", root_path(q: @query.presence, sort: @sort) %>.</p>
+    <p class="muted">Nothing on this page — <%= link_to "back to the first page", directory_path %>.</p>
   <% else %>
-    <p class="muted"><% if @query.present? %>Nothing matches “<%= @query %>”.<% else %>No plugins published yet — <%= link_to "be the first", publishing_path %>.<% end %></p>
+    <p class="muted"><% if @query.present? || @category || @tag %>Nothing matches<%= " “#{@query}”" if @query.present? %> — <%= link_to "clear filters", root_path %>.<% else %>No plugins published yet — <%= link_to "be the first", publishing_path %>.<% end %></p>
   <% end %>
 
   <% if @page > 1 || @more %>
     <div class="form-inline u-gap-top directory__pager">
       <% if @page > 1 %>
-        <%= link_to "← Prev", root_path(q: @query.presence, sort: @sort, page: (@page - 1 if @page - 1 > 1)), class: "button button--ghost button--small" %>
+        <%= link_to "← Prev", directory_path(page: (@page - 1 if @page - 1 > 1)), class: "button button--ghost button--small" %>
       <% end %>
       <span class="muted">Page <%= @page %></span>
       <% if @more %>
-        <%= link_to "Next →", root_path(q: @query.presence, sort: @sort, page: @page + 1), class: "button button--ghost button--small" %>
+        <%= link_to "Next →", directory_path(page: @page + 1), class: "button button--ghost button--small" %>
       <% end %>
     </div>
   <% end %>

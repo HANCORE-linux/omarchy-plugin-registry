@@ -1,1 +1,10 @@
-# See https://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file
+# plugins.omarchy.org — everything public is crawlable.
+User-agent: *
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /session
+Disallow: /device
+Disallow: /step_up
+
+Sitemap: https://plugins.omarchy.org/sitemap.xml

@@ -25,7 +25,7 @@ class SeedingAndClaimTest < ActionDispatch::IntegrationTest
     assert AuditEvent.exists?(action: "plugin.seed")
   end
 
-  test "seeded plugins that fail review are listed but uninstallable" do
+  test "seeded plugins that fail review are hidden from the public until cleared" do
     results = seed!(tarball: TarballBuilder.build(
       manifest: TarballBuilder.manifest(id: "gracehopper.weather"),
       files: { "Widget.qml" => "import QtQuick\nItem {}\n",
@@ -35,8 +35,10 @@ class SeedingAndClaimTest < ActionDispatch::IntegrationTest
     assert version.quarantined?
 
     get plugin_path("gracehopper", "weather")
-    assert_response :success
-    assert_match "Under review", response.body
+    assert_response :not_found
+
+    get root_path
+    assert_no_match(/weather/, response.body)
   end
 
   test "seeding is idempotent" do

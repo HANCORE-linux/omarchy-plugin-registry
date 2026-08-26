@@ -1,0 +1,27 @@
+{
+  "name": "taxonomy_too_many_tags",
+  "manifest": {
+    "schemaVersion": 1,
+    "id": "acme.weather",
+    "name": "Weather",
+    "version": "1.0.0",
+    "kinds": [
+      "bar-widget"
+    ],
+    "entryPoints": {
+      "barWidget": "Widget.qml"
+    },
+    "license": "MIT",
+    "tags": [
+      "bar",
+      "clock",
+      "media",
+      "weather"
+    ]
+  },
+  "files": {
+    "Widget.qml": "x"
+  },
+  "expect": "invalid",
+  "reason": "at most 3 tags"
+}

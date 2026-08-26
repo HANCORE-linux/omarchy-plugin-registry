@@ -1,0 +1,135 @@
+<% content_for :title, "#{@plugin.full_name}@#{@version.version} — Omarchy Plugins" %>
+<% content_for :meta_description, "Version #{@version.version} of #{@plugin.full_name} on the Omarchy plugin registry." %>
+<% content_for :social, social_meta(
+     title: "#{@plugin.full_name}@#{@version.version}",
+     description: @version.manifest["description"].presence || @plugin.summary.presence || "#{@plugin.full_name} on the Omarchy plugin registry.",
+     image_path: og_plugin_path(@publisher.name, @plugin.name),
+     url_path: plugin_version_path(@publisher.name, @plugin.name, @version.version)) %>
+
+<% if @version.yanked? %>
+  <div class="notice-banner notice-banner--warning">
+    <strong>Withdrawn.</strong> v<%= @version.version %> was yanked<%= " — #{@version.yank_reason}" if @version.yank_reason.present? %>.
+    It no longer resolves for new installs.
+  </div>
+<% elsif !@version.published? %>
+  <div class="notice-banner notice-banner--warning">
+    <strong><%= @version.state.humanize %>.</strong> This version has not cleared review — only publisher members and admins can see it.
+  </div>
+<% elsif @latest && @version.version != @latest.version %>
+  <div class="notice-banner notice-banner--warning">
+    <strong>Older version.</strong> You are viewing v<%= @version.version %> —
+    the latest release is <%= link_to "v#{@latest.version}", plugin_path(@publisher.name, @plugin.name) %>.
+  </div>
+<% end %>
+
+<div class="page-head">
+  <div class="container">
+    <p class="eyebrow"><%= Array(@version.manifest["kinds"]).presence&.join(" · ") || @plugin.kinds.join(" · ") %></p>
+    <h1><span class="ns"><%= link_to @publisher.name, publisher_path(@publisher.name) %>/</span><%= link_to @plugin.name, plugin_path(@publisher.name, @plugin.name) %><span class="ns">@<%= @version.version %></span></h1>
+    <p class="summary"><%= @version.manifest["description"].presence || @plugin.summary %></p>
+    <div class="page-head__row">
+      <%= state_badge(@version.state) %>
+      <% if @latest && @version.version == @latest.version %><span class="badge badge--ok">Latest</span><% end %>
+      <span class="muted">v<%= @version.version %> · <%= @version.license %></span>
+      <% if @version.published_at %>
+        <span class="muted">published <%= @version.published_at.to_date %></span>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<div class="plugin-layout container">
+  <article>
+    <div class="readme" data-controller="readme-code">
+      <% if @readme.present? %>
+        <%= render_markdown @readme %>
+      <% else %>
+        <p class="muted">No readme in this version.</p>
+      <% end %>
+    </div>
+  </article>
+
+  <aside class="sidebar">
+    <section>
+      <h4>Install this version</h4>
+      <% if @version.published? && @plugin.active? %>
+        <div class="install-cmd" data-controller="clipboard"
+             data-clipboard-text-value="omarchy plugin add <%= @plugin.full_name %>@<%= @version.version %>">
+          <span class="install-cmd__text"><span class="prompt">$</span> omarchy plugin add <%= @plugin.full_name %>@<%= @version.version %></span>
+          <%= render "shared/copy_button", label: "Copy pinned install command" %>
+        </div>
+        <% unless @latest && @version.version == @latest.version %>
+          <p class="muted u-gap-top-sm">Pins this release — no updates until you re-add
+            <code><%= @plugin.full_name %></code> without the version.</p>
+        <% end %>
+      <% elsif @version.yanked? %>
+        <p class="muted">Withdrawn — this version no longer resolves for new installs.</p>
+      <% else %>
+        <p class="muted">Not installable — this version has not cleared review.</p>
+      <% end %>
+    </section>
+    <section>
+      <h4>Details</h4>
+      <dl>
+        <dt>Plugin id</dt><dd><code><%= @plugin.manifest_id %></code></dd>
+        <dt>Version</dt><dd><%= @version.version %></dd>
+        <% if @version.published_at %>
+          <dt>Published</dt><dd><%= time_ago_in_words(@version.published_at) %> ago</dd>
+        <% end %>
+        <dt>Size</dt><dd><%= number_to_human_size(@version.size_bytes) %></dd>
+        <dt>SHA-256</dt><dd><code><%= @version.sha256.first(12) %>…</code></dd>
+        <% if @version.min_omarchy_version %>
+          <dt>Requires Omarchy</dt><dd>≥ <%= @version.min_omarchy_version %></dd>
+        <% end %>
+        <% if @version.published? || @version.yanked? %>
+          <dt>Tarball</dt><dd><a href="/<%= @version.tarball_path %>">.tar.gz</a></dd>
+        <% end %>
+        <% if (source = source_repo(@version.manifest["repository"] || @plugin.repository_url)) %>
+          <dt>Source</dt>
+          <dd>
+            <%= link_to source[:url], class: "source-link", title: source[:url] do %>
+              <%= render "shared/source_icon", icon: source[:icon] %><span><%= source[:label] %></span>
+            <% end %>
+          </dd>
+        <% end %>
+      </dl>
+    </section>
+    <% if @version.capability_fingerprint.present? %>
+      <section>
+        <h4>Capabilities</h4>
+        <dl>
+          <% @version.capability_fingerprint.each do |cap, value| %>
+            <dt><%= cap.humanize %></dt><dd><%= Array(value).join(", ") %></dd>
+          <% end %>
+        </dl>
+      </section>
+    <% end %>
+    <% if @version.provenance.present? %>
+      <section>
+        <h4>Provenance</h4>
+        <dl>
+          <dt>CI identity</dt>
+          <dd><a href="https://github.com/<%= @version.provenance["repository"] %>/commit/<%= @version.provenance["sha"] %>"><%= @version.provenance["repository"] %>@<%= @version.provenance["sha"].to_s.first(7) %></a></dd>
+          <dt>Workflow</dt><dd><code><%= @version.provenance["workflow"].to_s.split("@").first.to_s.split("/").last %></code></dd>
+          <dt>Via</dt><dd>OIDC trusted publishing (job identity, not a build attestation)</dd>
+        </dl>
+      </section>
+    <% end %>
+    <section>
+      <h4>Versions</h4>
+      <ul class="version-list">
+        <% @versions.each do |sibling| %>
+          <li>
+            <% if sibling.version == @version.version %>
+              <span class="v"><%= sibling.version %></span>
+            <% else %>
+              <%= link_to sibling.version, plugin_version_path(@publisher.name, @plugin.name, sibling.version), class: "v" %>
+            <% end %>
+            <span class="muted"><%= sibling.created_at.to_date %></span>
+            <%= state_badge(sibling.state) unless sibling.published? %>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+  </aside>
+</div>

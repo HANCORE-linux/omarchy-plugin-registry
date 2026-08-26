@@ -13,12 +13,16 @@ module Registry
     MAX_ENTRIES = 2_000
     MANIFEST_NAME = "manifest.json"
     README_CANDIDATES = %w[README.md readme.md README Readme.md].freeze
+    # Optional root preview image, first match wins in this order. Kept as full
+    # bytes (the 512KB scan window would truncate any real screenshot).
+    PREVIEW_CANDIDATES = %w[preview.png preview.jpg preview.jpeg preview.webp preview.gif].freeze
 
     # Per-file cap on content retained for scanning; larger files keep only
     # their first MAX_SCAN_BYTES (the scanner flags oversized/binary blobs anyway).
     MAX_SCAN_BYTES = 512.kilobytes
 
-    attr_reader :manifest, :readme, :files, :contents, :digests, :truncated, :sha256, :size_bytes
+    attr_reader :manifest, :readme, :files, :contents, :digests, :truncated, :sha256, :size_bytes,
+      :preview_name, :preview_bytes
 
     def self.inspect_bytes(bytes)
       new(bytes).tap(&:inspect!)
@@ -41,6 +45,7 @@ module Registry
       @directories = Set.new
       manifest_json = nil
       readme_content = nil
+      previews = {}
       unpacked = 0
 
       entry_count = 0
@@ -91,6 +96,7 @@ module Registry
         @contents[path] = content.byteslice(0, MAX_SCAN_BYTES)
         manifest_json = content if path == MANIFEST_NAME
         readme_content ||= content.dup.force_encoding(Encoding::UTF_8) if README_CANDIDATES.include?(path)
+        previews[path] = content if PREVIEW_CANDIDATES.include?(path)
       end
 
       # A file whose path is also a directory prefix of another entry can't be
@@ -109,6 +115,10 @@ module Registry
       raise InvalidTarball, "#{MANIFEST_NAME} missing at tarball root" if manifest_json.nil?
       @manifest = parse_manifest(manifest_json)
       @readme = readme_content&.valid_encoding? ? readme_content : nil
+      # Only one preview ships per plugin — a second candidate name is an
+      # ambiguity (which one did the author mean?), so refuse it outright.
+      raise InvalidTarball, "multiple preview images (#{previews.keys.sort.join(', ')}) — ship exactly one" if previews.size > 1
+      @preview_name, @preview_bytes = previews.first
       self
     rescue Zlib::Error, Gem::Package::TarInvalidError => e
       raise InvalidTarball, "not a valid gzipped tarball: #{e.message}"

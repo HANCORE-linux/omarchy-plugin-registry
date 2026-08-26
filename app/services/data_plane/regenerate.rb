@@ -296,6 +296,8 @@ module DataPlane
           "id" => plugin.manifest_id,
           "summary" => plugin.summary,
           "kinds" => plugin.kinds,
+          "category" => plugin.category,
+          "tags" => plugin.tags,
           "latest" => plugin.latest_version,
           "downloads" => plugin.downloads_count
         }

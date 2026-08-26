@@ -1,0 +1,31 @@
+<%= link_to plugin_path(plugin.publisher.name, plugin.name), class: "plugin-card" do %>
+  <% if plugin.preview? %>
+    <img class="plugin-card__preview" src="<%= rails_storage_proxy_path(plugin.preview_card) %>"
+      alt="" loading="lazy" decoding="async"
+      width="<%= plugin.preview_card_meta["width"] %>" height="<%= plugin.preview_card_meta["height"] %>">
+  <% else %>
+    <div class="plugin-card__preview plugin-card__preview--fallback" aria-hidden="true">
+      <span class="plugin-card__monogram"><%= plugin.name.first(2) %></span>
+      <span class="diamond">◆</span>
+    </div>
+  <% end %>
+  <h3><span class="ns"><%= plugin.publisher.name %>/</span><%= plugin.name %></h3>
+  <p><%= plugin.summary %></p>
+  <div class="plugin-card__meta">
+    <% if plugin.latest_version %>
+      <span><span class="diamond">◆</span> v<%= plugin.latest_version %></span>
+      <span><%= compact_number(plugin.downloads_count) %> downloads</span>
+      <% if plugin.repo_stars.to_i.positive? %>
+        <span title="GitHub stars">★ <%= compact_number(plugin.repo_stars) %></span>
+      <% end %>
+      <% if plugin.category %>
+        <span><%= Registry::Taxonomy.label(plugin.category) %></span>
+      <% elsif plugin.kinds.any? %>
+        <span><%= plugin.kinds.first %></span>
+      <% end %>
+      <%= card_activity_badge(plugin) %>
+    <% else %>
+      <span class="badge badge--warning">Under review</span>
+    <% end %>
+  </div>
+<% end %>

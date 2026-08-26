@@ -310,11 +310,63 @@ pre code { background: none; padding: 0; }
   padding: 13px 16px; border: 1px solid var(--hairline); background: var(--surface);
   border-radius: 0; outline-color: var(--magenta);
 }
+.directory__kbd {
+  font-family: var(--mono); font-size: 11px; color: var(--text-muted);
+  border: 1px solid var(--hairline-soft); padding: 4px 7px; white-space: nowrap;
+  align-self: center;
+}
 .directory__sort { display: flex; gap: 8px; flex-wrap: wrap; }
+.directory__count { font-size: 13px; margin: -16px 0 20px; }
 .directory__sort a { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; text-decoration: none; padding: 8px 12px; }
 .directory__sort a.active { background: var(--btn-bg); color: var(--btn-fg); }
 
+/* Category chips + tag chips share one look: pill, hairline, mono caps */
+.directory__filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.3px;
+  text-decoration: none; padding: 7px 12px; border-radius: 9999px;
+  border: 1px solid var(--hairline-soft); color: var(--text-soft);
+  transition: border-color var(--transition), color var(--transition), background var(--transition);
+}
+.chip:hover { border-color: var(--magenta); color: var(--magenta); }
+.chip--active { background: var(--btn-bg); color: var(--btn-fg); border-color: var(--btn-bg); }
+.chip--active:hover { background: var(--pink); color: var(--ink); border-color: var(--pink); }
+.chip__count { color: inherit; opacity: 0.6; }
+
 .plugin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 20px; }
+/* ---------- Recently-added band ----------
+   Its own full-bleed band between hero and directory: what's inside it is a
+   showcase, NOT part of the searchable/filterable results below. Compact
+   cards on a tinted ground make that read at a glance. */
+.recent-band {
+  background: var(--surface-tint);
+  border-bottom: 1px solid var(--hairline); box-shadow: var(--rule-shadow);
+  padding-block: 22px 26px;
+}
+.recent-band__head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.recent-band__more { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; text-decoration: none; color: var(--text-muted); }
+.recent-band__more:hover { color: var(--magenta); }
+/* One row, always — narrow viewports scroll sideways instead of wrapping */
+.recent-band__row {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(min(260px, 80vw), 1fr);
+  gap: 16px; overflow-x: auto; padding-bottom: 4px;
+}
+.recent-card {
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--surface); border: 1px solid var(--hairline);
+  padding: 14px 16px; text-decoration: none; font-size: 13px;
+  transition: background var(--transition);
+}
+.recent-card:hover { background: var(--bg); color: inherit; }
+.recent-card__name { font-family: var(--sans); font-size: 16px; font-weight: 600; }
+.recent-card__name .ns { color: var(--text-muted); font-weight: 400; }
+.recent-card__summary {
+  color: var(--text-soft); overflow: hidden; display: -webkit-box;
+  -webkit-line-clamp: 1; -webkit-box-orient: vertical;
+}
+.recent-card__meta { font-size: 12px; color: var(--text-muted); }
+.recent-card__meta .diamond { color: var(--magenta); }
 .directory__pager { justify-content: center; align-items: center; margin-top: 32px; }
 
 .plugin-card {
@@ -323,6 +375,26 @@ pre code { background: none; padding: 0; }
   text-decoration: none; transition: background var(--transition);
 }
 .plugin-card:hover { background: var(--surface-tint); color: inherit; }
+/* Full-bleed media strip above the text block; fixed aspect so mixed source
+   shapes can't ragged the grid */
+.plugin-card__preview {
+  margin: -24px -24px 8px; width: calc(100% + 48px); max-width: none;
+  /* height:auto so the width/height ATTRIBUTES (kept for layout stability)
+     yield to the fixed card ratio */
+  height: auto; aspect-ratio: 16 / 9; object-fit: cover;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface-tint);
+}
+/* No screenshot yet: a quiet monogram keeps the grid uniform without faking
+   variety — one accent, per the design system */
+.plugin-card__preview--fallback {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+}
+.plugin-card__monogram {
+  font-family: var(--sans); font-size: 56px; font-weight: 600;
+  color: var(--text-muted); opacity: 0.5; text-transform: uppercase; letter-spacing: 0.02em;
+}
+.plugin-card__preview--fallback .diamond { color: var(--magenta); font-size: 18px; }
 .plugin-card h3 { font-size: 18px; }
 .plugin-card h3 .ns { color: var(--text-muted); font-weight: 400; }
 .plugin-card p { font-size: 13px; color: var(--text-soft); flex: 1; }
@@ -335,6 +407,7 @@ pre code { background: none; padding: 0; }
 .page-head h1 { font-size: clamp(28px, 4vw, 40px); margin: 8px 0 10px; overflow-wrap: anywhere; }
 .page-head h1 .ns { color: var(--text-muted); font-weight: 400; }
 .page-head .summary { max-width: 60ch; color: var(--text-soft); }
+.page-head__chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .page-head__row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 18px; }
 
 .plugin-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 64px; padding-block: 40px 80px; }
@@ -345,6 +418,31 @@ pre code { background: none; padding: 0; }
   /* A wide readme table scrolls inside itself instead of stretching the column */
   .readme table { display: block; overflow-x: auto; }
 }
+
+/* ---------- Plugin preview + lightbox ---------- */
+
+.plugin-preview {
+  display: block; width: 100%; padding: 0; margin-bottom: 28px;
+  border: 1px solid var(--hairline); background: var(--surface);
+  cursor: zoom-in;
+}
+.plugin-preview img { width: 100%; height: auto; }
+
+.lightbox {
+  border: 1px solid var(--hairline); padding: 0;
+  background: var(--surface); max-width: min(92vw, 1400px); max-height: 88vh;
+  /* The global margin-0 reset kills the <dialog> UA centering — restore it */
+  margin: auto; position: fixed; inset: 0;
+}
+.lightbox::backdrop { background: rgba(13, 8, 38, 0.82); }
+.lightbox img { max-width: 100%; max-height: calc(88vh - 2px); object-fit: contain; }
+.lightbox__close {
+  position: absolute; top: 8px; right: 8px; z-index: 1;
+  width: 36px; height: 36px; line-height: 1; font-size: 22px; font-family: var(--mono);
+  background: var(--ink); color: var(--paper); border: 1px solid var(--hairline-on-dark-soft);
+  cursor: pointer;
+}
+.lightbox__close:hover { background: var(--pink); color: var(--ink); }
 
 .readme h1, .readme h2, .readme h3 { margin: 1.4em 0 0.5em; }
 .readme h1:first-child, .readme h2:first-child { margin-top: 0; }
@@ -358,9 +456,9 @@ pre code { background: none; padding: 0; }
 .sidebar { display: flex; flex-direction: column; gap: 28px; font-size: 13px; }
 .sidebar section { border-top: 1px solid var(--hairline); padding-top: 14px; }
 .sidebar h4 { text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; margin-bottom: 10px; }
-.sidebar .install-cmd { background: var(--ink); color: var(--paper); padding: 10px 10px 10px 14px; font-size: 13px; display: flex; align-items: center; gap: 10px; }
+.install-cmd { background: var(--ink); color: var(--paper); padding: 10px 10px 10px 14px; font-size: 13px; display: flex; align-items: center; gap: 10px; max-width: 560px; }
 .install-cmd__text { flex: 1; overflow-x: auto; white-space: nowrap; }
-.sidebar .install-cmd .prompt { color: var(--pink); }
+.install-cmd .prompt { color: var(--pink); }
 .sidebar dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; }
 .sidebar dt { color: var(--text-muted); }
 .sidebar dd { text-align: right; overflow-wrap: anywhere; }
@@ -368,6 +466,8 @@ pre code { background: none; padding: 0; }
 .sidebar .source-link svg { width: 14px; height: 14px; flex-shrink: 0; }
 
 .version-list { list-style: none; }
+.version-list .v { text-decoration: none; }
+a.v:hover { color: var(--magenta); }
 .version-list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--hairline-soft); }
 .version-list .v { font-weight: 700; }
 
@@ -527,6 +627,10 @@ pre code { background: none; padding: 0; }
   .site-header { background: var(--tn-chrome); }
   .section-dark, .site-footer { background: var(--tn-chrome); }
   .page-head { background: var(--tn-chrome); }
+  /* The recently-added band joins the frame; its cards sit raised on it */
+  .recent-band { background: var(--tn-chrome); }
+  .recent-card { background: var(--tn-raised); border-color: var(--hairline-soft); }
+  .recent-card:hover { background: var(--tn-lifted); }
 
   /* Code sinks into the frame layer instead of blending with the page */
   pre, .install-cmd, .token-reveal {

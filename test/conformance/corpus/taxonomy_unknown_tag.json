@@ -1,0 +1,25 @@
+{
+  "name": "taxonomy_unknown_tag",
+  "manifest": {
+    "schemaVersion": 1,
+    "id": "acme.weather",
+    "name": "Weather",
+    "version": "1.0.0",
+    "kinds": [
+      "bar-widget"
+    ],
+    "entryPoints": {
+      "barWidget": "Widget.qml"
+    },
+    "license": "MIT",
+    "tags": [
+      "bar",
+      "my-cool-plugin"
+    ]
+  },
+  "files": {
+    "Widget.qml": "x"
+  },
+  "expect": "invalid",
+  "reason": "unknown tags: my-cool-plugin"
+}

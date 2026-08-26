@@ -1,5 +1,17 @@
 <% content_for :title, "#{@plugin.full_name} — Omarchy Plugins" %>
+<% content_for :meta_description, @plugin.summary.presence || "#{@plugin.full_name} on the Omarchy plugin registry." %>
+<% content_for :social, social_meta(
+     title: @plugin.full_name,
+     description: @plugin.summary.presence || "#{@plugin.full_name} on the Omarchy plugin registry.",
+     image_path: og_plugin_path(@publisher.name, @plugin.name),
+     url_path: plugin_path(@publisher.name, @plugin.name)) %>
 
+<% if @privileged && !@plugin.ever_public? && !@plugin.security_holding? %>
+  <div class="notice-banner notice-banner--warning">
+    <strong>Not public yet.</strong> Nothing here has cleared review, so this page is visible only to
+    <%= @publisher.name %> members and admins. It goes public the moment a version releases.
+  </div>
+<% end %>
 <% if @plugin.security_holding? %>
   <div class="notice-banner notice-banner--danger">
     <strong>Security holding.</strong> This plugin was removed for malware and its name is permanently retired.
@@ -8,11 +20,6 @@
 <% elsif @plugin.quarantined? %>
   <div class="notice-banner notice-banner--warning">
     <strong>Under review.</strong> This plugin is quarantined while our team investigates. It cannot be installed right now.
-  </div>
-<% elsif @latest.nil? && @versions.any? { |v| v.quarantined? || v.held? || v.processing? } %>
-  <div class="notice-banner notice-banner--warning">
-    <strong>Under review.</strong> No version of this plugin has cleared the review pipeline yet.
-    Nothing is installable until one does.
   </div>
 <% elsif @revoked %>
   <div class="notice-banner notice-banner--danger">
@@ -32,6 +39,16 @@
     <p class="eyebrow"><%= @plugin.kinds.join(" · ") %></p>
     <h1><span class="ns"><%= link_to @publisher.name, publisher_path(@publisher.name) %>/</span><%= @plugin.name %></h1>
     <p class="summary"><%= @plugin.summary %></p>
+    <% if @plugin.category || @plugin.tags.any? %>
+      <div class="page-head__chips">
+        <% if @plugin.category %>
+          <%= link_to Registry::Taxonomy.label(@plugin.category), root_path(category: @plugin.category), class: "chip" %>
+        <% end %>
+        <% @plugin.tags.each do |tag| %>
+          <%= link_to "tag:#{tag}", root_path(tag: tag), class: "chip" %>
+        <% end %>
+      </div>
+    <% end %>
     <div class="page-head__row">
       <% if @latest %><%= state_badge(:published) %><span class="muted">v<%= @latest.version %> · <%= @latest.license %></span><% end %>
       <span class="muted"><%= compact_number(@plugin.downloads_count) %> downloads · <%= compact_number(@plugin.views_count) %> views</span>
@@ -45,6 +62,23 @@
 
 <div class="plugin-layout container">
   <article>
+    <% if @plugin.preview? && @plugin.preview_detail.attached? %>
+      <div data-controller="lightbox">
+        <button class="plugin-preview" type="button" data-action="lightbox#open"
+          aria-label="Enlarge <%= @plugin.full_name %> preview">
+          <img src="<%= rails_storage_proxy_path(@plugin.preview_detail) %>"
+            alt="<%= @plugin.full_name %> preview" decoding="async"
+            width="<%= @plugin.preview_detail_meta["width"] %>" height="<%= @plugin.preview_detail_meta["height"] %>">
+        </button>
+        <dialog class="lightbox" data-lightbox-target="dialog" data-action="click->lightbox#backdropClose"
+          aria-label="<%= @plugin.full_name %> preview">
+          <button class="lightbox__close" type="button" data-action="lightbox#close" aria-label="Close preview">×</button>
+          <img src="<%= rails_storage_proxy_path(@plugin.preview_detail) %>"
+            alt="<%= @plugin.full_name %> preview" loading="lazy" decoding="async">
+        </dialog>
+      </div>
+    <% end %>
+
     <div class="readme" data-controller="readme-code">
       <% if @plugin.readme.present? %>
         <%= render_markdown @plugin.readme %>
@@ -134,6 +168,16 @@
               <%= render "shared/source_icon", icon: source[:icon] %><span><%= source[:label] %></span>
             <% end %>
           </dd>
+          <% if @plugin.repo_stars %>
+            <dt>Stars</dt><dd>★ <%= compact_number(@plugin.repo_stars) %></dd>
+          <% end %>
+          <% if @plugin.repo_pushed_at %>
+            <dt>Last activity</dt><dd><%= time_ago_in_words(@plugin.repo_pushed_at) %> ago</dd>
+          <% end %>
+          <% if (release = @plugin.repo_release) %>
+            <dt>Release</dt>
+            <dd><% if release["release_url"] %><%= link_to release["release_tag"], release["release_url"] %><% else %><%= release["release_tag"] %><% end %></dd>
+          <% end %>
         <% end %>
       </dl>
     </section>
@@ -163,11 +207,12 @@
       <ul class="version-list">
         <% @versions.each do |version| %>
           <li>
-            <span class="v"><%= version.version %></span>
+            <%= link_to version.version, plugin_version_path(@publisher.name, @plugin.name, version.version), class: "v" %>
             <span class="muted"><%= version.created_at.to_date %></span>
             <%= state_badge(version.state) unless version.published? %>
           </li>
         <% end %>
+        <% if @versions.empty? %><li><span class="muted">No versions yet.</span></li><% end %>
       </ul>
     </section>
   </aside>

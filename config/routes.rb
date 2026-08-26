@@ -39,6 +39,8 @@ Rails.application.routes.draw do
 
   # Public directory
   get "plugins/:publisher/:name", to: "plugins#show", as: :plugin
+  get "plugins/:publisher/:name/:version", to: "plugins#version", as: :plugin_version,
+    constraints: { version: /\d[^\/]*/ }
   post "plugins/:publisher/:name/rating", to: "ratings#create", as: :plugin_rating
   post "plugins/:publisher/:name/comments", to: "comments#create", as: :plugin_comments
   resources :comments, only: :destroy
@@ -49,6 +51,12 @@ Rails.application.routes.draw do
   get "governance", to: "pages#governance"
   get "publishing", to: "pages#publishing"
   get "audit", to: "audit_log#index", as: :audit_log
+
+  # Share cards + crawler surfaces
+  get "og/site.png", to: "og#site", as: :og_site, format: false
+  get "og/:publisher/:name.png", to: "og#plugin", as: :og_plugin, format: false
+  get "sitemap.xml", to: "sitemaps#show", as: :sitemap, format: false
+  get "feed.xml", to: "feeds#show", as: :feed, format: false
 
   namespace :admin do
     root "dashboard#show"

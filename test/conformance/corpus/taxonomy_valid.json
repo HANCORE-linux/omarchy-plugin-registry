@@ -1,0 +1,25 @@
+{
+  "name": "taxonomy_valid",
+  "manifest": {
+    "schemaVersion": 1,
+    "id": "acme.weather",
+    "name": "Weather",
+    "version": "1.0.0",
+    "kinds": [
+      "bar-widget"
+    ],
+    "entryPoints": {
+      "barWidget": "Widget.qml"
+    },
+    "license": "MIT",
+    "category": "system",
+    "tags": [
+      "weather",
+      "bar"
+    ]
+  },
+  "files": {
+    "Widget.qml": "x"
+  },
+  "expect": "valid"
+}

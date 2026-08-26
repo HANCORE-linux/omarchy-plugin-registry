@@ -8,6 +8,8 @@ Rails.application.configure do
   config.x.publish_hold = 0
   config.x.registry_base_url = "http://registry.test"
   config.x.data_plane_root = Rails.root.join("tmp/test_data_plane")
+  # Never touch the GitHub API from the suite; tests override per-case.
+  config.x.repo_stats_lookup = ->(repository) { {} }
   # Settings specified here will take precedence over those in config/application.rb.
 
   # While tests run files are not watched, reloading is not necessary.

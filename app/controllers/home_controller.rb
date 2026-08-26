@@ -1,11 +1,29 @@
 class HomeController < ApplicationController
   allow_unauthenticated_access
 
+  # Computed per row from the versions table — plugins.updated_at is useless
+  # here (any counter or metadata write touches it).
+  LAST_PUBLISHED_SQL = <<~SQL.squish.freeze
+    (SELECT MAX(pv.published_at) FROM plugin_versions pv
+      WHERE pv.plugin_id = plugins.id AND pv.state = #{PluginVersion.states.fetch(:published)})
+  SQL
+  FIRST_PUBLISHED_SQL = <<~SQL.squish.freeze
+    (SELECT MIN(pv.published_at) FROM plugin_versions pv
+      WHERE pv.plugin_id = plugins.id AND pv.state = #{PluginVersion.states.fetch(:published)})
+  SQL
+  WEEK_DOWNLOADS_SQL = <<~SQL.squish.freeze
+    (SELECT COALESCE(SUM(dd.count), 0) FROM daily_downloads dd
+      JOIN plugin_versions pv ON pv.id = dd.plugin_version_id
+      WHERE pv.plugin_id = plugins.id AND dd.date >= date('now', '-7 days'))
+  SQL
+
   SORTS = {
-    "downloads" => { downloads_count: :desc },
-    "rating" => Arel.sql("CASE WHEN ratings_count = 0 THEN 0 ELSE ratings_sum * 1.0 / ratings_count END DESC, ratings_count DESC"),
-    "newest" => { created_at: :desc },
-    "name" => { name: :asc }
+    "downloads" => "plugins.downloads_count DESC",
+    "trending" => "#{WEEK_DOWNLOADS_SQL} DESC",
+    "rating" => "CASE WHEN ratings_count = 0 THEN 0 ELSE ratings_sum * 1.0 / ratings_count END DESC, ratings_count DESC",
+    "updated" => "#{LAST_PUBLISHED_SQL} DESC NULLS LAST",
+    "newest" => "plugins.created_at DESC",
+    "name" => "plugins.name ASC"
   }.freeze
 
   PER_PAGE = 24
@@ -14,28 +32,85 @@ class HomeController < ApplicationController
     @query = params[:q].to_s.strip
     @sort = SORTS.key?(params[:sort]) ? params[:sort] : "downloads"
     @page = [ params[:page].to_i, 1 ].max
+    @category = params[:category] if Registry::Taxonomy.category?(params[:category])
+    @tag = params[:tag] if Registry::Taxonomy.tag?(params[:tag])
+    @terms = parse_query(@query)
 
     # Plugins without a published version stay visible while genuinely in
     # review; burned names and rejected-only submissions don't pollute the
     # directory.
-    scope = Plugin.directory_visible.includes(:publisher)
-    if @query.present?
-      like = "%#{ActiveRecord::Base.sanitize_sql_like(@query.downcase)}%"
-      # LOWER on both sides: SQLite LIKE is case-insensitive but PostgreSQL's
-      # is not — normalize explicitly so both adapters match the same rows
-      scope = scope.where(
-        "LOWER(plugins.name) LIKE :q OR LOWER(plugins.summary) LIKE :q OR LOWER(plugins.normalized_name) LIKE :q", q: like)
-    end
+    scope = filtered_scope
     # id as tiebreaker: downloads/rating ties would otherwise let rows drift
     # between pages as OFFSET slides across an unstable order
-    plugins = scope.order(SORTS[@sort]).order(:id)
+    plugins = scope
+      .select("plugins.*", "#{FIRST_PUBLISHED_SQL} AS first_published_at", "#{LAST_PUBLISHED_SQL} AS last_published_at")
+      .order(Arel.sql(SORTS[@sort])).order(:id)
       .offset((@page - 1) * PER_PAGE).limit(PER_PAGE + 1).to_a
     @more = plugins.length > PER_PAGE
     @plugins = plugins.first(PER_PAGE)
+    # Announced (and shown) only while filtering — the unfiltered count is
+    # already in the hero stats.
+    @total = scope.unscope(:select).count if @query.present? || @category || @tag
+    @category_counts = Plugin.directory_visible.where.not(category: nil).group(:category).count
+    # A short strip of genuinely new plugins on the unfiltered first page —
+    # the default downloads sort would otherwise bury every fresh release.
+    if @page == 1 && @query.blank? && @category.nil? && @tag.nil?
+      @recent = Plugin.directory_visible.includes(:publisher).with_attached_preview_card
+        .select("plugins.*", "#{FIRST_PUBLISHED_SQL} AS first_published_at", "#{LAST_PUBLISHED_SQL} AS last_published_at")
+        .where("#{FIRST_PUBLISHED_SQL} >= ?", ApplicationHelper::CARD_RECENCY.ago)
+        .order(Arel.sql("first_published_at DESC")).order(:id).limit(4)
+    end
     @stats = {
       plugins: Plugin.listed.where.not(latest_version: nil).count,
       publishers: Publisher.claimed.count,
       downloads: Plugin.sum(:downloads_count)
     }
+  end
+
+  private
+
+  # The search box understands a few typed operators alongside plain text:
+  # @publisher, tag:media, kind:bar, category:system. Everything else matches
+  # name and summary.
+  def parse_query(query)
+    terms = { text: [], publishers: [], tags: [], kinds: [], categories: [] }
+    query.split(/\s+/).each do |token|
+      case token
+      when /\A@(.+)\z/ then terms[:publishers] << $1.downcase
+      when /\Atag:(.+)\z/i then terms[:tags] << $1.downcase
+      when /\Akind:(.+)\z/i then terms[:kinds] << $1.downcase
+      when /\Acategory:(.+)\z/i then terms[:categories] << $1.downcase
+      else terms[:text] << token
+      end
+    end
+    terms[:tags] << @tag if @tag
+    terms[:categories] << @category if @category
+    terms
+  end
+
+  def filtered_scope
+    scope = Plugin.directory_visible.includes(:publisher).with_attached_preview_card
+
+    if @terms[:text].any?
+      like = "%#{ActiveRecord::Base.sanitize_sql_like(@terms[:text].join(' ').downcase)}%"
+      # LOWER on both sides: SQLite LIKE is case-insensitive but PostgreSQL's
+      # is not — normalize explicitly so both adapters match the same rows
+      scope = scope.where(
+        "LOWER(plugins.name) LIKE :q OR LOWER(plugins.summary) LIKE :q OR LOWER(plugins.normalized_name) LIKE :q", q: like)
+    end
+    if @terms[:publishers].any?
+      scope = scope.joins(:publisher)
+        .where(publishers: { normalized_name: @terms[:publishers].map { |p| NameRules.normalize(p) } })
+    end
+    scope = scope.where(category: @terms[:categories]) if @terms[:categories].any?
+    @terms[:tags].each { |tag| scope = scope.where(json_membership("plugins.tags"), tag) }
+    @terms[:kinds].each { |kind| scope = scope.where(json_membership("plugins.kinds"), kind) }
+    scope
+  end
+
+  # Membership test inside a JSON-array column (SQLite json_each, same as the
+  # trending window above — this app is SQLite in every environment).
+  def json_membership(column)
+    "EXISTS (SELECT 1 FROM json_each(#{column}) WHERE json_each.value = ?)"
   end
 end
