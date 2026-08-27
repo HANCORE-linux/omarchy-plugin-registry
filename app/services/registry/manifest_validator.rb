@@ -149,9 +149,12 @@ module Registry
       end
     end
 
+    # A license is optional — many imported legacy plugins never declared one,
+    # and the directory shows "No license" honestly instead of gating on it.
+    # A DECLARED license must still be a real SPDX expression.
     def check_license
       license = manifest["license"].to_s
-      return errors << "license is required to publish (SPDX identifier)" if license.blank?
+      return if license.blank?
       errors << "license must be a known SPDX expression (got #{license})" unless valid_spdx_expression?(license)
     end
 

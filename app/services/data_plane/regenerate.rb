@@ -71,6 +71,7 @@ module DataPlane
         end
         generator.warn_orphan_indexes!
         generator.write_all_listing(failed_plugin_ids: failed_plugin_ids)
+        generator.write_legacy_map
         raise ArtifactIntegrityError, artifact_failures.join("; ") if artifact_failures.any?
       end
     end
@@ -212,6 +213,7 @@ module DataPlane
         "dl" => "#{DataPlane.base_url}/dl/{publisher}/{name}/{name}-{version}.tar.gz",
         "index" => "#{DataPlane.base_url}/index/{publisher}/{name}.json",
         "revocations" => "#{DataPlane.base_url}/revocations.json",
+        "legacy_map" => "#{DataPlane.base_url}/legacy-map.json",
         "signing_key" => "#{DataPlane.base_url}/signing-key.pub",
         "api" => DataPlane.base_url
       }.merge(freshness(INDEX_TTL))))
@@ -303,6 +305,25 @@ module DataPlane
         }
       end
       DataPlane.write("all.json", JSON.generate({ "plugins" => plugins }.merge(freshness(INDEX_TTL))))
+    end
+
+    # Migration map for installs made through the legacy marketplace: the
+    # Omarchy client matches a receipt-less installed folder by BOTH its
+    # legacy manifest id AND its source repo (legacy ids were never centrally
+    # unique on disk — id alone could adopt the wrong folder), then converts
+    # it to the registry-hosted plugin. Only currently installable plugins
+    # appear; a delisted import must not invite a conversion to nothing.
+    def write_legacy_map
+      mappings = Plugin.listed.where.not(latest_version: nil).includes(:publisher, :versions).filter_map do |plugin|
+        seeded = plugin.versions.detect { |v| v.legacy_id.present? }
+        next unless seeded
+        { "legacyId" => seeded.legacy_id,
+          "source" => "https://github.com/#{seeded.provenance["repository"]}",
+          "publisher" => plugin.publisher.name,
+          "name" => plugin.name }
+      end
+      DataPlane.write("legacy-map.json", JSON.pretty_generate(
+        { "schemaVersion" => 1, "mappings" => mappings }.merge(freshness(INDEX_TTL))))
     end
 
     # Previous all.json entries keyed by full name — only if the pair still

@@ -1,5 +1,6 @@
 require "open3"
 require "resolv"
+require "net/http"
 
 module Registry
   # Snapshots a public git repo's HEAD into tarball bytes for seeding.
@@ -10,8 +11,17 @@ module Registry
 
     CLONE_TIMEOUT = 180 # seconds
     MAX_CLONE_BYTES = 100 * 1024 * 1024
+    # GitHub's archive endpoint wraps content in a prefix directory, so the
+    # download can run slightly larger than the final repacked tarball cap.
+    MAX_ARCHIVE_DOWNLOAD_BYTES = TarballInspector::MAX_TARBALL_BYTES + 2 * 1024 * 1024
+    ARCHIVE_TIMEOUT = 120 # seconds
 
-    def self.tarball_for(repo_url)
+    # With a commit, fetches the exact reviewed snapshot as GitHub's archive
+    # tarball (codeload) — the seed importer must never substitute mutable
+    # HEAD for the commit the legacy marketplace actually validated. Without
+    # one, shallow-clones and archives HEAD as before.
+    def self.tarball_for(repo_url, commit = nil)
+      return archive_at_commit(repo_url, commit) if commit.present?
       validate_url!(repo_url)
       Dir.mktmpdir("registry-seed") do |dir|
         clone = File.join(dir, "repo")
@@ -26,6 +36,41 @@ module Registry
         enforce_clone_quota!(clone, repo_url)
         bounded_archive(clone, repo_url)
       end
+    end
+
+    # Exact-commit archives are GitHub-only for now (the whole legacy catalog
+    # is on github.com). The tarball carries a `owner-repo-sha/` prefix
+    # directory that SeedNormalizer strips during manifest normalization.
+    def self.archive_at_commit(repo_url, commit)
+      unless commit.to_s.match?(/\A[0-9a-f]{40}\z/)
+        raise SnapshotError, "commit must be a full 40-character sha (got #{commit.to_s.first(50)})"
+      end
+      validate_url!(repo_url)
+      owner, repo = URI.parse(repo_url.to_s).path.delete_prefix("/").delete_suffix(".git").split("/")
+      unless URI.parse(repo_url.to_s).host == "github.com" && owner.present? && repo.present?
+        raise SnapshotError, "exact-commit snapshots are only supported for github.com repositories"
+      end
+      download_archive(URI("https://codeload.github.com/#{owner}/#{repo}/tar.gz/#{commit}"))
+    end
+
+    def self.download_archive(uri)
+      out = +""
+      Net::HTTP.start(uri.host, uri.port, use_ssl: true,
+        open_timeout: 15, read_timeout: ARCHIVE_TIMEOUT) do |http|
+        http.request(Net::HTTP::Get.new(uri)) do |response|
+          unless response.is_a?(Net::HTTPSuccess)
+            raise SnapshotError, "archive download failed (HTTP #{response.code}) for #{uri}"
+          end
+          response.read_body do |chunk|
+            out << chunk
+            raise SnapshotError, "archive exceeds size limit" if out.bytesize > MAX_ARCHIVE_DOWNLOAD_BYTES
+          end
+        end
+      end
+      raise SnapshotError, "archive download was empty for #{uri}" if out.empty?
+      out
+    rescue Timeout::Error, SystemCallError, OpenSSL::SSL::SSLError, Net::ProtocolError => e
+      raise SnapshotError, "archive download failed for #{uri}: #{e.message.first(200)}"
     end
 
     def self.enforce_clone_quota!(clone, repo_url)

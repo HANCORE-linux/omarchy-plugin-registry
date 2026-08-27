@@ -102,12 +102,18 @@ class PublishFlowTest < ActionDispatch::IntegrationTest
     assert_match(/symlink/i, response.parsed_body["error"])
   end
 
-  test "rejects missing entry point and missing license" do
+  test "rejects missing entry point and invalid license; absent license is allowed" do
     publish TarballBuilder.build(manifest: TarballBuilder.manifest("entryPoints" => { "barWidget" => "Missing.qml" }))
     assert_match(/not found in tarball/, response.parsed_body["error"])
 
+    publish TarballBuilder.build(manifest: TarballBuilder.manifest(license: "Not-A-License", version: "1.0.1"))
+    assert_match(/SPDX/i, response.parsed_body["error"])
+
+    # No license at all publishes (rendered as "No license") — only a
+    # DECLARED-but-bogus license fails.
     publish TarballBuilder.build(manifest: TarballBuilder.manifest(license: nil, version: "1.0.1"))
-    assert_match(/license/i, response.parsed_body["error"])
+    assert_response :created
+    assert_nil PluginVersion.last.license
   end
 
   test "yanked versions stay in the index flagged, revocations serve" do

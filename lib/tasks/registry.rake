@@ -21,6 +21,98 @@ namespace :registry do
     puts "Run pending review jobs (bin/jobs) or rails registry:process_reviews to complete the pipeline."
   end
 
+  desc <<~DESC
+    Transform the legacy marketplace's built catalog (site/catalog.json from
+    HANCORE-linux/omarchy-plugin-marketplace) into seed entries + a dry-run
+    report. Writes <out_dir>/entries.json (feed to registry:seed_catalog) and
+    <out_dir>/report.json. Optional limit caps entries for a test batch.
+  DESC
+  task :transform_legacy_catalog, [ :catalog_path, :out_dir, :limit ] => :environment do |_t, args|
+    abort "usage: rails registry:transform_legacy_catalog[catalog.json,out_dir,limit]" if args[:catalog_path].blank? || args[:out_dir].blank?
+    catalog = JSON.parse(File.read(args[:catalog_path]))
+
+    # Legacy display categories → registry taxonomy slugs. The four retired
+    # legacy categories fold into their nearest current slug.
+    category_map = {
+      "appearance" => "appearance", "desktop" => "desktop", "developer tools" => "developer-tools",
+      "hardware" => "hardware", "productivity" => "productivity", "system" => "system",
+      "widgets" => "widgets", "other" => "other",
+      "bar widgets" => "widgets", "services" => "system", "overlays" => "widgets", "panels" => "widgets"
+    }
+
+    entries, skipped, renamed = [], [], []
+    names_seen = Hash.new { |h, k| h[k] = {} } # publisher => normalized name => plugin name
+
+    catalog.fetch("plugins").each do |plugin|
+      repo = plugin["repo"].to_s
+      skip = lambda { |reason| skipped << { "id" => plugin["id"], "repo" => repo, "reason" => reason } }
+
+      next skip.call("built-in (ships with Omarchy)") if plugin["sourceType"] != "community"
+      next skip.call("shell suite — not an installable plugin") if plugin["repositoryLayout"] == "suite"
+      # Monorepo/suite manifests live in subdirectories; the seed pipeline
+      # expects a root manifest. Handful of sources — import by hand later.
+      next skip.call("manifest not at repository root (#{plugin['manifestPath'] || 'missing'})") if plugin["manifestPath"] != "manifest.json"
+      next skip.call("no validated commit recorded") if plugin["listingValidatedCommit"].to_s.length != 40
+
+      owner, repo_name = repo[%r{\Ahttps://github\.com/([^/]+/[^/]+?)(?:\.git)?/?\z}, 1].to_s.split("/")
+      next skip.call("unparseable github repo URL") if owner.blank? || repo_name.blank?
+
+      publisher = owner.downcase
+      name = repo_name.downcase.gsub(/[^a-z0-9_-]+/, "-").squeeze("-").sub(/\A[-_]+/, "").sub(/[-_]+\z/, "").first(NameRules::MAX_LENGTH)
+      next skip.call("repo name sanitizes to nothing") if name.blank?
+      renamed << { "repo" => repo, "name" => name } if name != repo_name
+
+      # One plugin per (publisher, name) INCLUDING confusable folding — a
+      # second repo landing on the same name would seed into the first
+      # plugin's identity. Flag for a manual decision instead.
+      folded = NameRules.normalize(name)
+      if (existing = names_seen[publisher][folded])
+        next skip.call("name collides with #{publisher}/#{existing} after normalization")
+      end
+      names_seen[publisher][folded] = name
+
+      entries << {
+        "publisher" => publisher,
+        "name" => name,
+        "summary" => plugin["description"].to_s.strip,
+        "repository" => "https://github.com/#{owner}/#{repo_name}",
+        "commit" => plugin["listingValidatedCommit"],
+        "listed_at" => plugin["listedAt"].presence || plugin["addedAt"].presence,
+        "category" => category_map[plugin["category"].to_s.downcase],
+        "tags" => Array(plugin["tags"]).map { |t| t.to_s.downcase },
+        # Exact-commit legacy verification: "verified" on the legacy site
+        # means the RECORDED snapshot has passing baseline evidence or a
+        # maintainer attestation, and that snapshot is the commit we import.
+        "verified" => plugin["verificationStatus"] == "verified" &&
+          (plugin["verificationCommit"].blank? || plugin["verificationCommit"] == plugin["listingValidatedCommit"]),
+        "verification_method" => plugin["verificationMethod"].presence,
+        # Report-only context, ignored by the importer:
+        "legacy_catalog_id" => plugin["id"],
+        "manual_setup" => plugin["installAvailable"] == false
+      }
+    end
+
+    entries = entries.first(args[:limit].to_i) if args[:limit].present?
+
+    FileUtils.mkdir_p(args[:out_dir])
+    File.write(File.join(args[:out_dir], "entries.json"), JSON.pretty_generate(entries))
+    report = {
+      "generated_from" => args[:catalog_path],
+      "entries" => entries.length,
+      "skipped" => skipped.length,
+      "renamed" => renamed.length,
+      "manual_setup" => entries.count { |e| e["manual_setup"] },
+      "reserved_names_grandfathered" => entries.count { |e| NameRules.reserved?(e["name"]) },
+      "missing_listed_at" => entries.count { |e| e["listed_at"].blank? },
+      "unmapped_category" => entries.count { |e| e["category"].blank? },
+      "skipped_detail" => skipped,
+      "renamed_detail" => renamed
+    }
+    File.write(File.join(args[:out_dir], "report.json"), JSON.pretty_generate(report))
+    puts report.except("skipped_detail", "renamed_detail").map { |k, v| "#{k}: #{v}" }.join("\n")
+    puts "Wrote #{File.join(args[:out_dir], 'entries.json')} and report.json"
+  end
+
   desc "Run any pending review jobs inline (useful right after seeding)"
   task process_reviews: :environment do
     PluginVersion.processing.find_each do |version|

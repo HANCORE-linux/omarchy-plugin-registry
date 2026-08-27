@@ -15,13 +15,17 @@ module Registry
 
     # system_seed skips membership/MFA/claim checks — used ONLY by the seed
     # importer; seeded versions still run the full review pipeline.
-    def initialize(user:, publisher:, plugin_name:, tarball_bytes:, token: nil, system_seed: false)
+    # seed_provenance carries the legacy-marketplace lineage (source repo,
+    # reviewed commit, original id, original listing time) — accepted only on
+    # the system_seed path, never from a client-supplied publish.
+    def initialize(user:, publisher:, plugin_name:, tarball_bytes:, token: nil, system_seed: false, seed_provenance: nil)
       @user = user
       @publisher = publisher
       @plugin_name = plugin_name
       @tarball_bytes = tarball_bytes
       @token = token
       @system_seed = system_seed
+      @seed_provenance = system_seed ? seed_provenance : nil
     end
 
     def call
@@ -76,6 +80,8 @@ module Registry
       @plugin = publisher.plugins.find_by(name: plugin_name)
       if plugin.nil?
         @plugin = publisher.plugins.new(name: plugin_name)
+        # Seeds grandfather legacy omarchy-* names; interactive publishes don't
+        plugin.allow_reserved = true if @system_seed
         fail! plugin.errors.full_messages.join("; ") unless plugin.valid?
       elsif plugin.quarantined? && plugin.versions.where.not(state: :rejected).none?
         # Placeholder correction: accept the submission but leave the plugin
@@ -192,7 +198,7 @@ module Registry
           size_bytes: tarball.size_bytes,
           license: tarball.manifest["license"],
           min_omarchy_version: tarball.manifest["minOmarchyVersion"],
-          provenance: token&.provenance,
+          provenance: @seed_provenance || token&.provenance,
           api_token: token,
           state: :processing
         )

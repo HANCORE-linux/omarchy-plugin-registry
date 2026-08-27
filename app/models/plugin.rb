@@ -16,6 +16,12 @@ class Plugin < ApplicationRecord
   has_one_attached :preview_card
   has_one_attached :preview_detail
 
+  # Grandfather escape for the seed importer ONLY: hundreds of legacy
+  # marketplace plugins are named omarchy-* from before the reservation rule
+  # existed. Users know them by those names, so seeds keep them; new
+  # registrations stay blocked.
+  attr_accessor :allow_reserved
+
   validates :name, presence: true, uniqueness: { scope: :publisher_id },
     length: { maximum: NameRules::MAX_LENGTH },
     format: { with: NameRules::NAME_FORMAT, message: "must be lowercase letters, digits, - or _" }
@@ -164,7 +170,7 @@ class Plugin < ApplicationRecord
   private
 
   def name_not_reserved
-    errors.add(:name, "is reserved") if NameRules.reserved?(name)
+    errors.add(:name, "is reserved") if NameRules.reserved?(name) && !allow_reserved
   end
 
   def name_not_confusable_within_publisher

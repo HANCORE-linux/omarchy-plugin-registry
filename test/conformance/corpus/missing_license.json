@@ -15,6 +15,6 @@
   "files": {
     "Widget.qml": "x"
   },
-  "expect": "invalid",
-  "reason": "license is required"
+  "expect": "valid",
+  "reason": "license is optional — undeclared renders as No license (a DECLARED license must still be valid SPDX)"
 }

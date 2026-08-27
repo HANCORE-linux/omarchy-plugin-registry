@@ -65,7 +65,10 @@ module Registry
 
       ApplicationRecord.transaction do
         version.plugin.update!(state: :active) if placeholder_correction
-        version.update!(state: :published, published_at: Time.current, hold_until: nil)
+        # Seeded imports go live under their ORIGINAL marketplace listing time
+        # (provenance-recorded, system-seed only) so recency surfaces and
+        # publish-date analytics survive the migration.
+        version.update!(state: :published, published_at: version.seed_listed_at || Time.current, hold_until: nil)
         DataPlane.freeze_tarball(version, bytes)
         # refresh_latest_version! also applies page metadata from whichever
         # version is now the latest published one — only cleared code ever

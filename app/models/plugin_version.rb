@@ -64,6 +64,29 @@ class PluginVersion < ApplicationRecord
     end
   end
 
+  # The original legacy-marketplace listing time, honored as published_at at
+  # release. Gated on the system seed identity: ordinary publishes must never
+  # backdate themselves through crafted provenance.
+  def seed_listed_at
+    return nil unless user&.system?
+    timestamp = provenance&.dig("legacy", "listed_at")
+    Time.zone.parse(timestamp.to_s) rescue nil
+  end
+
+  # The id this plugin shipped under on the legacy marketplace — the client's
+  # migration key for adopting receipt-less legacy installs.
+  def legacy_id
+    provenance&.dig("legacy", "id").presence
+  end
+
+  # True when the seeded snapshot's EXACT commit carried passing legacy
+  # verification (automated baseline or maintainer attestation). Gated on the
+  # system seed identity so ordinary publishes can't smuggle trust in via
+  # provenance.
+  def seed_verified?
+    user&.system? && provenance&.dig("legacy", "verified") == true
+  end
+
   def tarball_filename = "#{plugin.name}-#{version}.tar.gz"
 
   # Path on the static data plane, relative to its root.

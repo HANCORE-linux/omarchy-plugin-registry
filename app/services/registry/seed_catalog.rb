@@ -73,18 +73,32 @@ module Registry
       return { entry:, status: "skipped", reason: "already published" } if
         publisher.plugins.find_by(name: entry.fetch("name"))&.versions&.exists?
 
-      bytes = snapshotter.call(entry.fetch("repository"))
+      # Legacy-marketplace entries pin the exact commit the old marketplace
+      # security-reviewed (`commit`) — never mutable HEAD — and carry the
+      # original listing metadata for normalization and backdating.
+      commit = entry["commit"].presence
+      bytes = if commit && (snapshotter.arity < 0 || snapshotter.arity >= 2)
+        snapshotter.call(entry.fetch("repository"), commit)
+      else
+        snapshotter.call(entry.fetch("repository"))
+      end
+      normalized = SeedNormalizer.normalize(bytes,
+        publisher_name: publisher.name, plugin_name: entry.fetch("name"),
+        category: entry["category"], tags: entry["tags"])
       version = PublishVersion.new(
         user: system_user, publisher:, plugin_name: entry.fetch("name"),
-        tarball_bytes: bytes, system_seed: true
+        tarball_bytes: normalized.bytes, system_seed: true,
+        seed_provenance: seed_provenance(entry, commit:, legacy_id: normalized.legacy_id)
       ).call
+      backdate!(version, entry["listed_at"])
       AuditEvent.record!(action: "plugin.seed", subject: version.plugin, public: true,
-        metadata: { plugin: version.plugin.full_name, source: entry["repository"] })
+        metadata: { plugin: version.plugin.full_name, source: entry["repository"],
+                    commit: commit, legacy_id: normalized.legacy_id }.compact)
       { entry:, status: "submitted", version: version.version }
     rescue ActiveRecord::RecordInvalid => e
       # A reserved/confusable publisher name fails ITS entry, not the batch
       { entry:, status: "failed", reason: e.message }
-    rescue PublishVersion::PublishError, RepoSnapshot::SnapshotError => e
+    rescue PublishVersion::PublishError, RepoSnapshot::SnapshotError, SeedNormalizer::NormalizeError => e
       # A legacy plugin whose snapshot fails validation must remain VISIBLE and
       # uninstallable, not silently vanish from the directory it came from.
       placeholder_plugin(entry, e.message)
@@ -93,12 +107,41 @@ module Registry
       { entry:, status: "failed", reason: e.message }
     end
 
+    # Lineage recorded on the version: the reviewed source commit (rendered as
+    # provenance on the plugin page) and the legacy identity the Omarchy client
+    # needs to migrate old installs onto the registry track.
+    def self.seed_provenance(entry, commit:, legacy_id:)
+      owner_repo = entry["repository"].to_s[%r{\Ahttps://github\.com/([^/]+/[^/]+?)(?:\.git)?\z}, 1]
+      legacy = { "id" => legacy_id, "listed_at" => entry["listed_at"].presence,
+                 # Exact-commit passing evidence from the legacy marketplace —
+                 # ReviewJob releases flags (never fails) on its strength.
+                 "verified" => entry["verified"] == true || nil,
+                 "verification" => entry["verification_method"].presence }.compact
+      { "source" => "legacy-marketplace",
+        "repository" => owner_repo,
+        "sha" => commit,
+        "legacy" => legacy.presence }.compact
+    end
+
+    # Imported plugins keep their original marketplace dates — 1,300+ seeds
+    # stamped "now" would bury the newest/recent surfaces for weeks and wreck
+    # publish-date analytics. published_at is backdated by ReleaseVersion
+    # (from provenance) when the version clears review.
+    def self.backdate!(version, listed_at)
+      timestamp = Time.zone.parse(listed_at.to_s) rescue nil
+      return if timestamp.nil?
+      version.update_columns(created_at: timestamp)
+      plugin = version.plugin
+      plugin.update_columns(created_at: timestamp) if timestamp < plugin.created_at
+    end
+
     def self.placeholder_plugin(entry, reason)
       publisher = Publisher.find_by(name: entry["publisher"].to_s.downcase)
       return if publisher.nil? || publisher.claimed?
       plugin = publisher.plugins.find_or_create_by!(name: entry["name"]) do |p|
         p.summary = entry["summary"]
         p.state = :quarantined
+        p.allow_reserved = true
       end
       AuditEvent.record!(action: "plugin.seed_failed", subject: plugin, public: true,
         metadata: { plugin: plugin.full_name, source: entry["repository"], reason: reason.first(300) })
