@@ -10,7 +10,11 @@ module Registry
   # "reasons": [...]} on stdout. Unset = review disabled (Phase 2 default-on
   # once an adapter is provisioned).
   class AiReview
-    TIMEOUT_SECONDS = 180
+    # The adapter reads a plugin in chunks — one model call per pass — so the
+    # budget covers a whole multi-pass review, not a single request. The
+    # adapter enforces its own shorter deadline and returns a real verdict;
+    # this is the backstop for an adapter that hangs instead.
+    TIMEOUT_SECONDS = 900
 
     Result = Struct.new(:verdict, :reasons) do
       def flagged? = verdict == "flag"
