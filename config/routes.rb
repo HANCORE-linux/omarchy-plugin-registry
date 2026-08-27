@@ -119,6 +119,8 @@ Rails.application.routes.draw do
   get "all.json", to: "data_plane#all", format: false
   get "revocations.json.sig", to: "data_plane#revocations", defaults: { sig: "1" }, format: false
   get "revocations.json", to: "data_plane#revocations", format: false
+  get "legacy-map.json.sig", to: "data_plane#legacy_map", defaults: { sig: "1" }, format: false
+  get "legacy-map.json", to: "data_plane#legacy_map", format: false
   get "signing-key.pub", to: "data_plane#signing_key", format: false
   get "index/:publisher/:plugin.json.sig", to: "data_plane#index_file", defaults: { sig: "1" }, format: false
   get "index/:publisher/:plugin.json", to: "data_plane#index_file", as: :index_file, format: false

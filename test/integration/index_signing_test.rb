@@ -13,7 +13,7 @@ class IndexSigningTest < ActionDispatch::IntegrationTest
   end
 
   test "every index file carries a verifiable detached signature" do
-    %w[config.json all.json revocations.json index/acme/weather.json].each do |file|
+    %w[config.json all.json revocations.json legacy-map.json index/acme/weather.json].each do |file|
       content = DataPlane.read(file)
       signature = DataPlane.read("#{file}.sig")
       assert DataPlane::Signer.verify?(content, signature), "bad signature for #{file}"
@@ -32,6 +32,18 @@ class IndexSigningTest < ActionDispatch::IntegrationTest
 
     verify_key = Ed25519::VerifyKey.new(Base64.strict_decode64(key))
     assert verify_key.verify(Base64.strict_decode64(signature), content)
+  end
+
+  test "every fixed URL config.json advertises is actually served" do
+    # A client reads config.json and follows these; an advertised endpoint
+    # that 404s is a broken install path, not a cosmetic gap. The templated
+    # dl/index entries are covered by the tarball and index tests.
+    config = JSON.parse(DataPlane.read("config.json"))
+    %w[revocations legacy_map signing_key].each do |key|
+      path = URI.parse(config.fetch(key)).path
+      get path
+      assert_response :success, "config.json advertises #{key} at #{path}, which does not serve"
+    end
   end
 
   test "a tampered index fails verification" do
