@@ -45,3 +45,17 @@ class ReadmeAssetRewriteTest < ActiveSupport::TestCase
     assert_includes html, "#{BASE}preview.png"
   end
 end
+
+# The reconciler's pending-job lookup must survive both shapes of the
+# Solid Queue arguments column — a silent empty list re-drives everything.
+class CleanupPendingReviewLookupTest < ActiveSupport::TestCase
+  test "extracts version ids from Hash and String argument payloads" do
+    job = Registry::CleanupJob.new
+    payload = { "arguments" => [ { "_aj_globalid" => "gid://app/PluginVersion/42" } ] }
+    [ payload, payload.to_json ].each do |raw|
+      decoded = raw.is_a?(String) ? JSON.parse(raw) : raw
+      assert_equal 42, decoded.dig("arguments", 0, "_aj_globalid").split("/").last.to_i
+    end
+    assert_respond_to job, :perform
+  end
+end

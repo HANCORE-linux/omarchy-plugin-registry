@@ -86,9 +86,13 @@ module Registry
       return [] unless defined?(SolidQueue::Job) && SolidQueue::Job.table_exists?
       SolidQueue::Job.where(class_name: "Registry::ReviewJob", finished_at: nil)
         .pluck(:arguments).filter_map do |raw|
-          gid = JSON.parse(raw.to_s).dig("arguments", 0, "_aj_globalid")
-          gid&.split("/")&.last&.to_i
-        rescue JSON::ParserError
+          # The column is JSON: some adapters hand back the decoded Hash and
+          # some the raw string. Parsing blindly turns a Hash into a
+          # ParserError, which would silently empty this list and re-drive
+          # every queued version — the exact amplification this prevents.
+          payload = raw.is_a?(String) ? JSON.parse(raw) : raw
+          payload.dig("arguments", 0, "_aj_globalid")&.split("/")&.last&.to_i
+        rescue JSON::ParserError, TypeError
           nil
         end
     rescue ActiveRecord::ActiveRecordError
