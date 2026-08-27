@@ -22,7 +22,7 @@ module Registry
     MAX_SCAN_BYTES = 512.kilobytes
 
     attr_reader :manifest, :readme, :files, :contents, :digests, :truncated, :sha256, :size_bytes,
-      :preview_name, :preview_bytes
+      :preview_name, :preview_bytes, :payload_markers
 
     def self.inspect_bytes(bytes)
       new(bytes).tap(&:inspect!)
@@ -40,6 +40,7 @@ module Registry
       @sha256 = Digest::SHA256.hexdigest(@bytes)
       @files = []
       @contents = {}
+      @payload_markers = {}
       @digests = {} # full-content SHA-256 per file — diffing must never rely on the truncated scan window
       @truncated = []
       @directories = Set.new
@@ -93,6 +94,14 @@ module Registry
         content = entry.read.to_s
         @digests[path] = Digest::SHA256.hexdigest(content)
         @truncated << path if content.bytesize > MAX_SCAN_BYTES
+        # Executable-payload markers over the FULL bytes, computed here because
+        # only the first MAX_SCAN_BYTES are retained — an appended payload past
+        # the scan window must not escape by hiding in the truncated tail.
+        markers = []
+        markers << "elf-executable" if content.match?(/\x7fELF/n)
+        markers << "pe-executable" if content.match?(/(?<!\A)MZ\x90\x00/n)
+        markers << "embedded-shebang" if content.match?(%r{\n#!\s*/(bin|usr)/}n)
+        @payload_markers[path] = markers if markers.any?
         @contents[path] = content.byteslice(0, MAX_SCAN_BYTES)
         manifest_json = content if path == MANIFEST_NAME
         readme_content ||= content.dup.force_encoding(Encoding::UTF_8) if README_CANDIDATES.include?(path)

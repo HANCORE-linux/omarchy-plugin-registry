@@ -6,6 +6,16 @@ module Registry
   class CapabilityFingerprint
     CODE_EXTENSIONS = %w[.qml .js .mjs .sh .bash].freeze
 
+    # Script languages a plugin can carry as sidecar programs (invoked via
+    # their interpreter from QML). Without this, a .py helper contributed
+    # NOTHING to the fingerprint — its content could change arbitrarily
+    # (add exfil, swap a clipboard-fix command) without tripping growth
+    # detection. Each such file joins as interpreter process + whole-file
+    # digest, same philosophy as non-shell shebang scripts.
+    SCRIPT_INTERPRETER_EXTENSIONS = {
+      ".py" => "python3", ".rb" => "ruby", ".lua" => "lua", ".pl" => "perl"
+    }.freeze
+
     def self.compute(tarball) = new(tarball).compute
 
     def initialize(tarball)
@@ -35,7 +45,8 @@ module Registry
           content.byteslice(0, Registry::TarballInspector::MAX_SCAN_BYTES).to_s
             .match?(/Process\s*\{|command\s*[:=]|bar\.run|execDetached|createQmlObject|
                      import\s+Qt|XMLHttpRequest|\bfetch\s*\(|WebSocket|Loader\s*\{|Qt\./x)
-        next unless CODE_EXTENSIONS.include?(ext) || shebang || smuggled_code
+        script_interpreter = SCRIPT_INTERPRETER_EXTENSIONS[ext]
+        next unless CODE_EXTENSIONS.include?(ext) || shebang || smuggled_code || script_interpreter
         text = content.dup.force_encoding(Encoding::UTF_8)
         text = text.scrub unless text.valid_encoding?
 
@@ -87,22 +98,33 @@ module Registry
         # might invoke by name: the first command of EVERY pipeline segment,
         # commands behind `;`, `&&`, `||`, `|`, control flow, env-var prefixes,
         # and command substitution all join the fingerprint.
-        if %w[.sh .bash].include?(ext) || shebang
-          # A shell script is an opaque program: ANY content change (arguments,
+        if %w[.sh .bash].include?(ext) || shebang || script_interpreter
+          # A script is an opaque program: ANY content change (arguments,
           # URLs, flags — not just command names) is a capability change.
           shell_digests << "#{path}##{Digest::SHA256.hexdigest(content).first(12)}"
-          text.each_line do |line|
-            next if line.strip.start_with?("#")
-            line.split(/;|&&|\|\||\|/).each do |segment|
-              words = segment.strip.split(/\s+/)
-              words.each { |w| @referenced_tokens << w }
-              word = words.find do |candidate|
-                !SHELL_NOISE.include?(candidate) && candidate.match?(%r{\A[A-Za-z0-9_./-]+\z}) && candidate.exclude?("=")
+          interpreter = shebang ? shebang_interpreter(text) : script_interpreter
+          if interpreter && !SHELL_INTERPRETERS.include?(interpreter) && !%w[.sh .bash].include?(ext)
+            # The line tokenizer below speaks shell; run over a python3/node
+            # daemon it records keywords and variable names as "processes" —
+            # noise with no growth value the per-file digest doesn't already
+            # provide. Non-shell scripts record what actually runs (their
+            # interpreter); literal URLs, paths, and spawn patterns in them
+            # are still scanned by the extractors above.
+            processes << interpreter
+          else
+            text.each_line do |line|
+              next if line.strip.start_with?("#")
+              line.split(/;|&&|\|\||\|/).each do |segment|
+                words = segment.strip.split(/\s+/)
+                words.each { |w| @referenced_tokens << w }
+                word = words.find do |candidate|
+                  !SHELL_NOISE.include?(candidate) && candidate.match?(%r{\A[A-Za-z0-9_./-]+\z}) && candidate.exclude?("=")
+                end
+                processes << binary_name(word) if word
               end
-              processes << binary_name(word) if word
-            end
-            line.scan(/[$`]\(?\s*([A-Za-z0-9_.\/-]+)/) do |m|
-              processes << binary_name(m[0]) unless SHELL_NOISE.include?(m[0])
+              line.scan(/[$`]\(?\s*([A-Za-z0-9_.\/-]+)/) do |m|
+                processes << binary_name(m[0]) unless SHELL_NOISE.include?(m[0])
+              end
             end
           end
         end
@@ -246,6 +268,16 @@ module Registry
     ].freeze
 
     private
+
+    # "#!/usr/bin/env python3" -> "python3", "#!/bin/bash -e" -> "bash"
+    def shebang_interpreter(text)
+      line = text.lines.first.to_s
+      return nil unless line.start_with?("#!")
+      words = line.delete_prefix("#!").strip.split(/\s+/)
+      name = binary_name(words[0])
+      name = binary_name(words[1]) if name == "env" && words[1]
+      name.presence
+    end
 
     def binary_name(command)
       command.to_s.strip.split(/\s+/).first.to_s.split("/").last.to_s

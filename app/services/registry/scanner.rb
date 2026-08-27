@@ -10,7 +10,14 @@ module Registry
       def as_json(*) = { "rule" => rule, "severity" => severity.to_s, "file" => file, "detail" => detail }
     end
 
-    TEXT_EXTENSIONS = %w[.qml .js .mjs .sh .bash .json .md .txt .yml .yaml .toml .conf .css .svg .xml .html .ini .desktop].freeze
+    # Any TEXT source ships scanned, whatever the language — the generic rules
+    # (curl-pipe, eval, dead-drop hosts, credential paths…) read fine across
+    # languages, and a blind "binary-payload" flag on a .rs helper just floods
+    # the queue. Genuinely binary content behind these still flags via
+    # binary-in-text-extension. (.xbm is a C-syntax text image format.)
+    TEXT_EXTENSIONS = %w[.qml .js .mjs .sh .bash .json .md .txt .yml .yaml .toml .conf .css .svg .xml .html .ini .desktop
+                         .py .rules .install .rs .ts .tsx .lua .rb .go .c .cpp .cc .h .hpp
+                         .service .timer .socket .jsonc .json5 .lock .license .xbm .vim .fish .nu .zsh .env .example .tmpl .template].freeze
 
     # Benign asset types allowed through unscanned — but only when the content
     # actually matches the claimed type. A script named icon.png is a payload.
@@ -27,19 +34,44 @@ module Registry
       ".woff2" => [ "wOF2".b ],
       ".mp3" => [ "ID3".b, "\xFF\xFB".b, "\xFF\xF3".b, "\xFF\xF2".b ],
       ".wav" => [ "RIFF".b ],
-      ".ogg" => [ "OggS".b ]
+      ".ogg" => [ "OggS".b ],
+      ".oga" => [ "OggS".b ],
+      ".opus" => [ "OggS".b ]
     }.freeze
 
-    # Invisible/bidi characters used to hide code from review (the GlassWorm
-    # trick). A leading BOM is stripped before scanning; any other occurrence
-    # of these codepoints is malicious-shaped.
-    INVISIBLE_UNICODE = /[\u200B-\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/
+    # ISO base-media containers carry their magic at offset 4 ("ftyp"), not 0.
+    OFFSET_FTYP_EXTS = %w[.mp4 .m4a .m4v .mov].freeze
+
+    # Extensions that promise compiled/opaque content — never eligible for the
+    # unknown-type text fallback, whatever their byte statistics say.
+    BINARY_EXTENSIONS = %w[.so .o .a .dylib .dll .exe .bin .pyc .pyo .qsb .dat .db .sqlite .sqlite3 .part].freeze
+
+    # Bidi override/embedding controls \u2014 the Trojan Source attack: they reorder
+    # how code RENDERS to a reviewer. No data file needs them either; always
+    # malicious-shaped in code.
+    BIDI_UNICODE = /[\u202A-\u202E\u2066-\u2069]/
+    # Zero-width and directional-mark codepoints. Suspicious in code (the
+    # GlassWorm hiding trick) but LEGITIMATE in internationalized data: ZWJ
+    # sequences in emoji tables, ZWNJ in Persian/Arabic orthography, LRM/RLM
+    # in RTL corpora. A leading BOM is stripped before scanning; the rest
+    # flags for judgment instead of auto-rejecting a prayer-times plugin over
+    # its own scripture strings.
+    INVISIBLE_UNICODE = /[\u200B-\u200F\u2060\uFEFF]/
 
     SUSPICIOUS_HOSTS = %w[
       pastebin.com paste.ee hastebin.com rentry.co
       discord.com/api/webhooks discordapp.com/api/webhooks
       api.telegram.org transfer.sh oshi.at temp.sh
     ].freeze
+
+    # Test suites ship in tarballs but are not entry points: their fixtures
+    # legitimately contain "evil" URLs, LAN IPs, `new Function(` module
+    # loaders, and curl-pipe examples — that is what test data looks like.
+    # FLAG findings there downgrade to NOTE: recorded and visible on the
+    # admin/plugin pages, never quarantine-triggering on their own. FAIL
+    # rules are never downgraded, and the capability fingerprint + AI review
+    # still cover test files in full.
+    TEST_PATH = %r{(?:\A|/)(?:tests?|spec|__tests__|testbed|fixtures?)/|(?:\A|/)test[_-][^/]*\z|[_.-]tests?\.[a-z]+\z|\.spec\.[a-z]+\z}i
 
     attr_reader :findings
 
@@ -57,35 +89,54 @@ module Registry
             text = text.scrub unless text.valid_encoding?
             # Docs legitimately carry RTL/formatting marks — they flag for a
             # human instead of auto-rejecting; CODE never needs them.
+            # manifest.json is described DATA (its text mentions what the
+            # plugin touches — that's the description, not behavior).
             docs = %w[.md .txt].include?(File.extname(path).downcase) ||
-              PLAIN_FILENAMES.include?(File.basename(path, ".*").downcase)
-            scan_file(path, text.delete_prefix("\uFEFF"), strict: !docs)
+              DOC_FILENAMES.include?(File.basename(path, ".*").downcase) ||
+              File.basename(path) == "manifest.json"
+            scan_file(path, text.delete_prefix("\uFEFF"), strict: !docs, doc: docs)
           else
             # Binary bytes hiding behind a code extension: pattern rules can't
             # see into it, so a human must.
-            findings << Finding.new("binary-in-text-extension", :flag, path,
+            findings << Finding.new("binary-in-text-extension", flag_or_note(path), path,
               "content is binary despite a #{File.extname(path)} extension")
           end
         elsif genuine_asset?(path, content)
           # Polyglots: a valid asset header with executable content behind it
-          # still runs if invoked. Flag embedded executable images outright,
-          # then run the pattern rules over the bytes (entropy excepted \u2014
-          # compressed image data is always high-entropy).
-          if content.to_s.b.match?(/\x7fELF|(?<!^)MZ\x90\x00/n)
+          # still runs if invoked. The inspector computed payload markers over
+          # the FULL bytes (past the retention window), which is the check
+          # that matters; text-pattern rules are NOT run over binary \u2014 random
+          # compressed bytes match zero-width-unicode and shell regexes by
+          # sheer statistics, and that noise was quarantining plugins for
+          # their screenshots.
+          Array(@tarball.payload_markers[path]).each do |marker|
             findings << Finding.new("polyglot-executable", :flag, path,
-              "asset contains an embedded executable image")
+              "asset contains an embedded executable payload (#{marker})")
           end
-          scan_file(path, content.dup.force_encoding(Encoding::UTF_8).scrub, entropy: false, strict: false)
+        elsif text_like?(content) && Array(@tarball.payload_markers[path]).empty? &&
+            !BINARY_EXTENSIONS.include?(File.extname(path).downcase)
+          # Unknown extension (or none) but plainly readable text \u2014 a .kt
+          # helper, a shader, an htoprc, a LICENSE-MIT. Scan it as code with
+          # the full strict ruleset; "binary-payload" on a text file was just
+          # a lie that flooded the queue. Never for executable-marked bytes or
+          # extensions that PROMISE binary \u2014 a mostly-ASCII .so is still a .so.
+          text = content.dup.force_encoding(Encoding::UTF_8)
+          text = text.scrub unless text.valid_encoding?
+          scan_file(path, text.delete_prefix("\ufeff"))
         else
-          # Unscannable non-asset content ships anyway \u2014 never unreviewed.
-          findings << Finding.new("binary-payload", :flag, path,
+          # Genuinely unscannable non-asset bytes ship anyway \u2014 never unreviewed.
+          findings << Finding.new("binary-payload", flag_or_note(path), path,
             "file is not a scannable type or a recognizable asset (#{File.extname(path).presence || 'no extension'}); a human must look")
         end
       end
       # Reviewed bytes must be ALL the bytes: anything past the per-file scan
-      # cap escaped analysis, so it goes to a human too.
+      # cap escaped analysis, so it goes to a human too. Magic-verified assets
+      # are exempt \u2014 their full bytes were checked for executable payload
+      # markers at inspection, and "screenshot bigger than 512KB" is the
+      # normal case, not an anomaly.
       @tarball.truncated.each do |path|
-        findings << Finding.new("scan-truncated", :flag, path,
+        next if genuine_asset?(path, @tarball.contents[path])
+        findings << Finding.new("scan-truncated", flag_or_note(path), path,
           "file exceeds the #{Registry::TarballInspector::MAX_SCAN_BYTES / 1.kilobyte}KB scan window \u2014 not fully analyzed")
       end
       scan_metadata
@@ -98,9 +149,24 @@ module Registry
       :pass
     end
 
+    def test_file?(path) = path.to_s.match?(TEST_PATH)
+
+    # Downgrade a would-be flag to an informational note inside test files.
+    def flag_or_note(path) = test_file?(path) ? :note : :flag
+
     private
 
-    PLAIN_FILENAMES = %w[readme license licence copying notice authors changelog contributing codeowners].freeze
+    # Prose files where RTL/formatting marks are legitimate — invisible
+    # unicode flags for a human here instead of auto-rejecting.
+    DOC_FILENAMES = %w[readme license licence copying notice authors changelog contributing codeowners].freeze
+
+    # qmldir is the QML module definition file — it ships in virtually every
+    # Quattro plugin and MUST scan as text, not flag as an opaque payload.
+    # The dotfiles/build files are ordinary repo furniture; scanning them with
+    # the full STRICT ruleset (they are code, not prose) beats sending every
+    # plugin that has a .gitignore to a human.
+    PLAIN_FILENAMES = (DOC_FILENAMES + %w[qmldir makefile dockerfile pkgbuild
+                         .gitignore .gitattributes .editorconfig .srcinfo]).freeze
 
     # RIFF is a container: the subtype at offset 8 must match the extension,
     # or any RIFF-prefixed payload would pass as .webp/.wav.
@@ -108,6 +174,7 @@ module Registry
 
     def genuine_asset?(path, content)
       ext = File.extname(path).downcase
+      return content.byteslice(4, 4).to_s.b == "ftyp" if OFFSET_FTYP_EXTS.include?(ext)
       magics = ASSET_MAGIC[ext]
       return false if magics.nil?
       head = content.byteslice(0, 16).to_s.b
@@ -135,33 +202,59 @@ module Registry
       false
     end
 
-    # strict: false is the asset-polyglot pass — binary data can innocently
-    # decode to control codepoints, so nothing auto-rejects there, it only flags.
-    def scan_file(path, text, entropy: true, strict: true)
-      check path, text, "invisible-unicode", strict ? :fail : :flag, INVISIBLE_UNICODE,
-        "invisible or bidirectional Unicode characters (code hidden from review)"
+    # doc: true limits scanning to the reviewer-deception rules — docs don't
+    # execute, so the behavior rules below would only flag their own install
+    # instructions. strict: false keeps prose from auto-rejecting on marks it
+    # may legitimately carry.
+    def scan_file(path, text, entropy: true, strict: true, doc: false)
+      check path, text, "bidi-unicode", strict ? :fail : :flag, BIDI_UNICODE,
+        "bidirectional override characters (code renders differently than it executes)"
+      check path, text, "invisible-unicode", :flag, INVISIBLE_UNICODE,
+        "zero-width or directional-mark Unicode characters (legitimate in i18n data, code-hiding in code)"
+      return if doc
       check path, text, "curl-pipe-shell", :flag, %r{\b(curl|wget)\b[^|\n;]*\|\s*(sudo\s+)?(?:/[\w/]*/)?(ba|z|da)?sh\b},
         "pipes a remote download straight into a shell"
       check path, text, "base64-decode-exec", :flag, /base64\s+(-d|--decode)[^\n]*\|\s*(sudo\s+)?\w*sh\b|eval.{0,40}base64|atob\s*\([^)]*\).{0,40}(eval|Function)/m,
         "decodes base64 and executes it"
       check path, text, "eval-construct", :flag, /\beval\s*\(|new\s+Function\s*\(/,
         "dynamic code evaluation"
-      check path, text, "raw-ip-url", :flag, %r{https?://\d{1,3}(\.\d{1,3}){3}},
+      # Loopback is the plugin's own machine (Hyprland IPC, local daemons) —
+      # not the dead-drop pattern this rule hunts. Everything else, including
+      # RFC1918, still flags: a LAN default in shipped code deserves a look.
+      check path, text, "raw-ip-url", :flag, %r{https?://(?!127\.|0\.0\.0\.0|\[?::1\]?)\d{1,3}(\.\d{1,3}){3}},
         "network call to a raw IP address"
       check path, text, "suspicious-host", :flag, /#{SUSPICIOUS_HOSTS.map { |h| Regexp.escape(h) }.join("|")}/,
         "contacts a paste site, webhook, or dead-drop service"
-      check path, text, "credential-paths", :flag, %r{(\$\{?HOME\}?|~)/\.(ssh|gnupg|aws|config/gh|mozilla)\b|\.ssh/id_},
+      check path, text, "credential-paths", :flag,
+        %r{(\$\{?HOME\}?|~)/\.(ssh|gnupg|aws|config/gh|mozilla)\b|\.ssh/id_|\.local/share/keyrings|/etc/shadow\b|\.config/(google-chrome|chromium|BraveSoftware)},
         "touches credential or key storage"
+      # A PEM header or a fixed-format token in shipped code is always worth a
+      # human look — these formats are FP-resistant (a scanner plugin carrying
+      # the TOKEN REGEX as a string won't match: metachars break the run).
+      check path, text, "hardcoded-private-key", :flag, /-----BEGIN [A-Z ]{0,20}PRIVATE KEY-----/,
+        "embeds a private key"
+      # AKIAIOSFODNN7EXAMPLE is AWS's documented example key — it appears in
+      # legitimate fixtures and docs everywhere and can never be a live leak.
+      check path, text, "hardcoded-token", :flag, /\b(?:ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{82}|(?!AKIAIOSFODNN7EXAMPLE)AKIA[0-9A-Z]{16})\b/,
+        "embeds a credential token"
+      # No innocent program executes decoded bytes.
+      check path, text, "python-decode-exec", :flag,
+        /\bexec\s*\(\s*(?:bytes\.fromhex|base64\.b(?:64)?decode|zlib\.decompress|codecs\.decode|marshal\.loads)/,
+        "executes decoded bytes"
       check path, text, "shell-history-tamper", :flag, /HISTFILE=|history\s+-c\b|shred\b.*bash_history/,
         "tampers with shell history"
       # Only the plugin's OWN storage (~/.config/omarchy/plugins/...) is a
       # legitimate write target; anything else in $HOME — dotfile or not — and
       # any system path needs a human look.
+      # cp/mv/install are also ordinary English words ("install detection
+      # (needs login shell for ~/go/bin)") — [^\n()]* keeps the verb→path span
+      # free of parentheses, which command lines essentially never contain but
+      # prose almost always does.
       check path, text, "home-write", :flag,
-        %r{(?:>>?|\btee\s+(?:-a\s+)?)\s*["']?(?:\$\{?HOME\}?|~)/(?!\.config/omarchy/plugins/)\S|\b(?:cp|mv|install)\b[^\n]*\s["']?(?:\$\{?HOME\}?|~)/(?!\.config/omarchy/plugins/)\S},
+        %r{(?:>>?|\btee\s+(?:-a\s+)?)\s*["']?(?:\$\{?HOME\}?|~)/(?!\.config/omarchy/plugins/)\S|\b(?:cp|mv|install)\b[^\n()]*\s["']?(?:\$\{?HOME\}?|~)/(?!\.config/omarchy/plugins/)\S},
         "writes into the home directory outside the plugin's own storage"
       check path, text, "system-write", :flag,
-        %r{(?:>>?|\btee\s+(?:-a\s+)?)\s*["']?/(?:etc|usr|var|boot|opt|srv)/|\b(?:cp|mv|install)\b[^\n]*\s["']?/(?:etc|usr|var|boot|opt|srv)/},
+        %r{(?:>>?|\btee\s+(?:-a\s+)?)\s*["']?/(?:etc|usr|var|boot|opt|srv)/|\b(?:cp|mv|install)\b[^\n()]*\s["']?/(?:etc|usr|var|boot|opt|srv)/},
         "writes to system paths"
       check path, text, "embedded-shebang", :flag, /\n#!\s*\/(bin|usr)\//, "script payload embedded past the file header" if !entropy
       check_entropy(path, text) if entropy
@@ -169,9 +262,13 @@ module Registry
 
     # Long high-entropy blobs are the signature of obfuscated payloads.
     def check_entropy(path, text)
-      text.scan(/[A-Za-z0-9+\/=_-]{400,}/).each do |blob|
+      # Embedded media data-URIs (icons inside SVGs, design mocks in HTML)
+      # are the standard idiom for high-entropy base64 — strip them before
+      # hunting for packed payloads, which don't announce their MIME type.
+      stripped = text.gsub(%r{data:(?:image|font|audio|video)/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+}i, "")
+      stripped.scan(/[A-Za-z0-9+\/=_-]{400,}/).each do |blob|
         next if entropy(blob) < 4.5
-        findings << Finding.new("obfuscation-entropy", :flag, path,
+        findings << Finding.new("obfuscation-entropy", flag_or_note(path), path,
           "high-entropy blob of #{blob.length} chars (possible packed payload)")
         break
       end
@@ -186,9 +283,19 @@ module Registry
       end
     end
 
+    # Regex metachar sequences that essentially never occur in real command
+    # lines but define detection-signature literals (a security plugin's own
+    # rule set). The hint SORTS the admin queue — it never suppresses: the
+    # surrounding text is author-controlled, so auto-downgrading on it would
+    # be a free evasion primitive.
+    PATTERN_LITERAL_CONTEXT = /\\[sbdwSBDW]|\(\?:|\[\^|re\.compile\(|new\s+RegExp\(/
+
     def check(path, text, rule, severity, pattern, detail)
       return unless (match = text.match(pattern))
-      findings << Finding.new(rule, severity, path, "#{detail}: #{match[0].to_s.strip.first(80)}")
+      severity = flag_or_note(path) if severity == :flag
+      context = "#{match.pre_match.last(80)}#{match[0]}#{match.post_match.first(80)}"
+      hint = context.match?(PATTERN_LITERAL_CONTEXT) ? " [match sits inside an apparent pattern literal — likely a detection signature, verify by eye]" : ""
+      findings << Finding.new(rule, severity, path, "#{detail}: #{match[0].to_s.strip.first(80)}#{hint}")
     end
 
     def entropy(string)
