@@ -2,14 +2,17 @@ class HomeController < ApplicationController
   allow_unauthenticated_access
 
   # Computed per row from the versions table — plugins.updated_at is useless
-  # here (any counter or metadata write touches it).
-  LAST_PUBLISHED_SQL = <<~SQL.squish.freeze
+  # here (any counter or metadata write touches it). The published-state enum
+  # integer is bound, not interpolated: a SQL constant assembled by hand is
+  # the shape a scanner has to flag, and it costs nothing to bind it.
+  PUBLISHED_STATE = PluginVersion.states.fetch(:published)
+  LAST_PUBLISHED_SQL = ActiveRecord::Base.sanitize_sql_array([ <<~SQL.squish, PUBLISHED_STATE ]).freeze
     (SELECT MAX(pv.published_at) FROM plugin_versions pv
-      WHERE pv.plugin_id = plugins.id AND pv.state = #{PluginVersion.states.fetch(:published)})
+      WHERE pv.plugin_id = plugins.id AND pv.state = ?)
   SQL
-  FIRST_PUBLISHED_SQL = <<~SQL.squish.freeze
+  FIRST_PUBLISHED_SQL = ActiveRecord::Base.sanitize_sql_array([ <<~SQL.squish, PUBLISHED_STATE ]).freeze
     (SELECT MIN(pv.published_at) FROM plugin_versions pv
-      WHERE pv.plugin_id = plugins.id AND pv.state = #{PluginVersion.states.fetch(:published)})
+      WHERE pv.plugin_id = plugins.id AND pv.state = ?)
   SQL
   WEEK_DOWNLOADS_SQL = <<~SQL.squish.freeze
     (SELECT COALESCE(SUM(dd.count), 0) FROM daily_downloads dd
