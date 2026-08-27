@@ -42,7 +42,7 @@
   <article>
     <div class="readme" data-controller="readme-code">
       <% if @readme.present? %>
-        <%= render_markdown @readme %>
+        <%= render_markdown @readme, asset_base: readme_asset_base(@version) %>
       <% else %>
         <p class="muted">No readme in this version.</p>
       <% end %>

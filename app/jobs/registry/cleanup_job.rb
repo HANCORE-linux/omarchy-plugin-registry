@@ -58,13 +58,41 @@ module Registry
 
     # A lost enqueue must never strand a version: re-drive processing versions
     # through review and overdue held versions through release.
+    #
+    # "Stuck" means NO job is waiting for it — not merely "old". Two things
+    # break the naive reading: seeded imports backdate created_at to their
+    # original marketplace listing date, so they are born months "old", and a
+    # bulk import leaves thousands of versions legitimately queued behind a
+    # slow reviewer. Re-driving those added ~1,400 redundant jobs an hour,
+    # growing without bound for as long as the backlog lasted.
     def resume_stuck_pipeline_work
-      PluginVersion.processing.where(created_at: ...10.minutes.ago).find_each do |version|
+      PluginVersion.processing.where(updated_at: ...10.minutes.ago)
+        .where.not(id: version_ids_with_pending_review).find_each do |version|
         ReviewJob.perform_later(version)
       end
       PluginVersion.held.where(hold_until: ...5.minutes.ago).find_each do |version|
         ReleaseJob.perform_later(version)
       end
+    end
+
+    # Version ids that already have an unfinished ReviewJob queued. Read once
+    # per sweep: the alternative is a LIKE against every row per version.
+    #
+    # Empty when the queue backend cannot be read (another adapter, or the
+    # test environment) — that degrades to the old unconditional re-drive,
+    # which is the safe direction: a redundant job no-ops, a missing one
+    # strands a version in processing forever.
+    def version_ids_with_pending_review
+      return [] unless defined?(SolidQueue::Job) && SolidQueue::Job.table_exists?
+      SolidQueue::Job.where(class_name: "Registry::ReviewJob", finished_at: nil)
+        .pluck(:arguments).filter_map do |raw|
+          gid = JSON.parse(raw.to_s).dig("arguments", 0, "_aj_globalid")
+          gid&.split("/")&.last&.to_i
+        rescue JSON::ParserError
+          nil
+        end
+    rescue ActiveRecord::ActiveRecordError
+      []
     end
   end
 end

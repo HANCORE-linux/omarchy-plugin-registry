@@ -81,7 +81,7 @@
 
     <div class="readme" data-controller="readme-code">
       <% if @plugin.readme.present? %>
-        <%= render_markdown @plugin.readme %>
+        <%= render_markdown @plugin.readme, asset_base: readme_asset_base(@latest) %>
       <% else %>
         <p class="muted">No readme provided.</p>
       <% end %>

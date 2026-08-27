@@ -1,9 +1,42 @@
 module ApplicationHelper
-  def render_markdown(text)
+  def render_markdown(text, asset_base: nil)
     return "" if text.blank?
-    Commonmarker.to_html(text,
+    html = Commonmarker.to_html(text,
       options: { extension: { table: true, strikethrough: true, autolink: true, tasklist: true },
-                 render: { unsafe: false } }).html_safe
+                 render: { unsafe: false } })
+    html = rewrite_relative_images(html, asset_base) if asset_base.present?
+    html.html_safe
+  end
+
+  # A README is written to be read INSIDE its repository, so its screenshots
+  # are repo-relative ("preview.png"). Served from a plugin page those resolve
+  # against /plugins/<publisher>/ and 404 — every imported README with an
+  # inline screenshot rendered as a broken image. Rewrite them onto the exact
+  # commit the version was built from: raw.githubusercontent.com content is
+  # immutable per sha, so the picture cannot change under a reviewed version.
+  #
+  # Relative LINKS (./CONTRIBUTING.md) are still broken — a raw URL would
+  # serve unrendered markdown, so they need the repo's tree URL instead.
+  def rewrite_relative_images(html, base)
+    doc = Nokogiri::HTML5.fragment(html)
+    doc.css("img[src]").each do |img|
+      src = img["src"].to_s.strip
+      next if src.blank? || src.start_with?("#") || src.match?(%r{\A(?:[a-z][a-z0-9+.\-]*:|//)}i)
+      img["src"] = URI.join(base, src.delete_prefix("./")).to_s
+    rescue URI::Error
+      next
+    end
+    doc.to_html
+  end
+
+  # The pinned raw-content base for a version's own source, or nil when we
+  # have no provenance to pin to (nothing is rewritten then — a wrong guess
+  # would point a plugin page at somebody else's repository).
+  def readme_asset_base(version)
+    repository = version&.provenance&.dig("repository")
+    sha = version&.provenance&.dig("sha")
+    return nil if repository.blank? || sha.blank?
+    "https://raw.githubusercontent.com/#{repository}/#{sha}/"
   end
 
   def compact_number(number)

@@ -76,7 +76,7 @@
       <details open>
         <summary>Readme</summary>
         <div class="readme" data-controller="readme-code">
-          <%= render_markdown @tarball.readme %>
+          <%= render_markdown @tarball.readme, asset_base: readme_asset_base(@version) %>
         </div>
       </details>
     <% elsif @tarball %>

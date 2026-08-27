@@ -4,7 +4,11 @@ module Registry
   # takedown); everything is re-derived from current state, so a stale or
   # duplicate run converges on the same result.
   class RefreshPreviewJob < ApplicationJob
-    queue_as :review
+    # NOT the review queue: a preview is cosmetic and quick, and sharing a
+    # queue with multi-pass AI reviews meant a bulk import buried every
+    # thumbnail behind thousands of slow jobs. Same reasoning that keeps
+    # mailers off it.
+    queue_as :previews
     # Serialized per plugin: two racing runs could interleave purge/attach and
     # leave a card without its detail image.
     limits_concurrency to: 1, key: ->(plugin) { "preview_plugin_#{plugin.id}" }
