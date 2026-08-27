@@ -1,0 +1,13 @@
+<%# The public capability panel, fed by Registry::CapabilitySummary. An empty
+    fingerprint is the strongest claim the registry can make, so it renders as
+    a positive statement rather than a blank grid. %>
+<% summary = Registry::CapabilitySummary.new(version.capability_fingerprint) %>
+<section class="capabilities">
+  <h4>Capabilities</h4>
+  <% if summary.empty? %>
+    <p class="muted">Nothing detected — this version runs no commands and declares no network or file access.</p>
+  <% else %>
+    <%= render "shared/capability_rows", summary: summary %>
+  <% end %>
+  <p class="muted capabilities__note">From static analysis of the published files. An update that gains a capability is held for human review.</p>
+</section>

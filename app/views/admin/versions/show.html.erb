@@ -54,6 +54,37 @@
   </section>
 
   <section>
+    <h2>Listing</h2>
+    <% kinds = Array(@version.manifest["kinds"]) %>
+    <% if kinds.any? || @version.manifest["category"].present? %>
+      <p class="eyebrow"><%= (kinds + [ @version.manifest["category"] ]).compact_blank.join(" · ") %></p>
+    <% end %>
+    <% if @version.manifest["description"].present? %>
+      <p class="summary"><%= @version.manifest["description"] %></p>
+    <% end %>
+    <%# Preview and readme come from the exact tarball under review, not the
+        plugin's published rendition — quarantined bytes may differ from what's live %>
+    <% if @tarball&.preview_bytes %>
+      <% preview_type = { ".png" => "image/png", ".jpg" => "image/jpeg", ".jpeg" => "image/jpeg",
+                          ".webp" => "image/webp", ".gif" => "image/gif" }[File.extname(@tarball.preview_name).downcase] %>
+      <div class="plugin-preview plugin-preview--static">
+        <img src="data:<%= preview_type %>;base64,<%= Base64.strict_encode64(@tarball.preview_bytes) %>"
+          alt="<%= @plugin.full_name %> preview (<%= @tarball.preview_name %>)">
+      </div>
+    <% end %>
+    <% if @tarball&.readme.present? %>
+      <details open>
+        <summary>Readme</summary>
+        <div class="readme" data-controller="readme-code">
+          <%= render_markdown @tarball.readme %>
+        </div>
+      </details>
+    <% elsif @tarball %>
+      <p class="muted">No readme in this version.</p>
+    <% end %>
+  </section>
+
+  <section>
     <h2>Identity</h2>
     <dl class="sidebar u-max-narrow">
       <div><dt class="eyebrow">SHA-256</dt><dd><code><%= @version.sha256 %></code></dd></div>
@@ -94,15 +125,22 @@
   <section>
     <h2>Capability fingerprint</h2>
     <% if @version.capability_fingerprint.present? %>
-      <dl class="sidebar u-max-narrow">
-        <% @version.capability_fingerprint.each do |capability, value| %>
-          <div><dt class="eyebrow"><%= capability %></dt><dd><%= Array(value).join(", ").presence || "—" %></dd></div>
-        <% end %>
-      </dl>
       <% growth = @version.scan_results&.dig("capability_growth") || [] %>
       <% if growth.any? %>
-        <p class="u-gap-top"><span class="badge badge--warning">Growth vs baseline</span> <%= growth.join(" · ") %></p>
+        <p><span class="badge badge--warning">Growth vs baseline</span> <%= growth.join(" · ") %></p>
       <% end %>
+      <% summary = Registry::CapabilitySummary.new(@version.capability_fingerprint) %>
+      <% if summary.empty? %>
+        <p class="muted">Nothing detected — no commands, network, or file access.</p>
+      <% else %>
+        <div class="u-max-narrow u-gap-top"><%= render "shared/capability_rows", summary: summary %></div>
+      <% end %>
+      <%# The stored hash is the growth baseline — argv/call-site digests the
+          growth entries above refer to live here, so it stays reachable %>
+      <details class="u-gap-top">
+        <summary class="muted">Raw fingerprint (growth baseline)</summary>
+        <pre><code><%= JSON.pretty_generate(@version.capability_fingerprint) %></code></pre>
+      </details>
     <% else %>
       <p class="muted">Not computed yet.</p>
     <% end %>

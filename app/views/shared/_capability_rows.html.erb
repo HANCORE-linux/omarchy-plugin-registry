@@ -1,0 +1,24 @@
+<%# Renders Registry::CapabilitySummary rows — shared by the public plugin
+    pages and the admin review view. Expects a non-empty `summary`. %>
+<ul class="capability-rows">
+  <% summary.rows.each do |row| %>
+    <li>
+      <span class="capability-rows__label"><%= row.label %></span>
+      <ul class="capability-rows__items">
+        <% row.preview.each do |item| %>
+          <li><%= row.code? ? tag.code(item) : item %></li>
+        <% end %>
+      </ul>
+      <% if row.hidden.any? %>
+        <details class="capability-rows__more">
+          <summary>+ <%= row.hidden.size %> more</summary>
+          <ul class="capability-rows__items">
+            <% row.hidden.each do |item| %>
+              <li><%= row.code? ? tag.code(item) : item %></li>
+            <% end %>
+          </ul>
+        </details>
+      <% end %>
+    </li>
+  <% end %>
+</ul>

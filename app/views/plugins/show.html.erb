@@ -50,7 +50,7 @@
       </div>
     <% end %>
     <div class="page-head__row">
-      <% if @latest %><%= state_badge(:published) %><span class="muted">v<%= @latest.version %> · <%= @latest.license %></span><% end %>
+      <% if @latest %><%= state_badge(:published) %><span class="muted">v<%= @latest.version %> · <%= @latest.license.presence || "No license" %></span><% end %>
       <span class="muted"><%= compact_number(@plugin.downloads_count) %> downloads · <%= compact_number(@plugin.views_count) %> views</span>
       <% if @plugin.average_rating %>
         <span class="rating-summary"><span class="diamond">◆</span> <%= @plugin.average_rating %>/5
@@ -182,24 +182,29 @@
       </dl>
     </section>
     <% if @latest&.capability_fingerprint.present? %>
-      <section>
-        <h4>Capabilities</h4>
-        <dl>
-          <% @latest.capability_fingerprint.each do |cap, value| %>
-            <dt><%= cap.humanize %></dt><dd><%= Array(value).join(", ") %></dd>
-          <% end %>
-        </dl>
-      </section>
+      <%= render "capabilities", version: @latest %>
     <% end %>
     <% if @latest&.provenance.present? %>
       <section>
         <h4>Provenance</h4>
-        <dl>
-          <dt>CI identity</dt>
-          <dd><a href="https://github.com/<%= @latest.provenance["repository"] %>/commit/<%= @latest.provenance["sha"] %>"><%= @latest.provenance["repository"] %>@<%= @latest.provenance["sha"].to_s.first(7) %></a></dd>
-          <dt>Workflow</dt><dd><code><%= @latest.provenance["workflow"].to_s.split("@").first.to_s.split("/").last %></code></dd>
-          <dt>Via</dt><dd>OIDC trusted publishing (job identity, not a build attestation)</dd>
-        </dl>
+        <% if @latest.provenance["source"] == "legacy-marketplace" %>
+          <dl>
+            <dt>Imported snapshot</dt>
+            <% if @latest.provenance["repository"].present? && @latest.provenance["sha"].present? %>
+              <dd><a href="https://github.com/<%= @latest.provenance["repository"] %>/tree/<%= @latest.provenance["sha"] %>"><%= @latest.provenance["repository"] %>@<%= @latest.provenance["sha"].to_s.first(7) %></a></dd>
+            <% else %>
+              <dd><%= @latest.provenance["repository"] %></dd>
+            <% end %>
+            <dt>Via</dt><dd>Seeded from the legacy marketplace listing (the commit its review recorded)</dd>
+          </dl>
+        <% else %>
+          <dl>
+            <dt>CI identity</dt>
+            <dd><a href="https://github.com/<%= @latest.provenance["repository"] %>/commit/<%= @latest.provenance["sha"] %>"><%= @latest.provenance["repository"] %>@<%= @latest.provenance["sha"].to_s.first(7) %></a></dd>
+            <dt>Workflow</dt><dd><code><%= @latest.provenance["workflow"].to_s.split("@").first.to_s.split("/").last %></code></dd>
+            <dt>Via</dt><dd>OIDC trusted publishing (job identity, not a build attestation)</dd>
+          </dl>
+        <% end %>
       </section>
     <% end %>
     <section>

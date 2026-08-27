@@ -30,7 +30,7 @@
     <div class="page-head__row">
       <%= state_badge(@version.state) %>
       <% if @latest && @version.version == @latest.version %><span class="badge badge--ok">Latest</span><% end %>
-      <span class="muted">v<%= @version.version %> · <%= @version.license %></span>
+      <span class="muted">v<%= @version.version %> · <%= @version.license.presence || "No license" %></span>
       <% if @version.published_at %>
         <span class="muted">published <%= @version.published_at.to_date %></span>
       <% end %>
@@ -95,14 +95,7 @@
       </dl>
     </section>
     <% if @version.capability_fingerprint.present? %>
-      <section>
-        <h4>Capabilities</h4>
-        <dl>
-          <% @version.capability_fingerprint.each do |cap, value| %>
-            <dt><%= cap.humanize %></dt><dd><%= Array(value).join(", ") %></dd>
-          <% end %>
-        </dl>
-      </section>
+      <%= render "capabilities", version: @version %>
     <% end %>
     <% if @version.provenance.present? %>
       <section>
