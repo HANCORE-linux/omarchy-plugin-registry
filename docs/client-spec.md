@@ -48,32 +48,23 @@ Everything above is the **install** path: static, signed, and the only thing a
 client may resolve a version from. A native browser needs a second, different
 thing — the human layer the website renders — so the Rails app answers its
 public read surfaces as JSON on the same URLs, negotiated by format:
+`/plugins.json`, `/plugins/<publisher>/<name>.json`,
+`/plugins/<publisher>/<name>/<version>.json`, `/publishers/<name>.json`.
 
-| Path | Contents |
-|---|---|
-| `GET /plugins.json` | The directory. Same query parameters as the web page: `q` (including the typed operators `@publisher`, `tag:`, `kind:`, `category:`), `sort`, `category`, `tag`, `page`. Returns `plugins`, `page` (`number`/`per_page`/`total`/`more`), `stats`, `recent`, and `taxonomy` — the curated category and tag vocabulary with counts, so a client renders facets without hardcoding a copy that goes stale. |
-| `GET /plugins/<publisher>/<name>.json` | One plugin: summary, readme, rating, preview image URLs, repository and stars, the full version list, the capability privacy-label, provenance, comments, and `notices`. |
-| `GET /plugins/<publisher>/<name>/<version>.json` | One version, with the readme extracted from that version's own frozen tarball. |
-| `GET /publishers/<name>.json` | A namespace and its plugins. `claimed: false` means the listing was seeded and no author has proven control of the source repo — say so rather than implying endorsement. |
+Full reference, including query parameters, paging, and payload shapes:
+**[browse-api.md](browse-api.md)**.
+
+Two rules matter here rather than there:
 
 **These are not a trust surface.** They are unsigned, they are served by Rails
 rather than the CDN origin, and a client must never resolve or install from
 them. Show them; then resolve the version, verify the checksum, and check the
 kill list through the signed data plane exactly as above.
 
-**`notices`** carries the warning banners the website shows — security holds,
-quarantines, revocations, withdrawn versions — as `{kind, tone, title, body}`.
-Render them. They come from the same code path as the page, so a takedown can
-never be visible on the site and invisible in the desktop browser.
-
-**Caching**: anonymous responses are `public, max-age=60,
-stale-while-revalidate=300` and carry an ETag. Send `If-None-Match` on refresh
-and handle `304`. Counters (downloads, views) are deliberately excluded from
-the ETag, so they may lag one revalidation — do not treat them as exact.
-
-**Images**: `preview.card.url` and `preview.detail.url` are absolute, long-lived
-URLs. Fetch them directly; there is nothing to sign or verify, and a missing
-preview is `null`, not an error.
+**Render `notices`.** They carry the warning banners the website shows —
+security holds, quarantines, revocations, withdrawn versions — from the same
+code path as the page, so a takedown can never be visible on the site and
+invisible in the desktop browser.
 
 ## `omarchy plugin add <publisher>/<name>`
 

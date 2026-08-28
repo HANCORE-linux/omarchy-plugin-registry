@@ -21,6 +21,15 @@ class BrowseApiTest < ActionDispatch::IntegrationTest
 
   def body = JSON.parse(response.body)
 
+  def seed_filler(count)
+    count.times do |i|
+      plugin = Plugin.create!(publisher: @acme, name: "filler-#{i}", summary: "Filler #{i}",
+        latest_version: "1.0.0", kinds: [ "bar-widget" ])
+      plugin.versions.create!(version: "1.0.0", manifest: {}, sha256: format("%064d", i),
+        size_bytes: 1, state: :published, published_at: 1.day.ago)
+    end
+  end
+
   # --- directory -----------------------------------------------------------
 
   test "directory JSON lists plugins with the browse vocabulary attached" do
@@ -64,6 +73,52 @@ class BrowseApiTest < ActionDispatch::IntegrationTest
 
     get directory_json_path(sort: "name")
     assert_equal %w[mixer weather], body["plugins"].map { |p| p["name"] }
+  end
+
+  test "per_page widens the JSON page and is capped" do
+    seed_filler(30)
+
+    get directory_json_path
+    assert_equal 24, body["plugins"].size, "default page size is unchanged"
+    assert_equal 24, body["page"]["per_page"]
+
+    get directory_json_path(per_page: 31)
+    assert_equal 31, body["plugins"].size
+    assert_equal 31, body["page"]["per_page"]
+    refute body["page"]["more"]
+
+    # Above the cap clamps rather than erroring — and never returns everything
+    get directory_json_path(per_page: 5000)
+    assert_equal HomeController::MAX_PER_PAGE, body["page"]["per_page"]
+
+    # Junk falls back to the default instead of an empty page
+    get directory_json_path(per_page: "banana")
+    assert_equal 24, body["page"]["per_page"]
+    assert_equal 24, body["plugins"].size
+  end
+
+  test "paging with per_page covers the catalog exactly once" do
+    seed_filler(30)   # 31 listed plugins in total, with @weather
+
+    seen = []
+    page = 1
+    loop do
+      get directory_json_path(per_page: 10, page: page)
+      seen.concat(body["plugins"].map { |p| p["id"] })
+      break unless body["page"]["more"]
+      page += 1
+    end
+
+    assert_equal 31, seen.size
+    assert_equal seen.uniq.size, seen.size, "a plugin must not repeat across pages"
+  end
+
+  test "the HTML grid ignores per_page so its pager cannot snap back" do
+    seed_filler(30)
+
+    get root_path(per_page: 100)
+    assert_response :success
+    assert_select ".plugin-grid .plugin-card", 24
   end
 
   # --- plugin detail -------------------------------------------------------

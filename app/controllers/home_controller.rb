@@ -31,6 +31,10 @@ class HomeController < ApplicationController
   }.freeze
 
   PER_PAGE = 24
+  # JSON callers may ask for a larger page so building a local index doesn't
+  # take dozens of round trips. Capped: an uncapped page size on a directory
+  # heading for six figures is a cheap way to make the server do a lot of work.
+  MAX_PER_PAGE = 100
 
   def index
     @query = params[:q].to_s.strip
@@ -38,6 +42,7 @@ class HomeController < ApplicationController
     @page = [ params[:page].to_i, 1 ].max
     @category = params[:category] if Registry::Taxonomy.category?(params[:category])
     @tag = params[:tag] if Registry::Taxonomy.tag?(params[:tag])
+    @per_page = page_size
     @terms = parse_query(@query)
 
     # Plugins without a published version stay visible while genuinely in
@@ -49,9 +54,9 @@ class HomeController < ApplicationController
     plugins = scope
       .select("plugins.*", "#{FIRST_PUBLISHED_SQL} AS first_published_at", "#{LAST_PUBLISHED_SQL} AS last_published_at")
       .order(Arel.sql(SORTS[@sort])).order(:id)
-      .offset((@page - 1) * PER_PAGE).limit(PER_PAGE + 1).to_a
-    @more = plugins.length > PER_PAGE
-    @plugins = plugins.first(PER_PAGE)
+      .offset((@page - 1) * @per_page).limit(@per_page + 1).to_a
+    @more = plugins.length > @per_page
+    @plugins = plugins.first(@per_page)
     # Announced (and shown) only while filtering — the unfiltered count is
     # already in the hero stats. JSON always carries it: a native client
     # paginating a list needs to know how far the list goes.
@@ -70,10 +75,19 @@ class HomeController < ApplicationController
       publishers: Publisher.claimed.count,
       downloads: Plugin.sum(:downloads_count)
     }
-    freshen(@plugins, @recent, @query, @sort, @category, @tag, @page, @more, @total, @stats.values)
+    freshen(@plugins, @recent, @query, @sort, @category, @tag, @page, @per_page, @more, @total, @stats.values)
   end
 
   private
+
+  # Honoured for JSON only. The web grid stays at its designed 24: the pager
+  # links don't carry per_page, so a bigger HTML page would silently snap back
+  # to 24 on "Next" — a broken pager is worse than a fixed page size.
+  def page_size
+    return PER_PAGE unless request.format.json?
+    requested = params[:per_page].to_i
+    requested.positive? ? requested.clamp(1, MAX_PER_PAGE) : PER_PAGE
+  end
 
   # The search box understands a few typed operators alongside plain text:
   # @publisher, tag:media, kind:bar, category:system. Everything else matches

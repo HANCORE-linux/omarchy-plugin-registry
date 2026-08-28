@@ -13,7 +13,7 @@ end
 
 json.page do
   json.number @page
-  json.per_page HomeController::PER_PAGE
+  json.per_page @per_page
   json.total @total
   json.more @more
 end

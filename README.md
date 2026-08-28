@@ -41,10 +41,9 @@ pipeline with deterministic scanning, capability fingerprints + delta holds,
 escalate-only AI review hook, publish hold window, Ed25519-signed index + kill
 list, device-flow CLI login, OIDC trusted publishing with provenance, passkeys,
 community (ratings/comments/views/reports + moderation), seeding + repo-proof
-claims, the admin console, and JSON read surfaces for a native in-desktop
-plugin browser (`/plugins.json`, `/plugins/<publisher>/<name>.json`,
-`/publishers/<name>.json` — see docs/client-spec.md; unsigned browse data,
-never an install path).
+claims, the admin console, and a JSON browse API for a native in-desktop
+plugin browser (docs/browse-api.md — unsigned browse data, never an install
+path).
 
 **Not yet done, and required before launch**: the Quattro-side client
 (`omarchy plugin add/update/publish`, signature + freshness verification,
