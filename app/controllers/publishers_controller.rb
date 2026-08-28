@@ -1,8 +1,14 @@
 class PublishersController < ApplicationController
+  include ConditionalGet
   allow_unauthenticated_access
 
   def show
     @publisher = Publisher.find_by!(name: params[:name])
-    @plugins = @publisher.plugins.directory_visible.order(downloads_count: :desc)
+    # includes/with_attached: the shared plugin partial reads publisher and
+    # preview for every row, and both formats render it.
+    @plugins = @publisher.plugins.directory_visible
+      .includes(:publisher).with_attached_preview_card
+      .order(downloads_count: :desc)
+    freshen(@publisher, @plugins)
   end
 end

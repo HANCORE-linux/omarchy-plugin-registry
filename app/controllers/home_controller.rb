@@ -1,4 +1,5 @@
 class HomeController < ApplicationController
+  include ConditionalGet
   allow_unauthenticated_access
 
   # Computed per row from the versions table — plugins.updated_at is useless
@@ -52,8 +53,9 @@ class HomeController < ApplicationController
     @more = plugins.length > PER_PAGE
     @plugins = plugins.first(PER_PAGE)
     # Announced (and shown) only while filtering — the unfiltered count is
-    # already in the hero stats.
-    @total = scope.unscope(:select).count if @query.present? || @category || @tag
+    # already in the hero stats. JSON always carries it: a native client
+    # paginating a list needs to know how far the list goes.
+    @total = scope.unscope(:select).count if @query.present? || @category || @tag || request.format.json?
     @category_counts = Plugin.directory_visible.where.not(category: nil).group(:category).count
     # A short strip of genuinely new plugins on the unfiltered first page —
     # the default downloads sort would otherwise bury every fresh release.
@@ -68,6 +70,7 @@ class HomeController < ApplicationController
       publishers: Publisher.claimed.count,
       downloads: Plugin.sum(:downloads_count)
     }
+    freshen(@plugins, @recent, @query, @sort, @category, @tag, @page, @more, @total, @stats.values)
   end
 
   private

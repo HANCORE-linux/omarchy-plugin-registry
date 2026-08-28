@@ -38,9 +38,19 @@ Rails.application.routes.draw do
   post "invitations/:id/decline", to: "invitations#decline", as: :decline_invitation
 
   # Public directory
+  # The directory itself is the root page, which has no format segment to hang
+  # ".json" on — give the JSON listing a real path instead of leaving clients
+  # on "/?format=json". Same action, same query parameters (q, sort, category,
+  # tag, page); no second HTML directory to keep canonical.
+  get "plugins.json", to: "home#index", as: :directory_json,
+    defaults: { format: "json" }, format: false
   get "plugins/:publisher/:name", to: "plugins#show", as: :plugin
+  # The version segment is dotted (semver), so the router would otherwise
+  # swallow a ".json" suffix into :version and 404 instead of negotiating the
+  # format. Constraining it to semver characters that do NOT end in ".json"
+  # lets Rails split the format itself — no hand-rolled suffix parsing.
   get "plugins/:publisher/:name/:version", to: "plugins#version", as: :plugin_version,
-    constraints: { version: /\d[^\/]*/ }
+    constraints: { version: /\d[0-9A-Za-z.\-+]*(?<!\.json)/ }
   post "plugins/:publisher/:name/rating", to: "ratings#create", as: :plugin_rating
   post "plugins/:publisher/:name/comments", to: "comments#create", as: :plugin_comments
   resources :comments, only: :destroy

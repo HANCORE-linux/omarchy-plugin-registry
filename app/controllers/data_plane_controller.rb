@@ -25,7 +25,7 @@ class DataPlaneController < ActionController::API
     return head :not_found unless version
     served = serve("dl/#{params[:publisher]}/#{params[:plugin]}/#{filename}",
       type: "application/gzip", disposition: "attachment", filename: filename,
-      cache_control: "public, max-age=31536000, immutable")
+      expires: 1.year, immutable: true)
     # Origin counting is a dev/small-scale convenience; production counts come
     # from CDN log aggregation (config disables the synchronous DB writes an
     # anonymous GET could otherwise hammer).
@@ -41,16 +41,16 @@ class DataPlaneController < ActionController::API
   def content_type_for_json = request.path.end_with?(".sig") ? "text/plain" : "application/json"
 
   # Returns truthy only when the file was actually sent. Indexes are mutable
-  # (short cache); immutable tarballs pass their own cache_control. The
-  # containment check runs on the CANONICALIZED absolute path — ../ segments
-  # or encoded separators can never escape the data-plane root.
-  def serve(relative_path, type:, disposition: "inline", filename: nil, cache_control: "public, max-age=60")
+  # (short cache); tarballs are frozen bytes and mark themselves immutable.
+  # The containment check runs on the CANONICALIZED absolute path — ../
+  # segments or encoded separators can never escape the data-plane root.
+  def serve(relative_path, type:, disposition: "inline", filename: nil, expires: 60.seconds, immutable: false)
     path = File.expand_path(relative_path, DataPlane.root.to_s)
     unless path.start_with?(DataPlane.root.to_s + File::SEPARATOR) && File.file?(path)
       head :not_found
       return false
     end
-    response.headers["Cache-Control"] = cache_control
+    expires_in expires, public: true, **(immutable ? { immutable: true } : {})
     send_file(path, type: type, disposition: disposition, filename: filename)
     true
   end

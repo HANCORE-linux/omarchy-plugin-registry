@@ -64,19 +64,25 @@ module ApplicationHelper
     nil
   end
 
+  # Share cards and JSON payloads both need absolute URLs — a native client
+  # reading /plugins/acme/weather.json can't resolve a root-relative path.
+  def absolute_url(path)
+    return nil if path.blank?
+    "#{DataPlane.base_url}#{path}"
+  end
+
   DEFAULT_META_DESCRIPTION = "The Omarchy plugin registry — hosted, scanned, revocable. Browse, install, and publish plugins for Omarchy.".freeze
 
   # OpenGraph/Twitter tags with absolute URLs. Pages call this through
   # content_for(:social); the layout falls back to the site-wide card.
   def social_meta(title:, description:, image_path:, url_path:)
-    base = DataPlane.base_url
     safe_join([
       tag.meta(property: "og:type", content: "website"),
       tag.meta(property: "og:site_name", content: "Omarchy Plugins"),
       tag.meta(property: "og:title", content: title),
       tag.meta(property: "og:description", content: description),
-      tag.meta(property: "og:url", content: "#{base}#{url_path}"),
-      tag.meta(property: "og:image", content: "#{base}#{image_path}"),
+      tag.meta(property: "og:url", content: absolute_url(url_path)),
+      tag.meta(property: "og:image", content: absolute_url(image_path)),
       tag.meta(property: "og:image:width", content: 1200),
       tag.meta(property: "og:image:height", content: 630),
       tag.meta(name: "twitter:card", content: "summary_large_image"),

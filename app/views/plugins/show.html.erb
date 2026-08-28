@@ -6,33 +6,7 @@
      image_path: og_plugin_path(@publisher.name, @plugin.name),
      url_path: plugin_path(@publisher.name, @plugin.name)) %>
 
-<% if @privileged && !@plugin.ever_public? && !@plugin.security_holding? %>
-  <div class="notice-banner notice-banner--warning">
-    <strong>Not public yet.</strong> Nothing here has cleared review, so this page is visible only to
-    <%= @publisher.name %> members and admins. It goes public the moment a version releases.
-  </div>
-<% end %>
-<% if @plugin.security_holding? %>
-  <div class="notice-banner notice-banner--danger">
-    <strong>Security holding.</strong> This plugin was removed for malware and its name is permanently retired.
-    Every version is on the signed revocation list; clients disable installed copies when they next sync it.
-  </div>
-<% elsif @plugin.quarantined? %>
-  <div class="notice-banner notice-banner--warning">
-    <strong>Under review.</strong> This plugin is quarantined while our team investigates. It cannot be installed right now.
-  </div>
-<% elsif @revoked %>
-  <div class="notice-banner notice-banner--danger">
-    <strong>Security notice.</strong> One or more versions of this plugin are on the signed revocation list; clients disable affected installs when they next sync it.
-  </div>
-<% elsif (withdrawn = @versions.select(&:yanked?)).any? %>
-  <div class="notice-banner notice-banner--warning">
-    <strong>Withdrawn versions.</strong>
-    <% withdrawn.first(3).each do |version| %>
-      v<%= version.version %> was yanked<%= " — #{version.yank_reason}" if version.yank_reason.present? %>.
-    <% end %>
-  </div>
-<% end %>
+<%= render "shared/notices", notices: @notices %>
 
 <div class="page-head">
   <div class="container">

@@ -6,15 +6,12 @@
      image_path: og_plugin_path(@publisher.name, @plugin.name),
      url_path: plugin_version_path(@publisher.name, @plugin.name, @version.version)) %>
 
-<% if @version.yanked? %>
-  <div class="notice-banner notice-banner--warning">
-    <strong>Withdrawn.</strong> v<%= @version.version %> was yanked<%= " — #{@version.yank_reason}" if @version.yank_reason.present? %>.
-    It no longer resolves for new installs.
-  </div>
-<% elsif !@version.published? %>
-  <div class="notice-banner notice-banner--warning">
-    <strong><%= @version.state.humanize %>.</strong> This version has not cleared review — only publisher members and admins can see it.
-  </div>
+<%# Withdrawn / not-yet-cleared come from Registry::PluginNotices so the JSON
+    response carries the identical warning. "Older version" is navigation
+    chrome and stays here — it needs a link, and a JSON client compares against
+    the plugin's latest_version itself. %>
+<% if @notices.any? %>
+  <%= render "shared/notices", notices: @notices %>
 <% elsif @latest && @version.version != @latest.version %>
   <div class="notice-banner notice-banner--warning">
     <strong>Older version.</strong> You are viewing v<%= @version.version %> —

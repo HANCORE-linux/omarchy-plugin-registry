@@ -1,0 +1,8 @@
+<%# Renders Registry::PluginNotices output. The same list is emitted as JSON
+    on the .json responses, so the web page and a native browser can never
+    disagree about a takedown. %>
+<% notices.each do |notice| %>
+  <div class="notice-banner notice-banner--<%= notice.tone %>">
+    <strong><%= notice.title %></strong> <%= notice.body %>
+  </div>
+<% end %>
